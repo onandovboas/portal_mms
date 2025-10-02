@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard do Administrador</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <style>
+    :root { --gap: 1rem; }
+    .content-wrap { max-width: 1200px; }
+    .sticky-top-blur { position: sticky; top: 0; z-index: 1030; backdrop-filter: saturate(180%) blur(8px); background: rgba(255,255,255,.85); border-bottom: 1px solid rgba(0,0,0,.06); }
+
+    /* Tabelas viram cartões no mobile */
+    .table-card-stack thead {
+      background-color: #f8f9fa;
+    }
+    @media (max-width: 576px) {
+      .table-card-stack thead { display: none; }
+      .table-card-stack tbody tr { display: block; margin-bottom: .75rem; border: 1px solid rgba(0,0,0,.08); border-radius: .75rem; overflow: hidden; background: #fff; }
+      .table-card-stack tbody tr td { display: grid; grid-template-columns: 9rem 1fr; gap: .5rem; border: 0 !important; padding: .5rem .75rem !important; }
+      .table-card-stack tbody tr td::before { content: attr(data-label); font-weight: 600; color: #6c757d; }
+    }
+
+    .btn-wrap { gap: .5rem; }
+    @media (max-width: 576px) { .btn-wrap { display: grid; grid-template-columns: 1fr 1fr; } }
+
+    .card-section > .card-header h4 { margin: 0; font-size: 1rem; }
+  </style>
+</head>
+<body class="bg-light">
+
+  <header class="sticky-top-blur">
+    <div class="container content-wrap d-flex justify-content-between align-items-center py-2 flex-wrap gap-2">
+      <div>
+        <h1 class="h4 mb-0">Dashboard</h1>
+        <small class="text-muted">Administração</small>
+      </div>
+      <div class="btn-wrap d-flex align-items-center">
+        <a href="{% url 'relatorio_professores' %}" class="btn btn-secondary btn-sm">Relatório de Professores</a>
+        <a href="{% url 'venda_livro' %}" class="btn btn-info btn-sm">Vender Material</a>
+        <a href="{% url 'lancamento_recebimento' %}" class="btn btn-primary btn-sm">Lançar Recebimento</a>
+        <form action="{% url 'logout' %}" method="post" class="m-0">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-outline-danger btn-sm w-100">Sair</button>
+        </form>
+      </div>
+    </div>
+  </header>
+
+  <main class="container content-wrap mt-3">
+    <div class="accordion mb-3" id="dashboardAccordion">
+
+      <!-- Renovações (agora começa FECHADA) -->
+      <div class="accordion-item card-section">
+        <h2 class="accordion-header" id="headRenovacoes">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseRenovacoes" aria-expanded="false" aria-controls="collapseRenovacoes">
+            Alerta de Renovações (Próximos 30 dias)
+          </button>
+        </h2>
+        <div id="collapseRenovacoes" class="accordion-collapse collapse" aria-labelledby="headRenovacoes" data-bs-parent="#dashboardAccordion">
+          <div class="accordion-body">
+            <div class="table-responsive">
+              <table class="table table-hover mb-0 align-middle table-card-stack">
+                <thead class="table-light">
+                  <tr>
+                    <th scope="col">Aluno</th>
+                    <th scope="col">Telefone</th>
+                    <th scope="col">Plano</th>
+                    <th scope="col">Fim do Contrato</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for contrato in contratos_a_vencer %}
+                  <tr>
+                    <td data-label="Aluno">{{ contrato.aluno.nome_completo }}</td>
+                    <td data-label="Telefone">{{ contrato.aluno.telefone|default:"-" }}</td>
+                    <td data-label="Plano">{{ contrato.get_plano_display }}</td>
+                    <td data-label="Fim do Contrato">{{ contrato.data_fim|date:"d/m/Y" }}</td>
+                  </tr>
+                  {% empty %}
+                  <tr><td colspan="4" class="text-center text-muted">Nenhum contrato vencendo nos próximos 30 dias.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Faltas Pendentes -->
+      <div class="accordion-item card-section">
+        <h2 class="accordion-header" id="headFaltas">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFaltas" aria-expanded="false" aria-controls="collapseFaltas">
+            Acompanhamentos de Faltas Pendentes
+          </button>
+        </h2>
+        <div id="collapseFaltas" class="accordion-collapse collapse" aria-labelledby="headFaltas" data-bs-parent="#dashboardAccordion">
+          <div class="accordion-body">
+            {% for acompanhamento in acompanhamentos_pendentes %}
+            <form action="{% url 'resolver_acompanhamento' pk=acompanhamento.pk %}" method="post" class="mb-3 p-3 border rounded bg-white">
+              {% csrf_token %}
+              <p class="mb-1"><strong>Aluno:</strong> {{ acompanhamento.aluno.nome_completo }}</p>
+              <p class="mb-1"><strong>Telefone:</strong> {{ acompanhamento.aluno.telefone|default:'não cadastrado' }}</p>
+              <p class="mb-2 text-muted"><strong>Alerta:</strong> {{ acompanhamento.criado_em|date:"d/m/Y" }} – {{ acompanhamento.numero_de_faltas }} faltas consecutivas</p>
+              <div class="mb-2">
+                <label for="motivo-{{ acompanhamento.pk }}" class="form-label">Motivo das Faltas e Ações Tomadas</label>
+                <textarea name="motivo" id="motivo-{{ acompanhamento.pk }}" class="form-control" rows="2" placeholder="Ex.: contato realizado em 01/09, retorno combinado, justificativa de saúde"></textarea>
+              </div>
+              <div class="d-grid d-sm-flex gap-2"><button type="submit" class="btn btn-info btn-sm">Marcar como Resolvido</button></div>
+            </form>
+            {% empty %}
+            <p class="text-center text-muted">Nenhum acompanhamento de faltas pendente. Ótimo trabalho!</p>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Experimentais -->
+      <div class="accordion-item card-section">
+        <h2 class="accordion-header" id="headExperimental">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseExperimental" aria-expanded="false" aria-controls="collapseExperimental">
+            Alunos em Aula Experimental <span class="badge bg-info text-dark ms-2">{{ inscricoes_experimentais.count }}</span>
+          </button>
+        </h2>
+        <div id="collapseExperimental" class="accordion-collapse collapse" aria-labelledby="headExperimental" data-bs-parent="#dashboardAccordion">
+          <div class="accordion-body">
+            <div class="table-responsive">
+              <table class="table table-hover mb-0 align-middle table-card-stack">
+                <thead class="table-light">
+                  <tr>
+                    <th scope="col">Aluno</th>
+                    <th scope="col">Telefone</th>
+                    <th scope="col">Turma</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for inscricao in inscricoes_experimentais %}
+                  <tr>
+                    <td data-label="Aluno">{{ inscricao.aluno.nome_completo }}</td>
+                    <td data-label="Telefone">{{ inscricao.aluno.telefone|default:"-" }}</td>
+                    <td data-label="Turma">{{ inscricao.turma.nome }}</td>
+                  </tr>
+                  {% empty %}
+                  <tr><td colspan="3" class="text-center text-muted">Nenhum aluno em aula experimental no momento.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Saldos de Alunos REMOVIDO -->
+
+    <div id="financeiro-top" class="d-flex justify-content-between align-items-center my-3 flex-wrap gap-2">
+      <h3 class="h5 mb-0">Status Financeiro – {{ data_selecionada|date:"F \d\e Y" }}</h3>
+      <div class="btn-group btn-group-sm" role="group" aria-label="Navegar por mês">
+        <a href="{% url 'dashboard_admin' %}?ano={{ nav.ano_anterior }}&mes={{ nav.mes_anterior }}#financeiro-top" class="btn btn-outline-secondary" aria-label="Mês anterior" data-preserve-scroll>&larr;</a>
+        <a href="{% url 'dashboard_admin' %}?ano={{ nav.ano_seguinte }}&mes={{ nav.mes_seguinte }}#financeiro-top" class="btn btn-outline-secondary" aria-label="Próximo mês" data-preserve-scroll>&rarr;</a>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-body bg-white">
+        <form method="GET" class="row g-3 align-items-end" novalidate>
+          <input type="hidden" name="ano" value="{{ data_selecionada.year }}" />
+          <input type="hidden" name="mes" value="{{ data_selecionada.month }}" />
+          <div class="col-12 col-md-4">
+            <label for="turma" class="form-label">Filtrar por Turma</label>
+            <select name="turma" id="turma" class="form-select">
+              <option value="">Todas as Turmas</option>
+              {% for turma in todas_as_turmas %}
+                <option value="{{ turma.pk }}" {% if filtros_ativos.turma == turma.pk|stringformat:"s" %}selected{% endif %}>{{ turma.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12 col-md-4">
+            <label for="tipo" class="form-label">Filtrar por Tipo</label>
+            <select name="tipo" id="tipo" class="form-select">
+              <option value="">Todos os Tipos</option>
+              {% for tipo_valor, tipo_nome in tipos_de_pagamento %}
+                <option value="{{ tipo_valor }}" {% if filtros_ativos.tipo == tipo_valor %}selected{% endif %}>{{ tipo_nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12 col-md-4 d-grid d-md-flex gap-2">
+            <button type="submit" class="btn btn-primary">Filtrar</button>
+            <a href="{% url 'dashboard_admin' %}?ano={{ data_selecionada.year }}&mes={{ data_selecionada.month }}" class="btn btn-secondary">Limpar</a>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Pagamentos Pendentes -->
+    <section class="card mb-3 card-section" aria-labelledby="sec-pendentes">
+      <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+        <h4 id="sec-pendentes" class="mb-0">Pagamentos Pendentes</h4>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <label for="sort-pendentes" class="form-label m-0 small">Ordenar:</label>
+          <select id="sort-pendentes" class="form-select form-select-sm">
+            <option value="az" selected>Aluno A→Z</option>
+            <option value="za">Aluno Z→A</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <!-- FORM DE AÇÃO EM MASSA -->
+        <form method="post" action="{% url 'pagamentos_bulk' %}" id="bulk-pendentes-form" class="mb-2">
+          {% csrf_token %}
+          <!-- mantém exatamente mês/ano/filtros atuais -->
+          <input type="hidden" name="next" value="{% url 'dashboard_admin' %}?ano={{ data_selecionada.year }}&mes={{ data_selecionada.month }}{% if filtros_ativos.turma %}&turma={{ filtros_ativos.turma }}{% endif %}{% if filtros_ativos.tipo %}&tipo={{ filtros_ativos.tipo }}{% endif %}#financeiro-top">
+          <input type="hidden" name="action" value="quitar">
+
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            <button type="submit" id="bulk-quitar-btn" class="btn btn-success btn-sm" disabled>
+              Quitar selecionados <span class="badge bg-light text-dark" id="bulk-count">0</span>
+            </button>
+            <small class="text-muted">Selecione um ou mais registros abaixo e clique para quitar em massa.</small>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle table-card-stack" id="tabela-pendentes">
+              <thead class="table-light">
+                <tr>
+                  <!-- Coluna de seleção -->
+                  <th scope="col" style="width:2.5rem;">
+                    <input class="form-check-input" type="checkbox" id="check-all-pendentes" aria-label="Selecionar todos os pagamentos visíveis">
+                  </th>
+                  <th scope="col">Aluno</th>
+                  <th scope="col">Telefone</th>
+                  <th scope="col">Descrição</th>
+                  <th scope="col">Valor Total</th>
+                  <th scope="col">Valor Restante</th>
+                  <th scope="col">Vencimento</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Ação Rápida</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for pagamento in pagamentos_pendentes %}
+                  {% if pagamento.status == 'atrasado' %}<tr class="table-danger">
+                  {% elif pagamento.status == 'parcial' %}<tr class="table-warning">
+                  {% else %}<tr>{% endif %}
+
+                  <!-- checkbox por linha -->
+                  <td data-label="Selecionar">
+                    <input class="form-check-input bulk-row" type="checkbox" name="ids" value="{{ pagamento.id }}" aria-label="Selecionar pagamento de {{ pagamento.aluno.nome_completo }}">
+                  </td>
+
+                  <td data-label="Aluno">{{ pagamento.aluno.nome_completo }}</td>
+                  <td data-label="Telefone">{{ pagamento.aluno.telefone|default:"-" }}</td>
+                  <td data-label="Descrição">{{ pagamento.descricao }}</td>
+                  <td data-label="Valor Total">R$ {{ pagamento.valor|floatformat:2 }}</td>
+                  <td data-label="Valor Restante"><strong>R$ {{ pagamento.valor_restante|floatformat:2 }}</strong></td>
+                  <td data-label="Vencimento">{{ pagamento.data_vencimento|date:"d/m/Y" }}</td>
+                  <td data-label="Status">
+                    <span class="badge {% if pagamento.status == 'atrasado' %}bg-danger{% elif pagamento.status == 'parcial' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                      {{ pagamento.get_status_display }}
+                    </span>
+                  </td>
+                  <td data-label="Ação Rápida">
+                    <form action="{% url 'lancamento_recebimento' %}" method="post" class="d-grid">
+                      {% csrf_token %}
+                      <input type="hidden" name="aluno" value="{{ pagamento.aluno.pk }}">
+                      <input type="hidden" name="valor" value="{{ pagamento.valor_restante }}">
+                      <!-- mantém mês/ano/filtros atuais -->
+                      <input type="hidden" name="next" value="{% url 'dashboard_admin' %}?ano={{ data_selecionada.year }}&mes={{ data_selecionada.month }}{% if filtros_ativos.turma %}&turma={{ filtros_ativos.turma }}{% endif %}{% if filtros_ativos.tipo %}&tipo={{ filtros_ativos.tipo }}{% endif %}#financeiro-top">
+                      <button type="submit" class="btn btn-success btn-sm">
+                        Quitar (R$ {{ pagamento.valor_restante|floatformat:2 }})
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="9" class="text-center text-muted">Nenhum pagamento pendente para este mês.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </form> <!-- /FORM DE AÇÃO EM MASSA -->
+      </div>
+    </section>
+
+    <!-- Pagamentos Recebidos -->
+    <section class="card mb-4 card-section" aria-labelledby="sec-recebidos">
+      <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+        <h4 id="sec-recebidos" class="mb-0">Pagamentos Recebidos</h4>
+        <div class="d-flex align-items-center gap-2">
+          <label for="sort-recebidos" class="form-label m-0 small text-white-50">Ordenar:</label>
+          <select id="sort-recebidos" class="form-select form-select-sm">
+            <option value="az" selected>Aluno A→Z</option>
+            <option value="za">Aluno Z→A</option>
+          </select>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 align-middle table-card-stack">
+            <thead class="table-light">
+              <tr>
+                <th scope="col">Aluno</th>
+                <th scope="col">Descrição</th>
+                <th scope="col">Valor</th>
+                <th scope="col">Data Pagamento</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for pagamento in pagamentos_pagos %}
+              <tr>
+                <td data-label="Aluno">{{ pagamento.aluno.nome_completo }}</td>
+                <td data-label="Descrição">{{ pagamento.descricao }}</td>
+                <td data-label="Valor">R$ {{ pagamento.valor|floatformat:2 }}</td>
+                <td data-label="Data Pagamento">{{ pagamento.data_pagamento|date:"d/m/Y"|default:"-" }}</td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="4" class="text-center text-muted">Nenhum pagamento recebido para este mês.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // Preserva posição de rolagem ao trocar de mês e restaura após o reload
+    (function(){
+      const KEY = 'dash-scroll';
+      document.querySelectorAll('a[data-preserve-scroll]').forEach(a => {
+        a.addEventListener('click', () => {
+          sessionStorage.setItem(KEY, String(window.scrollY));
+        });
+      });
+      const y = sessionStorage.getItem(KEY);
+      if (y !== null) {
+        window.scrollTo(0, parseInt(y, 10) || 0);
+        sessionStorage.removeItem(KEY);
+      }
+    })();
+
+    // Seleção em massa (Pendentes)
+  (function(){
+    const checkAll = document.getElementById('check-all-pendentes');
+    const table = document.getElementById('tabela-pendentes');
+    const checks = () => Array.from(table.querySelectorAll('tbody .bulk-row'));
+    const btn = document.getElementById('bulk-quitar-btn');
+    const badge = document.getElementById('bulk-count');
+
+    function updateState(){
+      const selected = checks().filter(c => c.checked).length;
+      badge.textContent = String(selected);
+      btn.disabled = selected === 0;
+      // estado do "selecionar todos"
+      const total = checks().length;
+      checkAll.indeterminate = selected > 0 && selected < total;
+      checkAll.checked = selected > 0 && selected === total;
+    }
+
+    checkAll?.addEventListener('change', () => {
+      checks().forEach(c => { c.checked = checkAll.checked; });
+      updateState();
+    });
+
+    table?.addEventListener('change', (e) => {
+      if (e.target.classList?.contains('bulk-row')) updateState();
+    });
+
+    updateState();
+  })();
+
+  // Ordenação alfabética (Aluno) - Pendentes e Recebidos
+  (function(){
+    function sortSection(sectionTitleId, selectId){
+      const title = document.getElementById(sectionTitleId);
+      if (!title) return;
+      const section = title.closest('section');
+      const table = section?.querySelector('table');
+      const select = document.getElementById(selectId);
+      if (!table || !select) return;
+
+      function apply(){
+        const tbody = table.tBodies[0]; if (!tbody) return;
+        const rows = Array.from(tbody.rows);
+        rows.sort((a,b)=>{
+          const ta = (a.cells[1]?.innerText || a.cells[0]?.innerText || '').trim().toLowerCase(); // 1 = Aluno (pois 0 é checkbox nos pendentes)
+          const tb = (b.cells[1]?.innerText || b.cells[0]?.innerText || '').trim().toLowerCase();
+          return select.value === 'az' ? ta.localeCompare(tb) : tb.localeCompare(ta);
+        });
+        rows.forEach(r=>tbody.appendChild(r));
+      }
+      select.addEventListener('change', apply);
+      apply();
+    }
+    sortSection('sec-pendentes','sort-pendentes');
+    sortSection('sec-recebidos','sort-recebidos');
+  })();
+  </script>
+</body>
+</html>

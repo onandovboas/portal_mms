@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Portal do Professor</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <style>
+    :root { --gap: 1rem; }
+    .content-wrap { max-width: 1200px; }
+    .sticky-top-blur { position: sticky; top: 0; z-index: 1030; backdrop-filter: saturate(180%) blur(8px); background: rgba(255,255,255,.8); border-bottom: 1px solid rgba(0,0,0,.06); }
+    .card-link { text-decoration: none; color: inherit; }
+    .card.turma-card { transition: transform .15s ease, box-shadow .2s ease; }
+    .card.turma-card:hover, .card.turma-card:focus-within { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,.12); }
+    .badge-soft { background: #f8f9fa; color: #343a40; border: 1px solid #e9ecef; }
+    .grid-controls .form-select, .grid-controls .form-control { min-width: 10rem; }
+    @media (max-width: 576px) {
+      .grid-controls { gap: .5rem !important; }
+      .grid-controls .btn, .grid-controls .form-select, .grid-controls .form-control { width: 100%; }
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <!-- Header -->
+  <header class="sticky-top-blur">
+    <div class="container content-wrap d-flex justify-content-between align-items-center py-2">
+      <div class="d-flex flex-column">
+        <h1 class="h4 mb-0">Portal do Professor</h1>
+        <p class="mb-0 text-muted small">Bem-vindo, {{ user.get_full_name|default:user.username }}!</p>
+      </div>
+      <form action="{% url 'logout' %}" method="post" class="m-0">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-danger btn-sm">Sair</button>
+      </form>
+    </div>
+  </header>
+
+  <main class="container content-wrap my-3">
+    <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 grid-controls gap-2">
+      <h2 class="h5 mb-0">Suas turmas</h2>
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <div class="input-group" role="search" aria-label="Buscar turma">
+          <span class="input-group-text" id="addon-search" aria-hidden="true">🔎</span>
+          <input type="search" id="filtro-turmas" class="form-control" placeholder="Buscar por nome ou stage" aria-describedby="addon-search" />
+          <button type="button" class="btn btn-outline-secondary" id="limpar-filtro" aria-label="Limpar busca">Limpar</button>
+        </div>
+        <select id="ordenar-por" class="form-select" aria-label="Ordenar turmas por">
+          <option value="nome" selected>Ordenar: Nome (A→Z)</option>
+          <option value="stage">Ordenar: Stage (↑)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <small id="contador-resultado" class="text-muted" aria-live="polite"></small>
+      <!-- Espaço para ações futuras: criar turma, importar, etc.  -->
+    </div>
+
+    <div id="grid-turmas" class="row g-3">
+      {% for info in turmas_info %}
+        <div class="col-12 col-sm-6 col-lg-4 turma-col" data-nome="{{ info.turma.nome|lower }}" data-stage="{{ info.turma.stage|default:0 }}">
+          <a href="{% url 'detalhe_turma' pk=info.turma.pk %}" class="card-link" aria-label="Abrir turma {{ info.turma.nome }} (Stage {{ info.turma.stage }})">
+            <div class="card h-100 turma-card">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                  <div>
+                    <h3 class="h6 card-title mb-1 text-truncate" title="{{ info.turma.nome }}">{{ info.turma.nome }}</h3>
+                    <div class="text-muted small">Stage {{ info.turma.stage }}</div>
+                  </div>
+                  <!-- Inicial do nome como avatar simples (acessível) -->
+                  <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width:2rem;height:2rem;" aria-hidden="true">
+                    {{ info.turma.nome|first|upper }}
+                  </div>
+                </div>
+              </div>
+              <div class="card-footer bg-white">
+                <span class="badge bg-secondary me-1" aria-label="{{ info.matriculados_count }} matriculados">
+                  {{ info.matriculados_count }} Matriculado(s)
+                </span>
+                {% if info.experimentais_count > 0 %}
+                <span class="badge bg-info text-dark me-1" aria-label="{{ info.experimentais_count }} experimentais">
+                  {{ info.experimentais_count }} Experimental(is)
+                </span>
+                {% endif %}
+                {% if info.acompanhando_count > 0 %}
+                <span class="badge badge-soft me-1" aria-label="{{ info.acompanhando_count }} acompanhando">
+                  {{ info.acompanhando_count }} Acompanhando
+                </span>
+                {% endif %}
+              </div>
+            </div>
+          </a>
+        </div>
+      {% empty %}
+        <div class="col-12">
+          <div class="alert alert-light border" role="status">
+            Nenhuma turma cadastrada no momento.
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    (function(){
+      const grid = document.getElementById('grid-turmas');
+      const filtro = document.getElementById('filtro-turmas');
+      const limpar = document.getElementById('limpar-filtro');
+      const ordenar = document.getElementById('ordenar-por');
+      const contador = document.getElementById('contador-resultado');
+
+      function atualizaContador() {
+        const visiveis = grid.querySelectorAll('.turma-col:not([hidden])').length;
+        const total = grid.querySelectorAll('.turma-col').length;
+        contador.textContent = total ? `${visiveis} de ${total} turma(s)` : '';
+      }
+
+      function aplicaFiltroOrdenacao(){
+        const q = (filtro?.value || '').trim().toLowerCase();
+
+        // Filtrar
+        grid.querySelectorAll('.turma-col').forEach(col => {
+          const nome = (col.getAttribute('data-nome')||'').toLowerCase();
+          const stage = (col.getAttribute('data-stage')||'').toString();
+          const match = !q || nome.includes(q) || stage.includes(q);
+          col.hidden = !match;
+        });
+
+        // Ordenar (somente elementos visíveis, mas a ordem aplica no DOM inteiro para consistência)
+        const cols = Array.from(grid.children);
+        const criterio = ordenar?.value || 'nome';
+        cols.sort((a,b) => {
+          if (criterio === 'stage') {
+            return Number(a.getAttribute('data-stage')||0) - Number(b.getAttribute('data-stage')||0);
+          }
+          // nome
+          return (a.getAttribute('data-nome')||'').localeCompare(b.getAttribute('data-nome')||'');
+        }).forEach(el => grid.appendChild(el));
+
+        atualizaContador();
+      }
+
+      filtro?.addEventListener('input', aplicaFiltroOrdenacao);
+      ordenar?.addEventListener('change', aplicaFiltroOrdenacao);
+      limpar?.addEventListener('click', () => { if (!filtro) return; filtro.value=''; filtro.focus(); aplicaFiltroOrdenacao(); });
+
+      // Inicial
+      aplicaFiltroOrdenacao();
+    })();
+  </script>
+</body>
+</html>

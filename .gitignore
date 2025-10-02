@@ -1,0 +1,27 @@
+# Arquivo de segredos que nunca deve ser compartilhado
+.env
+
+# Arquivos de cache gerados pelo Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Ambiente Virtual
+# (Não enviamos a pasta inteira, o requirements.txt já diz o que instalar)
+venv/
+env/
+
+# Banco de Dados Local
+# (O servidor de produção terá seu próprio banco de dados zerado)
+db.sqlite3
+*.sqlite3
+
+# Arquivos de Sistema Operacional e Editores de Código
+.DS_Store
+.vscode/
+.idea/
+
+# Pastas de arquivos estáticos e de mídia
+# (Essas pastas são geradas e populadas no servidor)
+staticfiles/
+media/
