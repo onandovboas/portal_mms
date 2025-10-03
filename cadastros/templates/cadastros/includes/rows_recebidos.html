@@ -1,0 +1,14 @@
+{% for pagamento in items %}
+<tr>
+  <td data-label="Aluno"><a href="{% url 'perfil_aluno' pk=pagamento.aluno.pk %}">{{ pagamento.aluno.nome_completo }}</a></td>
+  <td data-label="Descrição">{{ pagamento.descricao }}</td>
+  <td data-label="Valor">R$ {{ pagamento.valor|floatformat:2 }}</td>
+  <td data-label="Data Pagamento">
+    {% if pagamento.data_pagamento %}
+      <time datetime="{{ pagamento.data_pagamento|date:'Y-m-d' }}">{{ pagamento.data_pagamento|date:"d/m/Y" }}</time>
+    {% else %}-{% endif %}
+  </td>
+</tr>
+{% empty %}
+<tr><td colspan="4" class="text-center text-muted">Nenhum pagamento recebido para este mês.</td></tr>
+{% endfor %}

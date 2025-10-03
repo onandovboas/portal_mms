@@ -1,0 +1,7 @@
+{% for inscricao in items %}
+<tr>
+  <td data-label="Aluno">{{ inscricao.aluno.nome_completo }}</td>
+  <td data-label="Telefone">{{ inscricao.aluno.telefone|default:"-" }}</td>
+  <td data-label="Turma">{{ inscricao.turma.nome }}</td>
+</tr>
+{% endfor %}

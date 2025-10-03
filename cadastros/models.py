@@ -2,7 +2,8 @@
 from django.db import models
 from django.contrib.auth.models import User # Vamos precisar do User para os Professores
 from dateutil.relativedelta import relativedelta 
-from datetime import date
+from datetime import date, timezone
+from django.utils import timezone
 
 # Aluno permanece quase o mesmo
 class Aluno(models.Model):
@@ -111,6 +112,14 @@ class Contrato(models.Model):
 
     def __str__(self):
         return f"Contrato {self.get_plano_display()} de {self.aluno.nome_completo}"
+    
+    @property
+    def valor_total_contrato(self):
+        if self.plano == 'anual':
+            return self.valor_mensalidade * 12
+        elif self.plano == 'semestral':
+            return self.valor_mensalidade * 6
+        return self.valor_mensalidade # Para planos flexíveis, o total é apenas uma mensalidade
 
 
 class Pagamento(models.Model):
@@ -161,3 +170,39 @@ class AcompanhamentoFalta(models.Model):
 
     def __str__(self):
         return f"Acompanhamento de {self.aluno.nome_completo} - {self.get_status_display()}"
+    
+
+class TesteStage(models.Model):
+    aluno = models.ForeignKey(Aluno, on_delete=models.CASCADE, related_name="testes_stage")
+    turma = models.ForeignKey(Turma, on_delete=models.CASCADE)
+    data_teste = models.DateField(default=timezone.now)
+    stage_atingido = models.IntegerField("Stage Atingido")
+    observacoes = models.TextField("Observações", blank=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-data_teste', '-criado_em']
+    
+    def __str__(self):
+        return f"Teste Stage {self.stage_atingido} - {self.aluno.nome_completo}"
+
+class HorarioAula(models.Model):
+    DIA_CHOICES = [
+        (0, 'Segunda-feira'),
+        (1, 'Terça-feira'),
+        (2, 'Quarta-feira'),
+        (3, 'Quinta-feira'),
+        (4, 'Sexta-feira'),
+        (5, 'Sábado'),
+        (6, 'Domingo'),
+    ]
+    turma = models.ForeignKey(Turma, on_delete=models.CASCADE, related_name="horarios")
+    dia_semana = models.IntegerField("Dia da semana", choices=DIA_CHOICES)
+    horario_inicio = models.TimeField("Horário de Início")
+    horario_fim = models.TimeField("Horário de Fim", null=True, blank=True)
+
+    class Meta:
+        ordering = ['dia_semana', 'horario_inicio'] # Ordena os horários
+
+    def __str__(self):
+        return f"{self.turma.nome} - {self.get_dia_semana_display()} às {self.horario_inicio.strftime('%H:%M')}"

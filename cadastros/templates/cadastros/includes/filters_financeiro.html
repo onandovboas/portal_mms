@@ -1,0 +1,30 @@
+<div class="card mb-3">
+  <div class="card-body bg-white">
+    <form method="GET" class="row g-3 align-items-end" novalidate>
+      <input type="hidden" name="ano" value="{{ data_selecionada.year }}" />
+      <input type="hidden" name="mes" value="{{ data_selecionada.month }}" />
+      <div class="col-12 col-md-4">
+        <label for="turma" class="form-label">Filtrar por Turma</label>
+        <select name="turma" id="turma" class="form-select">
+          <option value="">Todas as Turmas</option>
+          {% for turma in todas_as_turmas %}
+            <option value="{{ turma.pk }}" {% if filtros_ativos.turma == turma.pk|stringformat:"s" %}selected{% endif %}>{{ turma.nome }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-4">
+        <label for="tipo" class="form-label">Filtrar por Tipo</label>
+        <select name="tipo" id="tipo" class="form-select">
+          <option value="">Todos os Tipos</option>
+          {% for tipo_valor, tipo_nome in tipos_de_pagamento %}
+            <option value="{{ tipo_valor }}" {% if filtros_ativos.tipo == tipo_valor %}selected{% endif %}>{{ tipo_nome }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-4 d-grid d-md-flex gap-2">
+        <button type="submit" class="btn btn-primary">Filtrar</button>
+        <a href="{% url 'dashboard_admin' %}?ano={{ data_selecionada.year }}&mes={{ data_selecionada.month }}" class="btn btn-secondary">Limpar</a>
+      </div>
+    </form>
+  </div>
+</div>

@@ -3,34 +3,46 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from .models import Turma, Inscricao, RegistroAula, Professor, Presenca, Pagamento, Contrato, AcompanhamentoFalta, Aluno
+from .forms import AlunoForm
 from django.utils import timezone
 from datetime import date, timedelta
-from django.db.models import Count
+from django.db.models import Q, Count
 from decimal import Decimal
 from dateutil.relativedelta import relativedelta 
 import calendar
 from django.db.models import Sum, F, DecimalField
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
-
-
+from django.shortcuts import get_object_or_404, render, redirect
+import csv
+from django.utils.encoding import smart_str
+from django.http import HttpResponse, HttpResponseRedirect
+from django.urls import reverse
+from django.contrib import messages
+from django.db.models.functions import ExtractWeek
+from datetime import datetime, timedelta
 
 
 # --- Views do Portal do Professor ---
 
+
 @login_required
 @login_required
 def portal_professor(request):
-    turmas_qs = Turma.objects.all().order_by('nome')
+    # 👇 A MUDANÇA ESTÁ NESTA LINHA 👇
+    turmas_qs = Turma.objects.all().prefetch_related(
+        'inscricao_set__aluno',  # Isso já existia
+        'horarios'               # <-- Adicionamos isso para buscar os horários
+    ).order_by('nome')
     
     turmas_info = []
     for turma in turmas_qs:
-        # Agora contamos os 3 status
         turmas_info.append({
             'turma': turma,
             'matriculados_count': turma.inscricao_set.filter(status='matriculado').count(),
             'experimentais_count': turma.inscricao_set.filter(status='experimental').count(),
             'acompanhando_count': turma.inscricao_set.filter(status='acompanhando').count(),
+            # O objeto 'turma' já vem com seus horários "anexados" graças ao prefetch_related
         })
 
     context = {
@@ -132,35 +144,54 @@ def detalhe_turma(request, pk):
 def dashboard_admin(request):
     hoje = timezone.now().date()
     
-    # --- LÓGICA DE FILTRO DE DATA (sem alterações) ---
+    # --- LÓGICA DE FILTRO DE DATA ---
     ano_param = request.GET.get('ano') or hoje.year
     mes_param = request.GET.get('mes') or hoje.month
     ano_selecionado = int(ano_param)
     mes_selecionado = int(mes_param)
     data_selecionada = date(ano_selecionado, mes_selecionado, 1)
 
-    # --- Lógica de Navegação (sem alterações) ---
+    # --- Lógica de Navegação ---
     mes_anterior = (data_selecionada.month - 2 + 12) % 12 + 1
     ano_anterior = data_selecionada.year if data_selecionada.month > 1 else data_selecionada.year - 1
     mes_seguinte = data_selecionada.month % 12 + 1
     ano_seguinte = data_selecionada.year if data_selecionada.month < 12 else data_selecionada.year + 1
 
-    # --- Lógica para Capturar Filtros Adicionais (sem alterações) ---
+    # --- Lógica para Capturar Filtros Adicionais ---
     turma_filtrada_id = request.GET.get('turma')
     tipo_filtrado = request.GET.get('tipo')
 
-    # --- Lógica de Busca de Dados (sem alterações) ---
+    # --- DEFINIR data_limite_renovacao ANTES de usar ---
+    data_limite_renovacao = hoje + timedelta(days=30)
+
+    # --- Consultas otimizadas ---
     pagamentos_pendentes = Pagamento.objects.filter(
         status__in=['pendente', 'parcial', 'atrasado'],
         mes_referencia__year=ano_selecionado,
         mes_referencia__month=mes_selecionado
-    )
+    ).select_related('aluno', 'contrato')
+
     pagamentos_pagos = Pagamento.objects.filter(
         status='pago',
         mes_referencia__year=ano_selecionado,
         mes_referencia__month=mes_selecionado
-    )
+    ).select_related('aluno', 'contrato')
 
+    contratos_a_vencer = Contrato.objects.filter(
+        ativo=True, 
+        data_fim__gte=hoje, 
+        data_fim__lte=data_limite_renovacao
+    ).select_related('aluno').order_by('data_fim')
+
+    acompanhamentos_pendentes = AcompanhamentoFalta.objects.filter(
+        status='pendente'
+    ).select_related('aluno').order_by('criado_em')
+
+    inscricoes_experimentais = Inscricao.objects.filter(
+        status='experimental'
+    ).select_related('aluno', 'turma')
+
+    # Aplicar filtros adicionais se existirem
     if turma_filtrada_id:
         alunos_da_turma = Inscricao.objects.filter(turma__id=turma_filtrada_id).values_list('aluno__id', flat=True)
         pagamentos_pendentes = pagamentos_pendentes.filter(aluno__id__in=alunos_da_turma)
@@ -173,12 +204,12 @@ def dashboard_admin(request):
     pagamentos_pendentes = pagamentos_pendentes.order_by('aluno__nome_completo')
     pagamentos_pagos = pagamentos_pagos.order_by('-data_pagamento')
 
-    data_limite_renovacao = hoje + timedelta(days=30)
-    contratos_a_vencer = Contrato.objects.filter(ativo=True, data_fim__gte=hoje, data_fim__lte=data_limite_renovacao).order_by('data_fim')
-    acompanhamentos_pendentes = AcompanhamentoFalta.objects.filter(status='pendente').order_by('criado_em')
-    inscricoes_experimentais = Inscricao.objects.filter(status='experimental')
-    
-    # O CONTEXTO FOI SIMPLIFICADO - REMOVEMOS AS BUSCAS POR SALDO DE CRÉDITO/DÉBITO
+    # Preparar headers para as tabelas
+    headers_renovacoes = ["Aluno", "Telefone", "Plano", "Fim do Contrato"]
+    headers_experimentais = ["Aluno", "Telefone", "Turma"]
+    headers_pendentes = ["Aluno", "Telefone", "Descrição", "Valor Restante", "Vencimento", "Status", "Ação Rápida"]
+    headers_recebidos = ["Aluno", "Descrição", "Valor", "Data Pagamento"]
+
     context = {
         'pagamentos_pendentes': pagamentos_pendentes,
         'pagamentos_pagos': pagamentos_pagos,
@@ -187,15 +218,24 @@ def dashboard_admin(request):
         'acompanhamentos_pendentes': acompanhamentos_pendentes,
         'inscricoes_experimentais': inscricoes_experimentais,
         'nav': {
-            'mes_anterior': mes_anterior, 'ano_anterior': ano_anterior,
-            'mes_seguinte': mes_seguinte, 'ano_seguinte': ano_seguinte,
+            'mes_anterior': mes_anterior, 
+            'ano_anterior': ano_anterior,
+            'mes_seguinte': mes_seguinte, 
+            'ano_seguinte': ano_seguinte,
         },
         'todas_as_turmas': Turma.objects.all(),
         'tipos_de_pagamento': Pagamento.TIPO_CHOICES,
-        'filtros_ativos': { 'turma': turma_filtrada_id, 'tipo': tipo_filtrado }
+        'filtros_ativos': { 
+            'turma': turma_filtrada_id, 
+            'tipo': tipo_filtrado 
+        },
+        "headers_renovacoes": headers_renovacoes,
+        "headers_experimentais": headers_experimentais,
+        "headers_pendentes": headers_pendentes,
+        "headers_recebidos": headers_recebidos,
     }
-    return render(request, 'cadastros/dashboard.html', context)
 
+    return render(request, 'cadastros/dashboard.html', context)
 
 
 @login_required
@@ -243,31 +283,62 @@ def lancamento_recebimento(request):
 
 @login_required
 def relatorio_pagamento_professores(request):
-    # Lógica de Filtro de Data (igual ao dashboard)
+    # --- Parte 1: Lógica de Filtro e Navegação (sem alterações) ---
     hoje = timezone.now().date()
     ano_selecionado = int(request.GET.get('ano', hoje.year))
     mes_selecionado = int(request.GET.get('mes', hoje.month))
     data_selecionada = date(ano_selecionado, mes_selecionado, 1)
 
-    # Lógica de Navegação de Meses
     mes_anterior = (data_selecionada.month - 2 + 12) % 12 + 1
     ano_anterior = data_selecionada.year if data_selecionada.month > 1 else data_selecionada.year - 1
     mes_seguinte = data_selecionada.month % 12 + 1
     ano_seguinte = data_selecionada.year if data_selecionada.month < 12 else data_selecionada.year + 1
 
-    # A MÁGICA DA CONTAGEM ACONTECE AQUI
-    # Filtra os registros de aula pelo mês/ano, agrupa por professor e conta quantos registros cada um tem.
-    relatorio = RegistroAula.objects.filter(
+    # --- Parte 2: Nova Consulta ao Banco de Dados ---
+    # Agora, extraímos o número da semana e agrupamos por professor E por semana.
+    relatorio_flat = RegistroAula.objects.filter(
         data_aula__year=ano_selecionado,
         data_aula__month=mes_selecionado
-    ).values(
-        'professor__nome_completo' # Agrupa pelo nome do professor
     ).annotate(
-        aulas_dadas=Count('id') # Conta a quantidade de aulas (id) para cada grupo
-    ).order_by('-aulas_dadas') # Ordena do que deu mais aulas para o que deu menos
+        semana=ExtractWeek('data_aula')  # Extrai o número da semana do ano
+    ).values(
+        'professor__nome_completo', 'semana'
+    ).annotate(
+        aulas_dadas=Count('id')
+    ).order_by('professor__nome_completo', 'semana')
+
+    # --- Parte 3: Processamento dos Dados em Python ---
+    # Transformamos a lista "plana" em um dicionário aninhado para facilitar a renderização.
+    relatorio_processado = {}
+    for item in relatorio_flat:
+        professor = item['professor__nome_completo']
+        semana = item['semana']
+        aulas = item['aulas_dadas']
+        
+        # Lógica para encontrar o início e fim da semana
+        primeiro_dia_ano = date(ano_selecionado, 1, 1)
+        # Ajuste para a semana começar na segunda-feira
+        if primeiro_dia_ano.weekday() > 0:
+            primeiro_dia_ano -= timedelta(days=primeiro_dia_ano.weekday())
+        
+        inicio_semana = primeiro_dia_ano + timedelta(weeks=semana - 1)
+        fim_semana = inicio_semana + timedelta(days=6)
+
+        if professor not in relatorio_processado:
+            relatorio_processado[professor] = {
+                'semanas': {},
+                'total_mensal': 0
+            }
+        
+        relatorio_processado[professor]['semanas'][semana] = {
+            'aulas': aulas,
+            'inicio': inicio_semana,
+            'fim': fim_semana
+        }
+        relatorio_processado[professor]['total_mensal'] += aulas
 
     context = {
-        'relatorio': relatorio,
+        'relatorio': relatorio_processado, # Enviamos o dicionário processado
         'data_selecionada': data_selecionada,
         'nav': {
             'mes_anterior': mes_anterior, 'ano_anterior': ano_anterior,
@@ -337,3 +408,189 @@ def pagamentos_bulk(request):
     if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
         return redirect(next_url)
     return redirect('dashboard_admin')
+
+@login_required
+def quitar_pagamento_especifico(request, pk):
+    # 1. Encontra o pagamento EXATO que foi clicado, usando o ID (pk).
+    pagamento = get_object_or_404(Pagamento, pk=pk)
+
+    # 2. Define a cobrança como totalmente paga, atualizando os campos necessários.
+    pagamento.status = 'pago'
+    pagamento.valor_pago = pagamento.valor
+    pagamento.data_pagamento = timezone.now().date()
+    pagamento.save()
+
+    # 3. Redireciona o usuário de volta para o dashboard.
+    return redirect('dashboard_admin')
+
+@login_required
+def perfil_aluno(request, pk):
+    # CONSULTA OTIMIZADA - Evita problemas N+1
+    aluno = get_object_or_404(
+        Aluno.objects.prefetch_related(
+            'contratos',
+            'pagamentos',
+            'acompanhamentos',
+            'presenca_set__registro_aula__turma',
+            'inscricao_set__turma'
+        ), 
+        pk=pk
+    )
+
+    # Contrato ativo
+    contrato_ativo = (Contrato.objects
+                      .filter(aluno=aluno, ativo=True)
+                      .filter(Q(data_fim__gte=timezone.now()) | Q(data_fim__isnull=True))
+                      .order_by('-data_inicio')
+                      .first())
+
+    # HISTÓRICO DE TURMAS - Nova funcionalidade
+    historico_turmas = (Inscricao.objects
+                        .filter(aluno=aluno)
+                        .select_related('turma')
+                        .order_by('-id'))
+
+    # ACOMPANHAMENTOS
+    acompanhamentos = (AcompanhamentoFalta.objects
+                       .filter(aluno=aluno)
+                       .order_by('-criado_em'))
+
+    # ESTATÍSTICAS DE FREQUÊNCIA
+    presencas_stats = Presenca.objects.filter(aluno=aluno).aggregate(
+        total_aulas=Count('id'),
+        total_presencas=Count('id', filter=Q(presente=True)),
+        total_faltas=Count('id', filter=Q(presente=False))
+    )
+    
+    # Calcular percentual de frequência
+    total_aulas = presencas_stats['total_aulas'] or 1  # Evita divisão por zero
+    percentual_frequencia = (presencas_stats['total_presencas'] / total_aulas) * 100
+
+    # Pagamentos
+    pagamentos = (Pagamento.objects
+                  .filter(aluno=aluno)
+                  .order_by('-data_vencimento'))
+
+    kpis = pagamentos.aggregate(
+        pendentes=Count('id', filter=Q(status='pendente')),
+        atrasados=Count('id', filter=Q(status='atrasado')),
+    )
+
+    # DADOS PARA GRÁFICO DE FREQUÊNCIA (ÚLTIMOS 6 MESES)
+    meses_frequencia = []
+    hoje = timezone.now().date()
+    
+    for i in range(5, -1, -1):  # Últimos 6 meses
+        mes_data = hoje - relativedelta(months=i)
+        mes_inicio = mes_data.replace(day=1)
+        if i == 0:
+            mes_fim = hoje
+        else:
+            mes_fim = mes_inicio + relativedelta(months=1) - timedelta(days=1)
+        
+        # Calcular frequência do mês
+        presencas_mes = Presenca.objects.filter(
+            aluno=aluno,
+            registro_aula__data_aula__range=[mes_inicio, mes_fim]
+        ).aggregate(
+            total=Count('id'),
+            presentes=Count('id', filter=Q(presente=True))
+        )
+        
+        total_mes = presencas_mes['total'] or 0
+        presentes_mes = presencas_mes['presentes'] or 0
+        percentual_mes = (presentes_mes / total_mes * 100) if total_mes > 0 else 0
+        
+        meses_frequencia.append({
+            'mes': mes_inicio.strftime('%b/%Y'),
+            'percentual': round(percentual_mes, 1),
+            'aulas': total_mes,
+            'presencas': presentes_mes
+        })
+
+    context = {
+        'meses_frequencia': meses_frequencia,
+        'aluno': aluno,
+        'contrato_ativo': contrato_ativo,
+        'historico_turmas': historico_turmas,
+        'acompanhamentos': acompanhamentos,
+        'presencas_stats': presencas_stats,
+        'percentual_frequencia': percentual_frequencia,
+        'pagamentos': pagamentos,
+        'kpis': kpis,
+    }
+
+    return render(request, 'cadastros/perfil_aluno.html', context)
+@login_required
+def exportar_pagamentos_aluno(request, pk):
+    aluno = get_object_or_404(Aluno, pk=pk)
+    qs = (Pagamento.objects
+          .filter(aluno=aluno)
+          .order_by('-data_vencimento'))
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    filename = f"pagamentos_{aluno.nome_completo.replace(' ', '_')}.csv"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+    writer = csv.writer(response)
+    writer.writerow([
+        'Aluno', 'Descrição', 'Tipo', 'Valor', 'Status',
+        'Mês de Referência', 'Vencimento', 'Data Pagamento', 'Valor Pago', 'Contrato ID'
+    ])
+    for p in qs:
+        writer.writerow([
+            smart_str(aluno.nome_completo),
+            smart_str(p.descricao),
+            p.get_tipo_display(),
+            f"{p.valor:.2f}",
+            p.get_status_display(),
+            p.mes_referencia.strftime("%Y-%m-%d") if p.mes_referencia else "",
+            p.data_vencimento.strftime("%Y-%m-%d") if p.data_vencimento else "",
+            p.data_pagamento.strftime("%Y-%m-%d") if p.data_pagamento else "",
+            f"{p.valor_pago:.2f}",
+            p.contrato_id or "",
+        ])
+    return response
+
+@login_required
+def novo_pagamento(request, pk):
+    """
+    Atalho: redireciona para o formulário de lançamento existente,
+    pré-selecionando o aluno via querystring e definindo 'next' para voltar ao perfil.
+    """
+    # se você já tem a rota 'lancamento_recebimento' no urls do projeto, isso funciona:
+    next_url = reverse('cadastros:perfil_aluno', args=[pk]) if request.resolver_match.namespace == 'cadastros' else reverse('perfil_aluno', args=[pk])
+    lancamento_url = reverse('lancamento_recebimento')  # essa rota está no urls do projeto raiz
+    return HttpResponseRedirect(f"{lancamento_url}?aluno={pk}&next={next_url}")
+
+
+
+
+def formulario_inscricao(request):
+    # Por enquanto, esta view apenas exibe a página.
+    # A lógica para salvar os dados virá depois.
+    if request.method == 'POST':
+        # Ação de salvar os dados virá aqui.
+        pass
+
+    return render(request, 'cadastros/inscricao_form.html')
+
+@login_required
+def editar_aluno(request, pk):
+    aluno = get_object_or_404(Aluno, pk=pk)
+
+    if request.method == "POST":
+        form = AlunoForm(request.POST, instance=aluno)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Dados do aluno atualizados com sucesso.")
+            return redirect("cadastros:perfil_aluno", pk=aluno.pk) if request.resolver_match.namespace == "cadastros" else redirect("perfil_aluno", pk=aluno.pk)
+        else:
+            messages.error(request, "Corrija os campos destacados e tente novamente.")
+    else:
+        form = AlunoForm(instance=aluno)
+
+    return render(request, "cadastros/editar_aluno.html", {
+        "form": form,
+        "aluno": aluno,
+    })

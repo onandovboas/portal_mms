@@ -1,0 +1,17 @@
+:root { --gap: 1rem; }
+.content-wrap { max-width: 1200px; }
+.sticky-top-blur { position: sticky; top: 0; z-index: 1030; backdrop-filter: saturate(180%) blur(8px); background: rgba(255,255,255,.85); border-bottom: 1px solid rgba(0,0,0,.06); }
+.btn-wrap { gap: .5rem; }
+@media (max-width: 576px) { .btn-wrap { display: grid; grid-template-columns: 1fr 1fr; } }
+.card-section > .card-header h4 { margin: 0; font-size: 1rem; }
+/* Tabelas viram cartões no mobile */
+.table-card-stack thead { background-color: #f8f9fa; }
+@media (max-width: 576px) {
+.table-card-stack thead { display: none; }
+.table-card-stack tbody tr { display: block; margin-bottom: .75rem; border: 1px solid rgba(0,0,0,.08); border-radius: .75rem; overflow: hidden; background: #fff; }
+.table-card-stack tbody tr td { display: grid; grid-template-columns: 9rem 1fr; gap: .5rem; border: 0 !important; padding: .5rem .75rem !important; }
+.table-card-stack tbody tr td::before { content: attr(data-label); font-weight: 600; color: #6c757d; }
+}
+/* Acessibilidade e foco */
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+.table-card-stack tbody tr:focus-within { outline: 2px solid rgba(13,110,253,.35); outline-offset: 2px; }

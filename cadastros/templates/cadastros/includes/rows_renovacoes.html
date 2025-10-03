@@ -1,0 +1,8 @@
+{% for contrato in items %}
+<tr>
+  <td data-label="Aluno"><a href="{% url 'perfil_aluno' pk=contrato.aluno.pk %}">{{ contrato.aluno.nome_completo }}</a></td>
+  <td data-label="Telefone">{{ contrato.aluno.telefone|default:"-" }}</td>
+  <td data-label="Plano">{{ contrato.get_plano_display }}</td>
+  <td data-label="Fim do Contrato"><time datetime="{{ contrato.data_fim|date:'Y-m-d' }}">{{ contrato.data_fim|date:"d/m/Y" }}</time></td>
+</tr>
+{% endfor %}

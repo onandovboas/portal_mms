@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Perfil de {{ aluno.nome_completo }}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --radius: 1rem; }
+    body { background: #f6f7fb; }
+    .avatar{width:48px;height:48px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-weight:600;background:#e9f2ff;color:#0d6efd;}
+    .card{border:0;border-radius:var(--radius);}
+    .card-header{border-bottom:1px solid rgba(0,0,0,.06);}
+    .rounded-3{border-radius:var(--radius)!important;}
+    .card-section-title{font-size:.9rem;letter-spacing:.02em;color:#6c757d;text-transform:uppercase;}
+    .table-sticky thead th{position:sticky;top:0;background:#fff;z-index:2;}
+    .kpi{border-left:4px solid var(--bs-primary);}
+    .kpi.warn{border-left-color:var(--bs-warning);}
+    .kpi.danger{border-left-color:var(--bs-danger);}
+    .empty-state{padding:3rem 1rem;text-align:center;color:#6c757d;}
+    .badge-soft{background:#eef2ff;color:#0d6efd;}
+    .badge-soft.success{background:#e8f5e9;color:#198754;}
+    .badge-soft.warning{background:#fff3cd;color:#7a5a00;}
+    .badge-soft.danger{background:#fdecea;color:#842029;}
+    .shadow-sm{box-shadow:0 8px 24px rgba(0,0,0,.04)!important;}
+    .btn-icon{display:inline-flex;align-items:center;gap:.4rem}
+  </style>
+</head>
+<body>
+  <div class="container my-4">
+
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-3">
+        <li class="breadcrumb-item"><a href="{% url 'dashboard_admin' %}">Dashboard</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{{ aluno.nome_completo }}</li>
+      </ol>
+    </nav>
+
+    <!-- Header -->
+    <header class="d-flex align-items-center justify-content-between bg-white rounded-3 p-3 shadow-sm">
+      <div class="d-flex align-items-center gap-3">
+        <div class="avatar" aria-hidden="true">
+          {% with aluno.nome_completo|slice:":1" as ini1 %}{{ ini1|upper }}{% endwith %}
+        </div>
+        <div>
+          <h1 class="h4 mb-1">Perfil do Aluno</h1>
+          <div class="text-muted small">
+            {{ aluno.nome_completo }} &middot; Cliente desde
+            <time datetime="{{ aluno.data_matricula|date:'Y-m-d' }}">{{ aluno.data_matricula|date:"d/m/Y" }}</time>
+          </div>
+        </div>
+      </div>
+      <div class="d-flex gap-2">
+        {% url 'editar_aluno' aluno.pk as editar_url %}
+        {% if editar_url %}
+          <a href="{{ editar_url }}" class="btn btn-outline-secondary btn-icon" aria-label="Editar aluno">
+            <i class="bi bi-pencil-square"></i><span>Editar</span>
+          </a>
+        {% else %}
+          <button type="button" class="btn btn-outline-secondary" disabled aria-disabled="true">
+            <i class="bi bi-pencil-square me-1"></i> Editar
+          </button>
+        {% endif %}
+      </div>
+    </header>
+
+    <!-- KPIs -->
+    <section class="row g-3 mt-3">
+      <div class="col-12 col-md-4">
+        <div class="card kpi shadow-sm">
+          <div class="card-body">
+            <div class="card-section-title">Mensalidade</div>
+            <div class="d-flex align-items-end justify-content-between">
+              <div>
+                <div class="h4 mb-0">
+                  {% if contrato_ativo %}
+                    <p class="mb-1"><strong>Plano:</strong> {{ contrato_ativo.get_plano_display }}</p>
+                    <p class="mb-2"><strong>Vigência:</strong>
+                      {% if contrato_ativo.data_fim %}
+                        <time datetime="{{ contrato_ativo.data_inicio|date:'Y-m-d' }}">{{ contrato_ativo.data_inicio|date:"d/m/Y" }}</time>
+                        a
+                        <time datetime="{{ contrato_ativo.data_fim|date:'Y-m-d' }}">{{ contrato_ativo.data_fim|date:"d/m/Y" }}</time>
+                      {% else %}
+                        Desde <time datetime="{{ contrato_ativo.data_inicio|date:'Y-m-d' }}">{{ contrato_ativo.data_inicio|date:"d/m/Y" }}</time> (sem data de término)
+                      {% endif %}
+                    </p>
+                    <hr class="my-2">
+                    <p class="mb-1"><strong>Valor Mensalidade:</strong> R$ {{ contrato_ativo.valor_mensalidade|floatformat:2 }}</p>
+                    {% if contrato_ativo.valor_matricula %}
+                      <p class="mb-1"><strong>Valor Matrícula:</strong> R$ {{ contrato_ativo.valor_matricula|floatformat:2 }}</p>
+                    {% endif %}
+                    {% if contrato_ativo.parcelas_matricula %}
+                      <p class="mb-0"><strong>Parcelas Matrícula:</strong> {{ contrato_ativo.parcelas_matricula }}x</p>
+                    {% endif %}
+                  {% else %}
+                    <div class="empty-state text-center p-3">
+                      <i class="bi bi-file-earmark-x fs-1 d-block mb-2"></i>
+                      <p class="mb-2">Nenhum contrato ativo no momento.</p>
+                    </div>
+                  {% endif %}
+                </div>
+                <small class="text-muted">Plano atual</small>
+              </div>
+              <i class="bi bi-cash-coin fs-3 text-muted"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-md-4">
+        <div class="card kpi warn shadow-sm">
+          <div class="card-body">
+            <div class="card-section-title">Pagamentos em Aberto</div>
+            <div class="d-flex align-items-end justify-content-between">
+              <div>
+                <div class="h4 mb-0">{{ kpis.pendentes|default:0 }}</div>
+                <small class="text-muted">Pendências</small>
+              </div>
+              <i class="bi bi-receipt fs-3 text-muted"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-md-4">
+        <div class="card kpi danger shadow-sm">
+          <div class="card-body">
+            <div class="card-section-title">Atrasados</div>
+            <div class="d-flex align-items-end justify-content-between">
+              <div>
+                <div class="h4 mb-0">{{ kpis.atrasados|default:0 }}</div>
+                <small class="text-muted">Necessitam ação</small>
+              </div>
+              <i class="bi bi-exclamation-triangle fs-3 text-muted"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main content -->
+    <div class="row g-4 mt-1">
+      <!-- Left column -->
+      <div class="col-lg-4">
+        <!-- Dados Cadastrais -->
+        <div class="card shadow-sm">
+          <div class="card-header bg-white">
+            <h2 class="h6 mb-0">Dados Cadastrais</h2>
+          </div>
+          <div class="card-body">
+            <dl class="row mb-0">
+              <dt class="col-5">E-mail</dt>
+              <dd class="col-7">
+                {% if aluno.email %}
+                  <a href="mailto:{{ aluno.email }}" class="text-decoration-none">{{ aluno.email }}</a>
+                {% else %}
+                  <span class="text-muted">Não informado</span>
+                {% endif %}
+              </dd>
+
+              <dt class="col-5">Telefone</dt>
+              <dd class="col-7">
+                {% if aluno.telefone %}
+                  <div class="d-flex align-items-center gap-2">
+                    <a href="tel:{{ aluno.telefone }}" class="text-decoration-none">{{ aluno.telefone }}</a>
+                    <a class="btn btn-outline-success btn-sm" target="_blank" rel="noopener"
+                       href="https://wa.me/{{ aluno.telefone|slugify }}" aria-label="Abrir WhatsApp">
+                      <i class="bi bi-whatsapp"></i>
+                    </a>
+                  </div>
+                {% else %}
+                  <span class="text-muted">Não informado</span>
+                {% endif %}
+              </dd>
+
+              <dt class="col-5">Status</dt>
+              <dd class="col-7">
+                {% with aluno.get_status_display as st %}
+                  <span class="badge {% if st == 'Ativo' %}text-bg-success{% elif st == 'Em pausa' %}text-bg-warning{% else %}text-bg-secondary{% endif %}">
+                    {{ st }}
+                  </span>
+                {% endwith %}
+              </dd>
+
+              <dt class="col-5">Cliente desde</dt>
+              <dd class="col-7">
+                <time datetime="{{ aluno.data_matricula|date:'Y-m-d' }}">{{ aluno.data_matricula|date:"d/m/Y" }}</time>
+              </dd>
+            </dl>
+          </div>
+        </div>
+
+        <!-- Contrato -->
+        <div class="card shadow-sm mt-3">
+          <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h2 class="h6 mb-0">Contrato Ativo</h2>
+            {% if contrato_ativo %}
+              <span class="badge text-bg-success">Vigente</span>
+            {% else %}
+              <span class="badge text-bg-danger">Inexistente</span>
+            {% endif %}
+          </div>
+          <div class="card-body">
+            {% if contrato_ativo %}
+              <div class="mb-2"><strong>Plano:</strong> {{ contrato_ativo.get_plano_display }}</div>
+              <div class="mb-2">
+                <strong>Vigência:</strong>
+                {% if contrato_ativo.data_fim %}
+                  <time datetime="{{ contrato_ativo.data_inicio|date:'Y-m-d' }}">{{ contrato_ativo.data_inicio|date:"d/m/Y" }}</time>
+                  a
+                  <time datetime="{{ contrato_ativo.data_fim|date:'Y-m-d' }}">{{ contrato_ativo.data_fim|date:"d/m/Y" }}</time>
+                {% else %}
+                  Desde <time datetime="{{ contrato_ativo.data_inicio|date:'Y-m-d' }}">{{ contrato_ativo.data_inicio|date:"d/m/Y" }}</time> (sem data de término)
+                {% endif %}
+              </div>
+              <hr>
+              <div class="row g-2">
+                <div class="col-12"><strong>Mensalidade:</strong> R$ {{ contrato_ativo.valor_mensalidade|floatformat:2 }}</div>
+                {% if contrato_ativo.valor_matricula %}
+                  <div class="col-12"><strong>Matrícula:</strong> R$ {{ contrato_ativo.valor_matricula|floatformat:2 }}</div>
+                {% endif %}
+                {% if contrato_ativo.parcelas_matricula %}
+                  <div class="col-12"><strong>Parcelas Matrícula:</strong> {{ contrato_ativo.parcelas_matricula }}x</div>
+                {% endif %}
+              </div>
+            {% else %}
+              <div class="empty-state">
+                <i class="bi bi-file-earmark-x fs-1 d-block mb-2"></i>
+                <p class="mb-2">Nenhum contrato ativo no momento.</p>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Gráfico de Frequência Mensal -->
+        <div class="card shadow-sm mt-3">
+          <div class="card-header bg-white">
+            <h2 class="h6 mb-0">Evolução da Frequência</h2>
+          </div>
+          <div class="card-body">
+            <h6 class="card-section-title mb-3">Últimos 6 meses</h6>
+            <div class="chart-container" style="position: relative; height: 200px;">
+              <canvas id="frequenciaChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right column -->
+      <div class="col-lg-8">
+        <!-- Histórico de Turmas -->
+        <div class="card shadow-sm">
+          <div class="card-header bg-white">
+            <h2 class="h6 mb-0">Histórico de Turmas</h2>
+          </div>
+          <div class="card-body p-0">
+            <div style="max-height: 300px; overflow: auto;">
+              <table class="table table-sm align-middle mb-0">
+                <thead class="border-bottom">
+                  <tr>
+                    <th scope="col">Turma</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Stage</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for inscricao in historico_turmas %}
+                  <tr>
+                    <td class="fw-medium">{{ inscricao.turma.nome }}</td>
+                    <td>
+                      <span class="badge 
+                        {% if inscricao.status == 'matriculado' %}text-bg-success
+                        {% elif inscricao.status == 'experimental' %}text-bg-warning
+                        {% elif inscricao.status == 'acompanhando' %}text-bg-info
+                        {% else %}text-bg-secondary{% endif %}">
+                        {{ inscricao.get_status_display }}
+                      </span>
+                    </td>
+                    <td>{{ inscricao.turma.stage }}</td>
+                  </tr>
+                  {% empty %}
+                  <tr>
+                    <td colspan="3" class="text-center py-3 text-muted">
+                      Nenhuma turma registrada para este aluno.
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Acompanhamento Pedagógico -->
+        <div class="card shadow-sm mt-3">
+          <div class="card-header bg-white">
+            <h2 class="h6 mb-0">Acompanhamento Pedagógico</h2>
+          </div>
+          <div class="card-body">
+            <!-- Estatísticas de Frequência -->
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <div class="card kpi {% if percentual_frequencia < 80 %}danger{% elif percentual_frequencia < 90 %}warn{% endif %}">
+                  <div class="card-body py-2">
+                    <div class="card-section-title">Frequência Geral</div>
+                    <div class="d-flex align-items-end justify-content-between">
+                      <div>
+                        <div class="h4 mb-0">{{ percentual_frequencia|floatformat:1 }}%</div>
+                        <small class="text-muted">
+                          {{ presencas_stats.total_presencas|default:0 }} presenças / 
+                          {{ presencas_stats.total_aulas|default:0 }} aulas
+                        </small>
+                      </div>
+                      <i class="bi bi-calendar-check fs-3 text-muted"></i>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Lista de Acompanhamentos -->
+            <h6 class="card-section-title mb-2">Acompanhamentos de Faltas</h6>
+            {% for acompanhamento in acompanhamentos %}
+            <div class="border rounded p-3 mb-2 {% if acompanhamento.status == 'pendente' %}bg-light{% endif %}">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <strong>Início: <time datetime="{{ acompanhamento.data_inicio_sequencia|date:'Y-m-d' }}">{{ acompanhamento.data_inicio_sequencia|date:"d/m/Y" }}</time></strong>
+                  <span class="badge ms-2 {% if acompanhamento.status == 'pendente' %}text-bg-warning{% else %}text-bg-success{% endif %}">
+                    {{ acompanhamento.get_status_display }}
+                  </span>
+                </div>
+                <small class="text-muted">{{ acompanhamento.criado_em|date:"d/m/Y" }}</small>
+              </div>
+              {% if acompanhamento.motivo %}
+              <div class="mt-2">
+                <strong>Ações/Motivo:</strong> {{ acompanhamento.motivo }}
+              </div>
+              {% endif %}
+              {% if acompanhamento.data_resolucao %}
+              <div class="mt-1">
+                <small class="text-muted">Resolvido em: {{ acompanhamento.data_resolucao|date:"d/m/Y H:i" }}</small>
+              </div>
+              {% endif %}
+            </div>
+            {% empty %}
+            <div class="text-center py-3 text-muted">
+              <i class="bi bi-check-circle fs-1 d-block mb-2"></i>
+              Nenhum acompanhamento de falta registrado.
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Histórico Financeiro -->
+        <div class="card shadow-sm mt-3">
+          <div class="card-header bg-white d-flex flex-wrap gap-2 align-items-center justify-content-between">
+            <h2 class="h6 mb-0">Histórico Financeiro</h2>
+
+            <!-- Filters -->
+            <form class="d-flex gap-2" role="search" onsubmit="return false" aria-label="Filtrar pagamentos" aria-live="polite">
+              <div class="input-group input-group-sm">
+                <span class="input-group-text" id="search-label"><i class="bi bi-search"></i></span>
+                <input type="search" id="searchInput" class="form-control" placeholder="Buscar descrição..." aria-labelledby="search-label">
+              </div>
+              <select id="statusFilter" class="form-select form-select-sm" aria-label="Filtrar por status">
+                <option value="">Todos os status</option>
+                <option value="pago">Pago</option>
+                <option value="pendente">Pendente</option>
+                <option value="parcial">Parcial</option>
+                <option value="atrasado">Atrasado</option>
+              </select>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="clearFilters" title="Limpar filtros" aria-label="Limpar filtros">
+                <i class="bi bi-x-circle"></i>
+              </button>
+            </form>
+          </div>
+
+          <div class="card-body p-0">
+            <div style="max-height: 420px; overflow: auto;">
+              <table class="table table-sm align-middle table-hover mb-0 table-sticky" id="pagamentosTable">
+                <thead class="border-bottom">
+                  <tr>
+                    <th scope="col" style="min-width: 40%">Descrição</th>
+                    <th scope="col">Valor</th>
+                    <th scope="col">Vencimento</th>
+                    <th scope="col">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                {% for pagamento in pagamentos %}
+                  <tr
+                    data-status="{{ pagamento.status }}"
+                    data-descricao="{{ pagamento.descricao|lower }}"
+                    class="{% if pagamento.status == 'atrasado' %}table-danger{% elif pagamento.status == 'parcial' %}table-warning{% endif %}">
+                    <td class="fw-medium">{{ pagamento.descricao }}</td>
+                    <td>R$ {{ pagamento.valor|floatformat:2 }}</td>
+                    <td>
+                      <span {% if pagamento.status == 'atrasado' %} class="text-danger fw-semibold" data-bs-toggle="tooltip" data-bs-title="Pagamento vencido" {% endif %}>
+                        <time datetime="{{ pagamento.data_vencimento|date:'Y-m-d' }}">{{ pagamento.data_vencimento|date:"d/m/Y" }}</time>
+                      </span>
+                    </td>
+                    <td>
+                      <span class="badge
+                        {% if pagamento.status == 'pago' %} text-bg-success
+                        {% elif pagamento.status == 'pendente' %} text-bg-secondary
+                        {% elif pagamento.status == 'parcial' %} text-bg-warning
+                        {% elif pagamento.status == 'atrasado' %} text-bg-danger
+                        {% else %} bg-light text-dark
+                        {% endif %}">
+                        {{ pagamento.get_status_display }}
+                      </span>
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr>
+                    <td colspan="4">
+                      <div class="empty-state">
+                        <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                        <p class="mb-1">Nenhum pagamento registrado.</p>
+                        <small>Dica: cadastre cobranças para acompanhar situação e vencimentos.</small>
+                      </div>
+                    </td>
+                  </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Paginação -->
+          {% if pagamentos.paginator.num_pages > 1 %}
+          <nav aria-label="Navegação de páginas de pagamentos">
+            <ul class="pagination pagination-sm justify-content-center mt-3">
+              {% if pagamentos.has_previous %}
+                <li class="page-item">
+                  <a class="page-link" href="?page_pagamentos={{ pagamentos.previous_page_number }}#pagamentos" aria-label="Página anterior">
+                    <span aria-hidden="true">&laquo;</span>
+                  </a>
+                </li>
+              {% endif %}
+              
+              {% for num in pagamentos.paginator.page_range %}
+                <li class="page-item {% if pagamentos.number == num %}active{% endif %}">
+                  <a class="page-link" href="?page_pagamentos={{ num }}#pagamentos">{{ num }}</a>
+                </li>
+              {% endfor %}
+              
+              {% if pagamentos.has_next %}
+                <li class="page-item">
+                  <a class="page-link" href="?page_pagamentos={{ pagamentos.next_page_number }}#pagamentos" aria-label="Próxima página">
+                    <span aria-hidden="true">&raquo;</span>
+                  </a>
+                </li>
+              {% endif %}
+            </ul>
+          </nav>
+          {% endif %}
+
+          <div class="card-footer bg-white d-flex flex-wrap gap-2 justify-content-end">
+            <a href="{% url 'novo_pagamento' aluno.pk %}" class="btn btn-outline-primary btn-sm btn-icon">
+              <i class="bi bi-plus-circle"></i><span>Adicionar Pagamento</span>
+            </a>
+            <a href="{% url 'exportar_pagamentos_aluno' aluno.pk %}" class="btn btn-outline-secondary btn-sm btn-icon">
+              <i class="bi bi-download"></i><span>Exportar CSV</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    // Tooltips
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
+
+    // Filtros simples (busca por descrição + status)
+    const searchInput = document.getElementById('searchInput');
+    const statusFilter = document.getElementById('statusFilter');
+    const clearBtn = document.getElementById('clearFilters');
+    const rows = Array.from(document.querySelectorAll('#pagamentosTable tbody tr'));
+
+    function applyFilters() {
+      const q = (searchInput?.value || '').trim().toLowerCase();
+      const st = (statusFilter?.value || '').trim();
+      rows.forEach(row => {
+        const desc = row.getAttribute('data-descricao') || '';
+        const rstatus = row.getAttribute('data-status') || '';
+        const matchText = !q || desc.includes(q);
+        const matchStatus = !st || rstatus === st;
+        row.style.display = (matchText && matchStatus) ? '' : 'none';
+      });
+    }
+    searchInput?.addEventListener('input', applyFilters);
+    statusFilter?.addEventListener('change', applyFilters);
+    clearBtn?.addEventListener('click', () => {
+      if (searchInput) searchInput.value = '';
+      if (statusFilter) statusFilter.value = '';
+      applyFilters();
+    });
+
+    // Gráfico de Frequência
+    document.addEventListener('DOMContentLoaded', function() {
+      const ctx = document.getElementById('frequenciaChart')?.getContext('2d');
+      if (!ctx) return;
+      
+      const mesesFrequencia = JSON.parse('{{ meses_frequencia|escapejs }}');
+      
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: mesesFrequencia.map(m => m.mes),
+          datasets: [{
+            label: 'Frequência (%)',
+            data: mesesFrequencia.map(m => m.percentual),
+            borderColor: '#198754',
+            backgroundColor: 'rgba(25, 135, 84, 0.1)',
+            tension: 0.3,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              max: 100,
+              ticks: {
+                callback: function(value) {
+                  return value + '%';
+                }
+              }
+            }
+          },
+          plugins: {
+            tooltip: {
+              callbacks: {
+                afterLabel: function(context) {
+                  const data = mesesFrequencia[context.dataIndex];
+                  return `Aulas: ${data.aulas} | Presenças: ${data.presencas}`;
+                }
+              }
+            }
+          }
+        }
+      });
+    });
+  </script>
+</body>
+</html>

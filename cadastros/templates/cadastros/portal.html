@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Portal do Professor</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --gap: 1rem; }
     .content-wrap { max-width: 1200px; }
@@ -14,6 +15,7 @@
     .card.turma-card:hover, .card.turma-card:focus-within { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,.12); }
     .badge-soft { background: #f8f9fa; color: #343a40; border: 1px solid #e9ecef; }
     .grid-controls .form-select, .grid-controls .form-control { min-width: 10rem; }
+    .horarios-list { font-size: 0.85rem; } /* Estilo para a lista de horários */
     @media (max-width: 576px) {
       .grid-controls { gap: .5rem !important; }
       .grid-controls .btn, .grid-controls .form-select, .grid-controls .form-control { width: 100%; }
@@ -21,7 +23,6 @@
   </style>
 </head>
 <body class="bg-light">
-  <!-- Header -->
   <header class="sticky-top-blur">
     <div class="container content-wrap d-flex justify-content-between align-items-center py-2">
       <div class="d-flex flex-column">
@@ -50,10 +51,8 @@
         </select>
       </div>
     </div>
-
     <div class="d-flex justify-content-between align-items-center mb-2">
       <small id="contador-resultado" class="text-muted" aria-live="polite"></small>
-      <!-- Espaço para ações futuras: criar turma, importar, etc.  -->
     </div>
 
     <div id="grid-turmas" class="row g-3">
@@ -67,12 +66,23 @@
                     <h3 class="h6 card-title mb-1 text-truncate" title="{{ info.turma.nome }}">{{ info.turma.nome }}</h3>
                     <div class="text-muted small">Stage {{ info.turma.stage }}</div>
                   </div>
-                  <!-- Inicial do nome como avatar simples (acessível) -->
                   <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width:2rem;height:2rem;" aria-hidden="true">
                     {{ info.turma.nome|first|upper }}
                   </div>
                 </div>
-              </div>
+
+                {% if info.turma.horarios.all %}
+                <hr class="my-2">
+                <div class="d-flex align-items-start gap-2 text-muted horarios-list">
+                  <i class="bi bi-clock mt-1"></i>
+                  <div>
+                    {% for horario in info.turma.horarios.all %}
+                      <div>{{ horario.get_dia_semana_display }}, {{ horario.horario_inicio|time:"H:i" }}</div>
+                    {% endfor %}
+                  </div>
+                </div>
+                {% endif %}
+                </div>
               <div class="card-footer bg-white">
                 <span class="badge bg-secondary me-1" aria-label="{{ info.matriculados_count }} matriculados">
                   {{ info.matriculados_count }} Matriculado(s)
@@ -118,26 +128,20 @@
 
       function aplicaFiltroOrdenacao(){
         const q = (filtro?.value || '').trim().toLowerCase();
-
-        // Filtrar
         grid.querySelectorAll('.turma-col').forEach(col => {
           const nome = (col.getAttribute('data-nome')||'').toLowerCase();
           const stage = (col.getAttribute('data-stage')||'').toString();
           const match = !q || nome.includes(q) || stage.includes(q);
           col.hidden = !match;
         });
-
-        // Ordenar (somente elementos visíveis, mas a ordem aplica no DOM inteiro para consistência)
         const cols = Array.from(grid.children);
         const criterio = ordenar?.value || 'nome';
         cols.sort((a,b) => {
           if (criterio === 'stage') {
             return Number(a.getAttribute('data-stage')||0) - Number(b.getAttribute('data-stage')||0);
           }
-          // nome
           return (a.getAttribute('data-nome')||'').localeCompare(b.getAttribute('data-nome')||'');
         }).forEach(el => grid.appendChild(el));
-
         atualizaContador();
       }
 
@@ -145,7 +149,6 @@
       ordenar?.addEventListener('change', aplicaFiltroOrdenacao);
       limpar?.addEventListener('click', () => { if (!filtro) return; filtro.value=''; filtro.focus(); aplicaFiltroOrdenacao(); });
 
-      // Inicial
       aplicaFiltroOrdenacao();
     })();
   </script>

@@ -15,4 +15,7 @@ urlpatterns = [
     path('lancamento/novo/', views.lancamento_recebimento, name='lancamento_recebimento'),
     path('venda/livro/', views.venda_livro, name='venda_livro'),
     path('relatorios/professores/', views.relatorio_pagamento_professores, name='relatorio_professores'),
+    path('aluno/<int:pk>/', views.perfil_aluno, name='perfil_aluno'),
+    path('inscricao/', views.formulario_inscricao, name='formulario_inscricao'),
+    path('pagamento/quitar/<int:pk>/', views.quitar_pagamento_especifico, name='quitar_pagamento'),
 ]
