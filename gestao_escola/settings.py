@@ -1,6 +1,6 @@
 from pathlib import Path
 import os
-from decouple import config
+from decouple import config, Csv # Adicione Csv à importação
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -9,13 +9,20 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
+# SECRET_KEY: Sua configuração está perfeita.
+# Ela será lida do arquivo .env localmente, ou das variáveis de ambiente no servidor.
 SECRET_KEY = config('SECRET_KEY')
 
-# SECURITY WARNING: don't run with debug turned on in production!
+# DEBUG: Sua configuração está ótima.
+# O padrão `default=False` é mais seguro. Para rodar localmente, certifique-se
+# de ter `DEBUG=True` no seu arquivo .env
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = []
+# ALLOWED_HOSTS: Esta é a principal mudança.
+# Em vez de uma lista vazia, vamos ler os domínios permitidos do ambiente.
+# No seu .env local, você pode ter: ALLOWED_HOSTS=127.0.0.1,localhost
+# No PythonAnywhere, você definirá: ALLOWED_HOSTS=seunome.pythonanywhere.com
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='127.0.0.1,localhost', cast=Csv())
 
 
 # Application definition
@@ -92,11 +99,13 @@ AUTH_PASSWORD_VALIDATORS = [
 
 
 # Internationalization
-# https://docs.djangoproject.com/en/5.2/topics/i18n/
+# https://docs.djangoproject.com/en/5.2/topics/i1n/
 
 LANGUAGE_CODE = 'pt-br'
 
-TIME_ZONE = 'UTC'
+# MUDANÇA RECOMENDADA: Ajuste o TIME_ZONE para refletir sua localidade.
+# Isso garante que datas e horas salvas no banco de dados sejam consistentes.
+TIME_ZONE = 'America/Sao_Paulo'
 
 USE_I18N = True
 
@@ -108,11 +117,18 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+# MUDANÇA NECESSÁRIA PARA DEPLOY:
+# STATIC_ROOT é a pasta para onde o Django irá copiar todos os arquivos estáticos
+# quando você rodar o comando `python manage.py collectstatic`.
+# O servidor de produção (Nginx, Apache) será configurado para usar esta pasta.
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-LOGIN_URL = '/login/' # Diz ao Django qual é a URL da página de login.
-LOGIN_REDIRECT_URL = '/' # Diz ao Django para onde ir APÓS o login bem-sucedido.
-LOGOUT_REDIRECT_URL = '/' # (Opcional) Diz para onde ir após o logout.
+LOGIN_URL = '/login/'
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/'
