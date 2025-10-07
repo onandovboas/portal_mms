@@ -1,11 +1,11 @@
 # cadastros/views.py
 from django.core.paginator import Paginator
 from django.contrib.auth.decorators import login_required
-from .models import Turma, Inscricao, RegistroAula, Professor, Presenca, Pagamento, Contrato, AcompanhamentoFalta, Aluno, Inscricao, RegistroAula, Presenca
-from .forms import AlunoForm, PagamentoForm, AlunoExperimentalForm, ContratoForm, RegistroAulaForm
+from .models import Turma, Inscricao, RegistroAula, Professor, Presenca, Pagamento, Contrato, AcompanhamentoFalta, Aluno, Inscricao, RegistroAula, Presenca, Lead
+from .forms import AlunoForm, PagamentoForm, AlunoExperimentalForm, ContratoForm, RegistroAulaForm, LeadForm
 from django.utils import timezone
 from datetime import date, timedelta
-from django.db.models import F, Sum, Count, Min, Q, Subquery, OuterRef, Max, DecimalField
+from django.db.models import F, Sum, Count, Min, Q, Subquery, OuterRef, Max, DecimalField, Exists
 from decimal import Decimal
 from dateutil.relativedelta import relativedelta 
 import calendar
@@ -181,11 +181,30 @@ def dashboard_admin(request):
         mes_referencia__month=mes_selecionado
     ).select_related('aluno', 'contrato')
 
+    data_limite_renovacao = hoje + timedelta(days=30)
     contratos_a_vencer = Contrato.objects.filter(
         ativo=True, 
         data_fim__gte=hoje, 
         data_fim__lte=data_limite_renovacao
     ).select_related('aluno').order_by('data_fim')
+    novos_contratos_subquery = Contrato.objects.filter(
+        aluno=OuterRef('aluno'),      # Compara com o aluno do contrato externo
+        data_inicio__gt=OuterRef('data_fim') # Verifica se o novo contrato começou DEPOIS do fim do antigo
+    )
+
+    # A query principal:
+    # - Filtra contratos que já venceram (data_fim < hoje)
+    # - Anota cada um com um booleano 'novo_contrato_existe'
+    # - Filtra para manter apenas aqueles onde 'novo_contrato_existe' é False
+    contratos_vencidos_sem_renovacao = Contrato.objects.filter(
+        ativo=True,
+        data_fim__lt=hoje
+    ).annotate(
+        novo_contrato_existe=Exists(novos_contratos_subquery)
+    ).filter(
+        novo_contrato_existe=False
+    ).select_related('aluno').order_by('-data_fim')
+
 
     acompanhamentos_pendentes = AcompanhamentoFalta.objects.filter(
         status='pendente'
@@ -209,7 +228,7 @@ def dashboard_admin(request):
     pagamentos_pagos = pagamentos_pagos.order_by('-data_pagamento')
 
     # Preparar headers para as tabelas
-    headers_renovacoes = ["Aluno", "Telefone", "Plano", "Fim do Contrato"]
+    headers_renovacoes = ["Aluno", "Telefone", "Plano", "Fim do Contrato", "Status"]
     headers_experimentais = ["Aluno", "Telefone", "Turma", "Ações"]
     headers_pendentes = ["","Aluno", "Telefone", "Descrição", "Valor Restante", "Vencimento", "Status", "Ação Rápida"]
     headers_recebidos = ["Aluno", "Descrição", "Valor", "Data Pagamento", "Ações"]
@@ -219,6 +238,7 @@ def dashboard_admin(request):
         'pagamentos_pagos': pagamentos_pagos,
         'data_selecionada': data_selecionada,
         'contratos_a_vencer': contratos_a_vencer,
+        'contratos_vencidos': contratos_vencidos_sem_renovacao,
         'acompanhamentos_pendentes': acompanhamentos_pendentes,
         'inscricoes_experimentais': inscricoes_experimentais,
         'nav': {
@@ -737,32 +757,49 @@ def quitar_dividas_aluno(request, pk):
     return redirect('cadastros:perfil_aluno', pk=aluno.pk)
 
 @login_required
+@login_required
 def novo_aluno_experimental(request):
+    lead_id = request.GET.get('lead_id') # Verifica se estamos vindo de uma conversão
+
     if request.method == 'POST':
         form = AlunoExperimentalForm(request.POST)
         if form.is_valid():
-            # Cria o aluno mas não salva no banco ainda (commit=False)
             aluno = form.save(commit=False)
-            aluno.status = 'ativo' # Define o status do aluno como ativo
-            aluno.save() # Agora salva o aluno no banco
+            aluno.status = 'ativo'
+            aluno.save()
 
-            # Pega a turma escolhida no formulário
             turma_selecionada = form.cleaned_data['turma_experimental']
-
-            # Cria a inscrição vinculando o aluno à turma com o status 'experimental'
             Inscricao.objects.create(
                 aluno=aluno,
                 turma=turma_selecionada,
                 status='experimental'
             )
+            
+            # A MÁGICA FINAL: Se viemos de uma conversão, atualiza o status do Lead
+            if lead_id:
+                try:
+                    lead = Lead.objects.get(pk=lead_id)
+                    lead.status = 'convertido'
+                    lead.save()
+                    messages.success(request, f'Lead "{lead.nome_completo}" convertido com sucesso em aluno experimental!')
+                except Lead.DoesNotExist:
+                    pass # Se o lead não for encontrado, não faz nada
+            else:
+                messages.success(request, f'Aluno(a) {aluno.nome_completo} cadastrado(a) como experimental.')
 
-            messages.success(request, f'Aluno(a) {aluno.nome_completo} cadastrado(a) como experimental na turma {turma_selecionada.nome}.')
             return redirect('cadastros:dashboard_admin')
     else:
-        form = AlunoExperimentalForm()
+        # Se recebermos dados via GET (do redirect), usamos para preencher o formulário
+        initial_data = {
+            'nome_completo': request.GET.get('nome_completo'),
+            'email': request.GET.get('email'),
+            'telefone': request.GET.get('telefone'),
+        }
+        form = AlunoExperimentalForm(initial=initial_data)
 
     context = {
-        'form': form
+        'form': form,
+        'lead_id': lead_id, # Passa o ID do lead para o template
     }
     return render(request, 'cadastros/novo_aluno_experimental.html', context)
 
@@ -811,3 +848,59 @@ def editar_registro_aula(request, pk):
         'registro_aula': registro_aula
     }
     return render(request, 'cadastros/editar_registro_aula.html', context)
+
+@login_required
+def lista_leads(request):
+    # Por padrão, vamos mostrar apenas os leads que precisam de atenção (não convertidos ou perdidos)
+    leads_ativos = Lead.objects.exclude(status__in=['convertido', 'perdido'])
+    
+    context = {
+        'leads': leads_ativos,
+    }
+    return render(request, 'cadastros/lista_leads.html', context)
+
+@login_required
+def adicionar_lead(request):
+    if request.method == 'POST':
+        form = LeadForm(request.POST)
+        if form.is_valid():
+            lead = form.save()
+            messages.success(request, f'Lead "{lead.nome_completo}" adicionado com sucesso.')
+            return redirect('cadastros:lista_leads')
+    else:
+        form = LeadForm()
+
+    context = {
+        'form': form
+    }
+    return render(request, 'cadastros/adicionar_lead.html', context)
+
+@login_required
+def editar_lead(request, pk):
+    lead = get_object_or_404(Lead, pk=pk)
+    if request.method == 'POST':
+        form = LeadForm(request.POST, instance=lead)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'Lead "{lead.nome_completo}" atualizado com sucesso.')
+            return redirect('cadastros:lista_leads')
+    else:
+        form = LeadForm(instance=lead)
+
+    context = {
+        'form': form,
+        'lead': lead,
+    }
+    return render(request, 'cadastros/editar_lead.html', context)
+
+@login_required
+def converter_lead(request, pk):
+    lead = get_object_or_404(Lead, pk=pk)
+    
+    # Prepara os dados do lead para passar via URL
+    # O redirect vai para o formulário de novo aluno experimental,
+    # já com os campos preenchidos e com o ID do lead para referência.
+    url_destino = reverse('cadastros:novo_aluno_experimental')
+    parametros = f'?lead_id={lead.pk}&nome_completo={lead.nome_completo}&email={lead.email or ""}&telefone={lead.telefone or ""}'
+    
+    return redirect(url_destino + parametros)

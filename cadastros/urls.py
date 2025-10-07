@@ -20,6 +20,12 @@ urlpatterns = [
     path('aluno/novo-experimental/', views.novo_aluno_experimental, name='novo_aluno_experimental'),
     path('aluno/<int:aluno_pk>/criar-contrato/', views.criar_contrato, name='criar_contrato'),
 
+    # Rota para Leads
+    path('leads/', views.lista_leads, name='lista_leads'),
+    path('leads/adicionar/', views.adicionar_lead, name='adicionar_lead'), 
+    path('leads/<int:pk>/editar/', views.editar_lead, name='editar_lead'),
+    path('leads/<int:pk>/converter/', views.converter_lead, name='converter_lead'),
+
     #Rotas de Turmas
     path('turma/<int:pk>/', views.detalhe_turma, name='detalhe_turma'),
     path('registro-aula/editar/<int:pk>/', views.editar_registro_aula, name='editar_registro_aula'),

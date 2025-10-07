@@ -206,3 +206,37 @@ class HorarioAula(models.Model):
 
     def __str__(self):
         return f"{self.turma.nome} - {self.get_dia_semana_display()} às {self.horario_inicio.strftime('%H:%M')}"
+    
+class Lead(models.Model):
+    STATUS_CHOICES = [
+        ('novo', 'Novo Contato'),
+        ('contatado', 'Contato Realizado'),
+        ('agendado', 'Aula Experimental Agendada'),
+        ('convertido', 'Convertido em Aluno'),
+        ('perdido', 'Perdido'),
+    ]
+    
+    FONTE_CHOICES = [
+        ('indicacao', 'Indicação'),
+        ('instagram', 'Instagram'),
+        ('google', 'Google'),
+        ('fachada', 'Fachada da Escola'),
+        ('outro', 'Outro'),
+    ]
+
+    nome_completo = models.CharField(max_length=200)
+    telefone = models.CharField(max_length=20, blank=True)
+    email = models.EmailField(blank=True)
+    status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='novo')
+    fonte_contato = models.CharField("Origem do Contato", max_length=15, choices=FONTE_CHOICES, blank=True)
+    disponibilidade_horarios = models.TextField("Disponibilidade de Horários", blank=True)
+    observacoes = models.TextField(blank=True)
+    data_criacao = models.DateTimeField(auto_now_add=True)
+    data_atualizacao = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-data_criacao']
+
+    def __str__(self):
+        return f"{self.nome_completo} ({self.get_status_display()})"
+    

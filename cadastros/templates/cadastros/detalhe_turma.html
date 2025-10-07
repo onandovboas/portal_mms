@@ -24,6 +24,7 @@
   </style>
 </head>
 <body class="bg-light">
+  <!-- Cabeçalho / Navegação -->
   <header class="sticky-top-blur">
     <nav class="navbar container content-wrap py-2" aria-label="Navegação da turma">
       <div class="d-flex align-items-center gap-2">
@@ -40,6 +41,7 @@
   </header>
 
   <main class="container content-wrap my-3">
+    <!-- Edição rápida da turma -->
     <section class="card mb-3" aria-labelledby="sec-detalhes">
       <div class="card-body">
         <h2 id="sec-detalhes" class="h5 mb-3">Detalhes da turma</h2>
@@ -60,8 +62,10 @@
       </div>
     </section>
 
+    <!-- Grid principal: esquerda registro / direita histórico + anotações -->
     <div class="row g-3">
       <div class="col-12 col-lg-7 order-2 order-lg-1">
+        <!-- Registrar Nova Aula -->
         <section class="card" aria-labelledby="sec-registrar">
           <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
             <h2 id="sec-registrar" class="h5 mb-0">Registrar nova aula</h2>
@@ -71,6 +75,7 @@
             <form method="post" novalidate>
               {% csrf_token %}
 
+              <!-- Lista de Presença -->
               <fieldset class="mb-3" aria-describedby="hint-presenca">
                 <legend class="h6 mb-2">Lista de presença</legend>
                 <p id="hint-presenca" class="text-muted small mb-2">Use a busca para filtrar alunos. "Marcar todos" afeta apenas a lista visível.</p>
@@ -81,7 +86,9 @@
                   <button type="button" class="btn btn-outline-secondary" id="btn-limpar-filtro" aria-label="Limpar busca">Limpar</button>
                 </div>
 
+                <!-- O SEU ACORDEÃO DE PRESENÇA COMPLETO -->
                 <div class="accordion" id="accordionPresenca">
+                  <!-- Matriculados -->
                   <div class="accordion-item">
                     <h3 class="accordion-header" id="head-matriculados">
                       <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-matriculados" aria-expanded="true" aria-controls="collapse-matriculados">
@@ -113,11 +120,96 @@
                     </div>
                   </div>
 
+                  <!-- Experimentais -->
+                  <div class="accordion-item">
+                    <h3 class="accordion-header" id="head-experimentais">
+                      <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-experimentais" aria-expanded="false" aria-controls="collapse-experimentais">
+                        Aula Experimental <span class="badge bg-info text-dark ms-2">{{ experimentais.count }}</span>
+                      </button>
+                    </h3>
+                    <div id="collapse-experimentais" class="accordion-collapse collapse" aria-labelledby="head-experimentais" data-bs-parent="#accordionPresenca">
+                      <div class="accordion-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                          <div class="form-check touch-target">
+                            <input class="form-check-input" type="checkbox" id="toggle-all-experimentais" />
+                            <label class="form-check-label" for="toggle-all-experimentais">Marcar todos visíveis</label>
+                          </div>
+                          <small class="text-muted" id="sel-experimentais" aria-live="polite"></small>
+                        </div>
+                        <ul class="list-unstyled list-scroll" id="lista-experimentais">
+                          {% for inscricao in experimentais %}
+                            <li class="mb-1 aluno-item" data-nome="{{ inscricao.aluno.nome_completo|lower }}">
+                              <div class="form-check touch-target">
+                                <input class="form-check-input presenca-checkbox" type="checkbox" name="presenca" value="{{ inscricao.aluno.pk }}" id="e-{{ inscricao.aluno.pk }}" />
+                                <label class="form-check-label" for="e-{{ inscricao.aluno.pk }}">{{ inscricao.aluno.nome_completo }}</label>
+                              </div>
+                            </li>
+                          {% empty %}
+                            <li class="text-muted">Nenhum aluno em aula experimental nesta turma.</li>
+                          {% endfor %}
+                        </ul>
+                      </div>
+                    </div>
                   </div>
+
+                  <!-- Acompanhando -->
+                  <div class="accordion-item">
+                    <h3 class="accordion-header" id="head-acompanhando">
+                      <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-acompanhando" aria-expanded="false" aria-controls="collapse-acompanhando">
+                        Acompanhando <span class="badge muted-badge ms-2">{{ acompanhando.count }}</span>
+                      </button>
+                    </h3>
+                    <div id="collapse-acompanhando" class="accordion-collapse collapse" aria-labelledby="head-acompanhando" data-bs-parent="#accordionPresenca">
+                      <div class="accordion-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                          <div class="form-check touch-target">
+                            <input class="form-check-input" type="checkbox" id="toggle-all-acompanhando" />
+                            <label class="form-check-label" for="toggle-all-acompanhando">Marcar todos visíveis</label>
+                          </div>
+                          <small class="text-muted" id="sel-acompanhando" aria-live="polite"></small>
+                        </div>
+                        <ul class="list-unstyled list-scroll" id="lista-acompanhando">
+                          {% for inscricao in acompanhando %}
+                            <li class="mb-1 aluno-item" data-nome="{{ inscricao.aluno.nome_completo|lower }}">
+                              <div class="form-check touch-target">
+                                <input class="form-check-input presenca-checkbox" type="checkbox" name="presenca" value="{{ inscricao.aluno.pk }}" id="a-{{ inscricao.aluno.pk }}" />
+                                <label class="form-check-label" for="a-{{ inscricao.aluno.pk }}">{{ inscricao.aluno.nome_completo }}</label>
+                              </div>
+                            </li>
+                          {% empty %}
+                            <li class="text-muted">Nenhum aluno acompanhando esta turma.</li>
+                          {% endfor %}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Trancados (só leitura) -->
+                  <div class="accordion-item">
+                    <h3 class="accordion-header" id="head-trancados">
+                      <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-trancados" aria-expanded="false" aria-controls="collapse-trancados">
+                        Trancados <span class="badge bg-danger ms-2">{{ trancados.count }}</span>
+                      </button>
+                    </h3>
+                    <div id="collapse-trancados" class="accordion-collapse collapse" aria-labelledby="head-trancados" data-bs-parent="#accordionPresenca">
+                      <div class="accordion-body">
+                        <ul class="list-unstyled mb-0">
+                          {% for inscricao in trancados %}
+                            <li class="text-muted">{{ inscricao.aluno.nome_completo }}</li>
+                          {% empty %}
+                            <li class="text-muted">Nenhum aluno com matrícula trancada nesta turma.</li>
+                          {% endfor %}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
               </fieldset>
 
               <hr class="my-4" />
 
+              <!-- Detalhes da Lição -->
               <fieldset aria-labelledby="legend-licao" class="gy-3 row">
                 <legend id="legend-licao" class="h6">Detalhes da lição</legend>
                 <div class="col-md-6">
@@ -150,6 +242,7 @@
                 </div>
               </fieldset>
 
+              <!-- Barra de ação -->
               <div class="fab-bar bg-white p-2 mt-3 rounded-3 d-grid">
                 <button type="submit" name="salvar_aula" class="btn btn-primary btn-lg">Salvar registro da aula</button>
               </div>
@@ -159,6 +252,7 @@
       </div>
 
       <div class="col-12 col-lg-5 order-1 order-lg-2">
+        <!-- Histórico -->
         <section class="card mb-3" aria-labelledby="sec-historico">
           <div class="card-header d-flex justify-content-between align-items-center gap-2 flex-wrap">
             <div>
@@ -171,6 +265,7 @@
             </div>
           </div>
           <div class="card-body">
+            <!-- 👇 MUDANÇA 1: O loop agora usa 'page_obj' 👇 -->
             {% for aula in page_obj %}
               <div class="card mb-3">
                 <div class="card-header d-flex justify-content-between align-items-center">
@@ -193,38 +288,43 @@
             {% empty %}
               <div class="text-center text-muted">Nenhum registro de aula encontrado para este mês.</div>
             {% endfor %}
-              <nav aria-label="Navegação do histórico de aulas" class="mt-4">
-                <ul class="pagination pagination-sm justify-content-center">
-                  {% if page_obj.has_previous %}
-                    <li class="page-item">
-                      <a class="page-link" href="?page={{ page_obj.previous_page_number }}&ano={{ data_selecionada.year }}&mes={{ data_selecionada.month }}">&laquo;</a>
-                    </li>
-                  {% else %}
-                    <li class="page-item disabled"><span class="page-link">&laquo;</span></li>
-                  {% endif %}
 
-                  {% for num in page_obj.paginator.page_range %}
-                    {% if page_obj.number == num %}
-                      <li class="page-item active"><span class="page-link">{{ num }}</span></li>
-                    {% else %}
-                      <li class="page-item">
-                        <a class="page-link" href="?page={{ num }}&ano={{ data_selecionada.year }}&mes={{ data_selecionada.month }}">{{ num }}</a>
-                      </li>
-                    {% endif %}
-                  {% endfor %}
+            <!-- 👇 MUDANÇA 2: Os controlos de paginação foram adicionados aqui 👇 -->
+            {% if page_obj.paginator.num_pages > 1 %}
+            <nav aria-label="Navegação do histórico de aulas" class="mt-4">
+              <ul class="pagination pagination-sm justify-content-center">
+                {% if page_obj.has_previous %}
+                  <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}&ano={{ data_selecionada.year }}&mes={{ data_selecionada.month }}">&laquo;</a>
+                  </li>
+                {% else %}
+                  <li class="page-item disabled"><span class="page-link">&laquo;</span></li>
+                {% endif %}
 
-                  {% if page_obj.has_next %}
-                    <li class="page-item">
-                      <a class="page-link" href="?page={{ page_obj.next_page_number }}&ano={{ data_selecionada.year }}&mes={{ data_selecionada.month }}">&raquo;</a>
-                    </li>
+                {% for num in page_obj.paginator.page_range %}
+                  {% if page_obj.number == num %}
+                    <li class="page-item active"><span class="page-link">{{ num }}</span></li>
                   {% else %}
-                    <li class="page-item disabled"><span class="page-link">&raquo;</span></li>
+                    <li class="page-item">
+                      <a class="page-link" href="?page={{ num }}&ano={{ data_selecionada.year }}&mes={{ data_selecionada.month }}">{{ num }}</a>
+                    </li>
                   {% endif %}
-                </ul>
-              </nav>
-            </div>
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                  <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}&ano={{ data_selecionada.year }}&mes={{ data_selecionada.month }}">&raquo;</a>
+                  </li>
+                {% else %}
+                  <li class="page-item disabled"><span class="page-link">&raquo;</span></li>
+                {% endif %}
+              </ul>
+            </nav>
+            {% endif %}
+          </div>
         </section>
 
+        <!-- Anotações -->
         <section class="card" aria-labelledby="sec-anotacoes">
           <div class="card-header"><h2 id="sec-anotacoes" class="h5 mb-0">Anotações importantes</h2></div>
           <div class="card-body">
@@ -250,7 +350,8 @@
       const limpar = document.getElementById('btn-limpar-filtro');
       const grupos = [
         { list: document.getElementById('lista-matriculados'), toggle: document.getElementById('toggle-all-matriculados'), sel: document.getElementById('sel-matriculados') },
-        // ... (outros grupos se existirem)
+        { list: document.getElementById('lista-experimentais'), toggle: document.getElementById('toggle-all-experimentais'), sel: document.getElementById('sel-experimentais') },
+        { list: document.getElementById('lista-acompanhando'), toggle: document.getElementById('toggle-all-acompanhando'), sel: document.getElementById('sel-acompanhando') },
       ].filter(g => g.list);
 
       function aplicaFiltro() {

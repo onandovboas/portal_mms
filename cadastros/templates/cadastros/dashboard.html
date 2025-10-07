@@ -42,7 +42,14 @@
         </h2>
         <div id="collapseRenovacoes" class="accordion-collapse collapse" aria-labelledby="headRenovacoes" data-bs-parent="#dashboardAccordion">
           <div class="accordion-body">
-            {% include "cadastros/includes/table_card_stack.html" with table_id="tbl-renovacoes" headers=headers_renovacoes rows_template="cadastros/includes/rows_renovacoes.html" items=contratos_a_vencer empty_text="Nenhum contrato vencendo nos próximos 30 dias." %}
+            <h5 class="text-info-emphasis">A Vencer (Próximos 30 dias)</h5>
+            {% include "cadastros/includes/table_card_stack.html" with table_id="tbl-renovacoes" headers=headers_renovacoes rows_template="cadastros/includes/rows_renovacoes.html" items=contratos_a_vencer empty_text="Nenhum contrato vencendo." %}
+            
+            {% if contratos_vencidos %}
+                <hr class="my-4">
+                <h5 class="text-danger">Vencidos sem Renovação</h5>
+                {% include "cadastros/includes/table_card_stack.html" with table_id="tbl-vencidos" headers=headers_renovacoes rows_template="cadastros/includes/rows_renovacoes.html" items=contratos_vencidos empty_text="Nenhum contrato vencido sem renovação." %}
+            {% endif %}
           </div>
         </div>
       </div>
@@ -105,6 +112,7 @@
         <a href="{% url 'cadastros:relatorio_alunos_pendentes' %}" class="list-group-item list-group-item-action text-danger fw-bold">
           <i class="bi bi-exclamation-triangle-fill"></i> Alunos com Pendências
         </a>
+        <a href="{% url 'cadastros:lista_leads' %}" class="btn btn-dark btn-sm"><i class="bi bi-star me-1"></i> CRM de Leads</a>
         <a href="{% url 'cadastros:novo_aluno_experimental' %}" class="btn btn-success btn-sm"><i class="bi bi-person-plus me-1"></i> Novo Experimental</a>
       </div>
     </div>

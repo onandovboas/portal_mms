@@ -1,8 +1,22 @@
-{% for contrato in items %}
+{% load tz %} {# Carrega a tag de timezone #}
+
+{% for item in items %}
 <tr>
-  <td data-label="Aluno"><a href="{% url 'cadastros:perfil_aluno' pk=contrato.aluno.pk %}">{{ contrato.aluno.nome_completo }}</a></td>
-  <td data-label="Telefone">{{ contrato.aluno.telefone|default:"-" }}</td>
-  <td data-label="Plano">{{ contrato.get_plano_display }}</td>
-  <td data-label="Fim do Contrato"><time datetime="{{ contrato.data_fim|date:'Y-m-d' }}">{{ contrato.data_fim|date:"d/m/Y" }}</time></td>
+  <td>
+    <a href="{% url 'cadastros:perfil_aluno' item.aluno.pk %}">{{ item.aluno.nome_completo }}</a>
+  </td>
+  <td>{{ item.aluno.telefone|default:'--' }}</td>
+  <td>{{ item.get_plano_display }}</td>
+  <td>
+    <time datetime="{{ item.data_fim|date:'Y-m-d' }}">{{ item.data_fim|date:"d/m/Y" }}</time>
+  </td>
+  <td>
+    {% now "Y-m-d" as today_date %}
+    {% if item.data_fim|date:"Y-m-d" < today_date %}
+        <span class="badge text-bg-danger">Vencido há {{ item.data_fim|timesince }}</span>
+    {% else %}
+        <span class="badge text-bg-info">Vence em {{ item.data_fim|timeuntil }}</span>
+    {% endif %}
+  </td>
 </tr>
 {% endfor %}

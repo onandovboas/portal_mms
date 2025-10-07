@@ -1,6 +1,6 @@
 import re
 from django import forms
-from .models import Aluno, Pagamento, Turma, Contrato, RegistroAula, Inscricao
+from .models import Aluno, Pagamento, Turma, Contrato, RegistroAula, Inscricao, Lead
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -121,4 +121,18 @@ class RegistroAulaForm(forms.ModelForm):
             'new_reading': forms.NumberInput(attrs={'class': 'form-control'}),
             'old_reading': forms.NumberInput(attrs={'class': 'form-control'}),
             'lesson_check': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+
+class LeadForm(forms.ModelForm):
+    class Meta:
+        model = Lead
+        fields = ['nome_completo', 'telefone', 'email', 'status', 'fonte_contato', 'disponibilidade_horarios', 'observacoes']
+        widgets = {
+            'nome_completo': forms.TextInput(attrs={'class': 'form-control'}),
+            'telefone': forms.TextInput(attrs={'class': 'form-control'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'status': forms.Select(attrs={'class': 'form-select'}),
+            'fonte_contato': forms.Select(attrs={'class': 'form-select'}),
+            'disponibilidade_horarios': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'observacoes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
