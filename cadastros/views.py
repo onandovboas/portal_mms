@@ -1,16 +1,14 @@
 # cadastros/views.py
-
-from django.shortcuts import render, redirect, get_object_or_404
+from django.core.paginator import Paginator
 from django.contrib.auth.decorators import login_required
-from .models import Turma, Inscricao, RegistroAula, Professor, Presenca, Pagamento, Contrato, AcompanhamentoFalta, Aluno
-from .forms import AlunoForm
+from .models import Turma, Inscricao, RegistroAula, Professor, Presenca, Pagamento, Contrato, AcompanhamentoFalta, Aluno, Inscricao, RegistroAula, Presenca
+from .forms import AlunoForm, PagamentoForm, AlunoExperimentalForm, ContratoForm, RegistroAulaForm
 from django.utils import timezone
 from datetime import date, timedelta
-from django.db.models import Q, Count
+from django.db.models import F, Sum, Count, Min, Q, Subquery, OuterRef, Max, DecimalField
 from decimal import Decimal
 from dateutil.relativedelta import relativedelta 
 import calendar
-from django.db.models import Sum, F, DecimalField
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 from django.shortcuts import get_object_or_404, render, redirect
@@ -20,7 +18,6 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from django.contrib import messages
 from django.db.models.functions import ExtractWeek
-from datetime import datetime, timedelta
 
 
 # --- Views do Portal do Professor ---
@@ -61,7 +58,7 @@ def detalhe_turma(request, pk):
             try:
                 professor = Professor.objects.get(usuario=request.user)
             except Professor.DoesNotExist:
-                return redirect('portal_professor')
+                return redirect('cadastros:portal_professor')
 
             novo_registro = RegistroAula.objects.create(
                 turma=turma, professor=professor, data_aula=date.today(),
@@ -97,7 +94,7 @@ def detalhe_turma(request, pk):
                 turma.stage = novo_stage
             turma.save()
 
-        return redirect('detalhe_turma', pk=turma.pk)
+        return redirect('cadastros:detalhe_turma', pk=turma.pk)
 
     # --- LÓGICA GET ATUALIZADA ---
     hoje = timezone.now().date()
@@ -106,6 +103,12 @@ def detalhe_turma(request, pk):
     historico_aulas = RegistroAula.objects.filter(turma=turma, data_aula__year=ano_selecionado, data_aula__month=mes_selecionado).order_by('-data_aula')
     data_atual = date(ano_selecionado, mes_selecionado, 1)
     
+    paginator = Paginator(historico_aulas, 5) 
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    data_atual = date(ano_selecionado, mes_selecionado, 1)
+
     # ... (lógica de navegação de meses continua a mesma) ...
     mes_anterior = (data_atual.month - 2 + 12) % 12 + 1
     ano_anterior = data_atual.year if data_atual.month > 1 else data_atual.year - 1
@@ -123,6 +126,7 @@ def detalhe_turma(request, pk):
         'turma': turma,
         # 👇 Enviamos as listas separadas para o template 👇
         'matriculados': inscritos_matriculados,
+        'page_obj': page_obj,
         'experimentais': inscritos_experimentais,
         'acompanhando': inscritos_acompanhando,
         'trancados': inscritos_trancados,
@@ -206,9 +210,9 @@ def dashboard_admin(request):
 
     # Preparar headers para as tabelas
     headers_renovacoes = ["Aluno", "Telefone", "Plano", "Fim do Contrato"]
-    headers_experimentais = ["Aluno", "Telefone", "Turma"]
-    headers_pendentes = ["Aluno", "Telefone", "Descrição", "Valor Restante", "Vencimento", "Status", "Ação Rápida"]
-    headers_recebidos = ["Aluno", "Descrição", "Valor", "Data Pagamento"]
+    headers_experimentais = ["Aluno", "Telefone", "Turma", "Ações"]
+    headers_pendentes = ["","Aluno", "Telefone", "Descrição", "Valor Restante", "Vencimento", "Status", "Ação Rápida"]
+    headers_recebidos = ["Aluno", "Descrição", "Valor", "Data Pagamento", "Ações"]
 
     context = {
         'pagamentos_pendentes': pagamentos_pendentes,
@@ -249,7 +253,7 @@ def resolver_acompanhamento(request, pk):
         acompanhamento.data_resolucao = timezone.now()
         acompanhamento.save()
         
-    return redirect('dashboard_admin')
+    return redirect('cadastros:dashboard_admin')
 
 @login_required
 def lancamento_recebimento(request):
@@ -276,7 +280,7 @@ def lancamento_recebimento(request):
         next_url = request.POST.get('next') or request.GET.get('next')
         if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
             return redirect(next_url)
-        return redirect('dashboard_admin')
+        return redirect('cadastros:dashboard_admin')
 
     alunos = Aluno.objects.filter(status='ativo').order_by('nome_completo')
     return render(request, 'cadastros/lancamento_form.html', {'alunos': alunos})
@@ -376,7 +380,7 @@ def venda_livro(request):
                 status='pendente'
             )
         
-        return redirect('dashboard_admin')
+        return redirect('cadastros:dashboard_admin')
 
     # Lógica GET: Apenas exibe o formulário
     alunos = Aluno.objects.filter(status='ativo').order_by('nome_completo')
@@ -407,7 +411,7 @@ def pagamentos_bulk(request):
     # Redireciona de volta para o mês/filtros atuais se for seguro
     if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
         return redirect(next_url)
-    return redirect('dashboard_admin')
+    return redirect('cadastros:dashboard_admin')
 
 @login_required
 def quitar_pagamento_especifico(request, pk):
@@ -421,7 +425,7 @@ def quitar_pagamento_especifico(request, pk):
     pagamento.save()
 
     # 3. Redireciona o usuário de volta para o dashboard.
-    return redirect('dashboard_admin')
+    return redirect('cadastros:dashboard_admin')
 
 @login_required
 def perfil_aluno(request, pk):
@@ -560,7 +564,7 @@ def novo_pagamento(request, pk):
     """
     # se você já tem a rota 'lancamento_recebimento' no urls do projeto, isso funciona:
     next_url = reverse('cadastros:perfil_aluno', args=[pk]) if request.resolver_match.namespace == 'cadastros' else reverse('perfil_aluno', args=[pk])
-    lancamento_url = reverse('lancamento_recebimento')  # essa rota está no urls do projeto raiz
+    lancamento_url = reverse('cadastros:lancamento_recebimento')  # essa rota está no urls do projeto raiz
     return HttpResponseRedirect(f"{lancamento_url}?aluno={pk}&next={next_url}")
 
 
@@ -594,3 +598,216 @@ def editar_aluno(request, pk):
         "form": form,
         "aluno": aluno,
     })
+
+@login_required
+def relatorio_alunos_pendentes(request):
+    # Esta consulta é o coração da funcionalidade.
+    # 1. Filtramos apenas alunos que têm pagamentos com status de pendência.
+    # 2. Usamos .annotate() para calcular novos campos para cada aluno:
+    #    - total_devido: A soma do (valor total - valor já pago).
+    #    - cobrancas_pendentes: A contagem de pagamentos em aberto.
+    #    - vencimento_mais_antigo: A data de vencimento mais antiga entre as pendências.
+    # 3. Filtramos novamente para garantir que só apareçam alunos com cobranças pendentes.
+    # 4. Ordenamos para que os casos mais críticos (vencimento mais antigo) apareçam primeiro.
+    
+    alunos_com_pendencias = Aluno.objects.filter(
+        pagamentos__status__in=['pendente', 'atrasado', 'parcial']
+    ).annotate(
+        total_devido=Sum(
+            F('pagamentos__valor') - F('pagamentos__valor_pago'),
+            filter=Q(pagamentos__status__in=['pendente', 'atrasado', 'parcial'])
+        ),
+        cobrancas_pendentes=Count(
+            'pagamentos__id',
+            filter=Q(pagamentos__status__in=['pendente', 'atrasado', 'parcial'])
+        ),
+        vencimento_mais_antigo=Min(
+            'pagamentos__data_vencimento',
+            filter=Q(pagamentos__status__in=['pendente', 'atrasado', 'parcial'])
+        )
+    ).filter(cobrancas_pendentes__gt=0).order_by('vencimento_mais_antigo')
+
+    context = {
+        'alunos': alunos_com_pendencias,
+    }
+    return render(request, 'cadastros/relatorio_alunos_pendentes.html', context)
+
+@login_required
+def lista_alunos(request):
+    # Usamos Subquery para buscar informações de outros modelos de forma eficiente,
+    # evitando o problema de N+1 queries.
+
+    # Subquery para buscar o plano do contrato ativo mais recente.
+    contrato_ativo_plano = Contrato.objects.filter(
+        Q(aluno=OuterRef('pk')) & (Q(data_fim__gte=timezone.now()) | Q(data_fim__isnull=True)),
+        ativo=True
+    ).order_by('-data_inicio').values('plano')[:1]
+
+    # Subquery para buscar o valor da mensalidade do mesmo contrato.
+    contrato_ativo_valor = Contrato.objects.filter(
+        Q(data_fim__gte=timezone.now()) | Q(data_fim__isnull=True),
+        aluno=OuterRef('pk'), 
+        ativo=True
+    ).order_by('-data_inicio').values('valor_mensalidade')[:1]
+    
+    # Subquery para buscar a data do último pagamento efetuado.
+    ultimo_pagamento = Pagamento.objects.filter(
+        aluno=OuterRef('pk'),
+        status='pago'
+    ).order_by('-data_pagamento').values('data_pagamento')[:1]
+
+    # A query principal anota (adiciona) as informações das subqueries a cada aluno.
+    alunos = Aluno.objects.annotate(
+        plano_contrato=Subquery(contrato_ativo_plano),
+        valor_mensalidade_contrato=Subquery(contrato_ativo_valor),
+        data_ultimo_pagamento=Subquery(ultimo_pagamento)
+    ).order_by('nome_completo')
+
+    context = {
+        'alunos': alunos,
+    }
+    return render(request, 'cadastros/lista_alunos.html', context)
+
+@login_required
+def editar_pagamento(request, pk):
+    pagamento = get_object_or_404(Pagamento, pk=pk)
+    
+    if request.method == 'POST':
+        form = PagamentoForm(request.POST, instance=pagamento)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Pagamento atualizado com sucesso!')
+            # Redireciona de volta para o dashboard, mantendo os filtros de mês/ano
+            return redirect(request.GET.get('next', 'cadastros:dashboard_admin'))
+    else:
+        form = PagamentoForm(instance=pagamento)
+
+    context = {
+        'form': form,
+        'pagamento': pagamento
+    }
+    return render(request, 'cadastros/editar_pagamento.html', context)
+
+@login_required
+def pagamentos_acoes_em_lote(request):
+    if request.method == 'POST':
+        pagamento_ids = request.POST.getlist('pagamento_ids')
+        acao = request.POST.get('acao')
+
+        if not pagamento_ids:
+            messages.warning(request, 'Nenhum pagamento foi selecionado.')
+            return redirect(request.META.get('HTTP_REFERER', 'cadastros:dashboard_admin'))
+
+        queryset = Pagamento.objects.filter(pk__in=pagamento_ids)
+
+        if acao == 'quitar':
+            queryset.update(
+                status='pago',
+                valor_pago=F('valor'), # Define o valor pago igual ao valor total da cobrança
+                data_pagamento=timezone.now().date()
+            )
+            messages.success(request, f'{len(pagamento_ids)} pagamento(s) foram quitados com sucesso.')
+        
+        # Aqui podemos adicionar outras ações no futuro (ex: elif acao == 'cancelar': ...)
+
+    # Redireciona de volta para a página anterior (o dashboard)
+    return redirect(request.META.get('HTTP_REFERER', 'cadastros:dashboard_admin'))
+
+@require_POST # Garante que esta view só pode ser acessada via método POST, por segurança
+@login_required
+def quitar_dividas_aluno(request, pk):
+    aluno = get_object_or_404(Aluno, pk=pk)
+    
+    # Encontra todos os pagamentos com status de pendência para este aluno
+    pagamentos_pendentes = Pagamento.objects.filter(
+        aluno=aluno,
+        status__in=['pendente', 'parcial', 'atrasado']
+    )
+    
+    # Usa o método .update() para atualizar todos de uma vez de forma eficiente
+    pagamentos_pendentes.update(
+        status='pago',
+        valor_pago=F('valor'),
+        data_pagamento=timezone.now().date()
+    )
+    
+    messages.success(request, f'Todas as pendências de {aluno.nome_completo} foram quitadas.')
+    
+    # Redireciona de volta para a página de perfil do aluno
+    return redirect('cadastros:perfil_aluno', pk=aluno.pk)
+
+@login_required
+def novo_aluno_experimental(request):
+    if request.method == 'POST':
+        form = AlunoExperimentalForm(request.POST)
+        if form.is_valid():
+            # Cria o aluno mas não salva no banco ainda (commit=False)
+            aluno = form.save(commit=False)
+            aluno.status = 'ativo' # Define o status do aluno como ativo
+            aluno.save() # Agora salva o aluno no banco
+
+            # Pega a turma escolhida no formulário
+            turma_selecionada = form.cleaned_data['turma_experimental']
+
+            # Cria a inscrição vinculando o aluno à turma com o status 'experimental'
+            Inscricao.objects.create(
+                aluno=aluno,
+                turma=turma_selecionada,
+                status='experimental'
+            )
+
+            messages.success(request, f'Aluno(a) {aluno.nome_completo} cadastrado(a) como experimental na turma {turma_selecionada.nome}.')
+            return redirect('cadastros:dashboard_admin')
+    else:
+        form = AlunoExperimentalForm()
+
+    context = {
+        'form': form
+    }
+    return render(request, 'cadastros/novo_aluno_experimental.html', context)
+
+@login_required
+def criar_contrato(request, aluno_pk):
+    aluno = get_object_or_404(Aluno, pk=aluno_pk)
+    if request.method == 'POST':
+        form = ContratoForm(request.POST)
+        if form.is_valid():
+            contrato = form.save(commit=False)
+            contrato.aluno = aluno # Associa o contrato ao aluno correto
+            contrato.save()
+
+            # A MÁGICA DA AUTOMAÇÃO ACONTECE AQUI:
+            # Busca a inscrição experimental do aluno e atualiza o status para 'matriculado'
+            Inscricao.objects.filter(aluno=aluno, status='experimental').update(status='matriculado')
+
+            messages.success(request, f'Contrato criado para {aluno.nome_completo}. Status atualizado para "Matriculado".')
+            return redirect('cadastros:perfil_aluno', pk=aluno.pk) # Redireciona para o perfil do aluno
+    else:
+        form = ContratoForm()
+
+    context = {
+        'form': form,
+        'aluno': aluno
+    }
+    return render(request, 'cadastros/criar_contrato.html', context)
+
+@login_required
+def editar_registro_aula(request, pk):
+    registro_aula = get_object_or_404(RegistroAula, pk=pk)
+    turma_pk = registro_aula.turma.pk # Guarda o ID da turma para o redirecionamento
+
+    if request.method == 'POST':
+        form = RegistroAulaForm(request.POST, instance=registro_aula)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Registro de aula atualizado com sucesso!')
+            # Redireciona de volta para a página de detalhes da turma
+            return redirect('cadastros:detalhe_turma', pk=turma_pk)
+    else:
+        form = RegistroAulaForm(instance=registro_aula)
+
+    context = {
+        'form': form,
+        'registro_aula': registro_aula
+    }
+    return render(request, 'cadastros/editar_registro_aula.html', context)

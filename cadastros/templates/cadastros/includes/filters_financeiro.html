@@ -23,7 +23,7 @@
       </div>
       <div class="col-12 col-md-4 d-grid d-md-flex gap-2">
         <button type="submit" class="btn btn-primary">Filtrar</button>
-        <a href="{% url 'dashboard_admin' %}?ano={{ data_selecionada.year }}&mes={{ data_selecionada.month }}" class="btn btn-secondary">Limpar</a>
+        <a href="{% url 'cadastros:dashboard_admin' %}?ano={{ data_selecionada.year }}&mes={{ data_selecionada.month }}" class="btn btn-secondary">Limpar</a>
       </div>
     </form>
   </div>

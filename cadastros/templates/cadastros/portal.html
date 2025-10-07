@@ -58,7 +58,7 @@
     <div id="grid-turmas" class="row g-3">
       {% for info in turmas_info %}
         <div class="col-12 col-sm-6 col-lg-4 turma-col" data-nome="{{ info.turma.nome|lower }}" data-stage="{{ info.turma.stage|default:0 }}">
-          <a href="{% url 'detalhe_turma' pk=info.turma.pk %}" class="card-link" aria-label="Abrir turma {{ info.turma.nome }} (Stage {{ info.turma.stage }})">
+          <a href="{% url 'cadastros:detalhe_turma' pk=info.turma.pk %}" class="card-link" aria-label="Abrir turma {{ info.turma.nome }} (Stage {{ info.turma.stage }})">
             <div class="card h-100 turma-card">
               <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start gap-2">

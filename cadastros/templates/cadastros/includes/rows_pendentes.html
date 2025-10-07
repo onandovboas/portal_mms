@@ -1,23 +1,33 @@
-{# Cabeçalho esperado: 'Aluno','Telefone','Descrição','Valor Restante','Vencimento','Status','Ação Rápida' #}
-{% for pagamento in items %}
-  {% if pagamento.status == 'atrasado' %}<tr class="table-danger">
-  {% elif pagamento.status == 'parcial' %}<tr class="table-warning">
-  {% else %}<tr>{% endif %}
-
-  <td data-label="Aluno"><a href="{% url 'perfil_aluno' pk=pagamento.aluno.pk %}">{{ pagamento.aluno.nome_completo }}</a></td>
-  <td data-label="Telefone">{{ pagamento.aluno.telefone|default:"-" }}</td>
-  <td data-label="Descrição">{{ pagamento.descricao }}</td>
-  <td data-label="Valor Restante"><strong>R$ {{ pagamento.valor_restante|floatformat:2 }}</strong></td>
-  <td data-label="Vencimento"><time datetime="{{ pagamento.data_vencimento|date:'Y-m-d' }}">{{ pagamento.data_vencimento|date:"d/m/Y" }}</time></td>
-  <td data-label="Status">
-    <span class="badge {% if pagamento.status == 'atrasado' %}bg-danger{% elif pagamento.status == 'parcial' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
-      {{ pagamento.get_status_display }}
-    </span>
-  </td>
-  <td data-label="Ação Rápida">
-    <a href="{% url 'quitar_pagamento' pk=pagamento.pk %}" class="btn btn-success btn-sm d-grid">Quitar</a>
-  </td>
+{% for item in items %}
+<tr data-aluno="{{ item.aluno.nome_completo|lower }}" data-descricao="{{ item.descricao|lower }}">
+    <td class="text-center">
+        <input class="form-check-input" type="checkbox" name="pagamento_ids" value="{{ item.pk }}" aria-label="Selecionar pagamento de {{ item.aluno.nome_completo }}">
+    </td>
+    <td>
+        <a href="{% url 'cadastros:perfil_aluno' item.aluno.pk %}">{{ item.aluno.nome_completo }}</a>
+    </td>
+    <td>{{ item.aluno.telefone|default:'--' }}</td>
+    <td>{{ item.descricao }}</td>
+    <td>R$ {{ item.valor_restante|floatformat:2 }}</td>
+    <td>
+        <span class="{% if item.status == 'atrasado' %}text-danger fw-bold{% endif %}">
+            <time datetime="{{ item.data_vencimento|date:'Y-m-d' }}">{{ item.data_vencimento|date:"d/m/Y" }}</time>
+        </span>
+    </td>
+    <td>
+        <span class="badge 
+            {% if item.status == 'pendente' %}text-bg-secondary
+            {% elif item.status == 'parcial' %}text-bg-warning
+            {% elif item.status == 'atrasado' %}text-bg-danger
+            {% endif %}">
+            {{ item.get_status_display }}
+        </span>
+    </td>
+    <td>
+        <div class="d-flex gap-2">
+            <a href="{% url 'cadastros:quitar_pagamento' item.pk %}" class="btn btn-success btn-sm" title="Quitar Pagamento">Quitar</a>
+            <a href="{% url 'cadastros:editar_pagamento' item.pk %}?next={{ request.get_full_path|urlencode }}" class="btn btn-secondary btn-sm" title="Editar Lançamento">Editar</a>
+        </div>
+    </td>
 </tr>
-{% empty %}
-<tr><td colspan="7" class="text-center text-muted py-4">Nenhum pagamento pendente para este mês.</td></tr>
 {% endfor %}

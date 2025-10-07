@@ -1,6 +1,9 @@
-from django import forms
-from .models import Aluno
 import re
+from django import forms
+from .models import Aluno, Pagamento, Turma, Contrato, RegistroAula, Inscricao
+from django.shortcuts import get_object_or_404, redirect, render
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 
 UF_CHOICES = [
     ("", "—"),
@@ -46,3 +49,76 @@ class AlunoForm(forms.ModelForm):
     def clean_estado(self):
         uf = (self.cleaned_data.get("estado") or "").upper()
         return uf if uf in dict(UF_CHOICES) else ""
+
+class PagamentoForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Esta mágica acontece aqui:
+        # 1. Verificamos se o formulário está editando um pagamento existente.
+        # 2. Se sim, pegamos a data de vencimento.
+        # 3. Formatamos a data para o padrão AAAA-MM-DD que o HTML entende.
+        if self.instance and self.instance.data_vencimento:
+            self.initial['data_vencimento'] = self.instance.data_vencimento.strftime('%Y-%m-%d')
+
+    class Meta:
+        model = Pagamento
+        fields = ['descricao', 'valor', 'data_vencimento', 'status', 'valor_pago']
+        widgets = {
+            # O widget de data agora funcionará corretamente
+            'data_vencimento': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'descricao': forms.TextInput(attrs={'class': 'form-control'}),
+            'valor': forms.NumberInput(attrs={'class': 'form-control'}),
+            'valor_pago': forms.NumberInput(attrs={'class': 'form-control'}),
+            'status': forms.Select(attrs={'class': 'form-select'}),
+        }
+
+class AlunoExperimentalForm(forms.ModelForm):
+    # Este campo busca todas as turmas cadastradas e exibe como um menu de seleção.
+    turma_experimental = forms.ModelChoiceField(
+        queryset=Turma.objects.all().order_by('nome'),
+        label="Turma para aula experimental",
+        required=True,
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    class Meta:
+        model = Aluno
+        # Pedimos apenas os campos essenciais para um primeiro contato
+        fields = ['nome_completo', 'telefone', 'email']
+        widgets = {
+            "nome_completo": forms.TextInput(attrs={"class":"form-control", "placeholder":"Nome completo"}),
+            "telefone": forms.TextInput(attrs={"class":"form-control", "placeholder":"(00) 00000-0000"}),
+            "email": forms.EmailInput(attrs={"class":"form-control", "placeholder":"email@exemplo.com"}),
+        }
+
+class ContratoForm(forms.ModelForm):
+    class Meta:
+        model = Contrato
+        # O campo 'aluno' será preenchido automaticamente pela view
+        fields = ['plano', 'data_inicio', 'valor_mensalidade', 'valor_matricula', 'parcelas_matricula', 'observacoes']
+        widgets = {
+            'data_inicio': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'plano': forms.Select(attrs={'class': 'form-select'}),
+            'valor_mensalidade': forms.NumberInput(attrs={'class': 'form-control'}),
+            'valor_matricula': forms.NumberInput(attrs={'class': 'form-control'}),
+            'parcelas_matricula': forms.NumberInput(attrs={'class': 'form-control'}),
+            'observacoes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+
+class RegistroAulaForm(forms.ModelForm):
+    class Meta:
+        model = RegistroAula
+        # 1. Adicionado 'data_aula' à lista de campos
+        fields = ['data_aula', 'last_parag', 'last_word', 'new_dictation', 'old_dictation', 'new_reading', 'old_reading', 'lesson_check']
+        
+        # 2. Adicionado o widget para o novo campo
+        widgets = {
+            'data_aula': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'last_parag': forms.NumberInput(attrs={'class': 'form-control'}),
+            'last_word': forms.TextInput(attrs={'class': 'form-control'}),
+            'new_dictation': forms.NumberInput(attrs={'class': 'form-control'}),
+            'old_dictation': forms.NumberInput(attrs={'class': 'form-control'}),
+            'new_reading': forms.NumberInput(attrs={'class': 'form-control'}),
+            'old_reading': forms.NumberInput(attrs={'class': 'form-control'}),
+            'lesson_check': forms.TextInput(attrs={'class': 'form-control'}),
+        }

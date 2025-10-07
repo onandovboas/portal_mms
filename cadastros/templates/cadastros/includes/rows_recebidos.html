@@ -1,14 +1,21 @@
-{% for pagamento in items %}
-<tr>
-  <td data-label="Aluno"><a href="{% url 'perfil_aluno' pk=pagamento.aluno.pk %}">{{ pagamento.aluno.nome_completo }}</a></td>
-  <td data-label="Descrição">{{ pagamento.descricao }}</td>
-  <td data-label="Valor">R$ {{ pagamento.valor|floatformat:2 }}</td>
-  <td data-label="Data Pagamento">
-    {% if pagamento.data_pagamento %}
-      <time datetime="{{ pagamento.data_pagamento|date:'Y-m-d' }}">{{ pagamento.data_pagamento|date:"d/m/Y" }}</time>
-    {% else %}-{% endif %}
+{% comment %} 
+Arquivo: templates/cadastros/includes/rows_recebidos.html 
+{% endcomment %}
+{% for item in items %}
+<tr data-aluno="{{ item.aluno.nome_completo|lower }}" data-descricao="{{ item.descricao|lower }}">
+  <td>
+    <a href="{% url 'cadastros:perfil_aluno' item.aluno.pk %}">{{ item.aluno.nome_completo }}</a>
+  </td>
+  <td>{{ item.descricao }}</td>
+  <td>R$ {{ item.valor|floatformat:2 }}</td>
+  <td>
+    <time datetime="{{ item.data_pagamento|date:'Y-m-d' }}">{{ item.data_pagamento|date:"d/m/Y" }}</time>
+  </td>
+  
+  <td>
+    <a href="{% url 'cadastros:editar_pagamento' item.pk %}?next={{ request.get_full_path|urlencode }}" class="btn btn-secondary btn-sm" title="Editar Lançamento">
+      Editar
+    </a>
   </td>
 </tr>
-{% empty %}
-<tr><td colspan="4" class="text-center text-muted">Nenhum pagamento recebido para este mês.</td></tr>
 {% endfor %}

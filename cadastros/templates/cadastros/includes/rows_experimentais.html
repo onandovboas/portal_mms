@@ -1,7 +1,14 @@
-{% for inscricao in items %}
-<tr>
-  <td data-label="Aluno">{{ inscricao.aluno.nome_completo }}</td>
-  <td data-label="Telefone">{{ inscricao.aluno.telefone|default:"-" }}</td>
-  <td data-label="Turma">{{ inscricao.turma.nome }}</td>
+{% for item in items %}
+<tr data-aluno="{{ item.aluno.nome_completo|lower }}">
+  <td>
+    <a href="{% url 'cadastros:perfil_aluno' item.aluno.pk %}">{{ item.aluno.nome_completo }}</a>
+  </td>
+  <td>{{ item.aluno.telefone|default:'--' }}</td>
+  <td>{{ item.turma.nome }}</td>
+  <td>
+    <a href="{% url 'cadastros:criar_contrato' item.aluno.pk %}" class="btn btn-success btn-sm">
+        <i class="bi bi-file-text me-1"></i> Criar Contrato
+    </a>
+  </td>
 </tr>
 {% endfor %}

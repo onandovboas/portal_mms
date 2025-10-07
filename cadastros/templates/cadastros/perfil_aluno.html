@@ -33,7 +33,7 @@
     <!-- Breadcrumb -->
     <nav aria-label="breadcrumb">
       <ol class="breadcrumb mb-3">
-        <li class="breadcrumb-item"><a href="{% url 'dashboard_admin' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'cadastros:dashboard_admin' %}">Dashboard</a></li>
         <li class="breadcrumb-item active" aria-current="page">{{ aluno.nome_completo }}</li>
       </ol>
     </nav>
@@ -53,7 +53,7 @@
         </div>
       </div>
       <div class="d-flex gap-2">
-        {% url 'editar_aluno' aluno.pk as editar_url %}
+        {% url 'cadastros:editar_aluno' aluno.pk as editar_url %}
         {% if editar_url %}
           <a href="{{ editar_url }}" class="btn btn-outline-secondary btn-icon" aria-label="Editar aluno">
             <i class="bi bi-pencil-square"></i><span>Editar</span>
@@ -459,12 +459,18 @@
           {% endif %}
 
           <div class="card-footer bg-white d-flex flex-wrap gap-2 justify-content-end">
-            <a href="{% url 'novo_pagamento' aluno.pk %}" class="btn btn-outline-primary btn-sm btn-icon">
+            <a href="{% url 'cadastros:novo_pagamento' aluno.pk %}" class="btn btn-outline-primary btn-sm btn-icon">
               <i class="bi bi-plus-circle"></i><span>Adicionar Pagamento</span>
             </a>
-            <a href="{% url 'exportar_pagamentos_aluno' aluno.pk %}" class="btn btn-outline-secondary btn-sm btn-icon">
+            <a href="{% url 'cadastros:exportar_pagamentos_aluno' aluno.pk %}" class="btn btn-outline-secondary btn-sm btn-icon">
               <i class="bi bi-download"></i><span>Exportar CSV</span>
             </a>
+            <form action="{% url 'cadastros:quitar_dividas_aluno' aluno.pk %}" method="post" onsubmit="return confirm('Tem certeza que deseja quitar TODAS as pendências deste aluno?');">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-success btn-sm btn-icon">
+                  <i class="bi bi-check-circle-fill"></i><span>Quitar Todas as Pendências</span>
+              </button>
+          </form>
           </div>
         </div>
       </div>
