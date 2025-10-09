@@ -129,6 +129,6 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-LOGIN_URL = '/login/'
-LOGIN_REDIRECT_URL = '/'
-LOGOUT_REDIRECT_URL = '/'
+LOGIN_URL = 'cadastros:portal_login'
+LOGIN_REDIRECT_URL = 'cadastros:portal_aluno' # Redirecionamento padrão para o portal do aluno
+LOGOUT_REDIRECT_URL = 'cadastros:portal_login' # Para onde vai após o logout

@@ -2,11 +2,13 @@
 from django.db import models
 from django.contrib.auth.models import User # Vamos precisar do User para os Professores
 from dateutil.relativedelta import relativedelta 
-from datetime import date, timezone
+from datetime import date, timezone, timedelta
 from django.utils import timezone
+import uuid
 
 # Aluno permanece quase o mesmo
 class Aluno(models.Model):
+    usuario = models.OneToOneField(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="perfil_aluno")
     STATUS_CHOICES = [("ativo", "Ativo"), ("inativo", "Inativo"), ("trancado", "Trancado")]
     nome_completo = models.CharField(max_length=200)
     cpf = models.CharField(max_length=14, unique=True, null=True, blank=True)
@@ -171,6 +173,44 @@ class AcompanhamentoFalta(models.Model):
     def __str__(self):
         return f"Acompanhamento de {self.aluno.nome_completo} - {self.get_status_display()}"
     
+class AcompanhamentoPedagogico(models.Model):
+    STATUS_CHOICES = [
+        ('agendado', 'Agendado'),
+        ('realizado', 'Realizado'),
+        ('cancelado', 'Cancelado'),
+    ]
+
+    aluno = models.ForeignKey(Aluno, on_delete=models.CASCADE, related_name="acompanhamentos_pedagogicos")
+    status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='agendado')
+    
+    # Datas
+    data_agendamento = models.DateTimeField("Data e Hora do Agendamento")
+    data_realizacao = models.DateTimeField("Data e Hora de Realização", null=True, blank=True)
+    
+    # Contexto no momento do acompanhamento
+    stage_no_momento = models.IntegerField("Stage do Aluno no Momento do Acompanhamento")
+    
+    # Campos da Entrevista
+    dificuldades = models.TextField(blank=True)
+    relacao_lingua = models.TextField("Relação com a língua", blank=True)
+    objetivo_estudo = models.TextField("Objetivo do estudo", blank=True)
+    correcao_ditados = models.TextField("Correção de ditados", blank=True)
+    pontos_fortes = models.TextField(blank=True)
+    pontos_melhorar = models.TextField("Pontos a serem melhorados", blank=True)
+    estrategia = models.TextField("Estratégia", blank=True)
+    comentarios_extras = models.TextField(blank=True)
+
+    # Rastreabilidade
+    criado_por = models.ForeignKey(Professor, on_delete=models.SET_NULL, null=True, related_name="acompanhamentos_criados")
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-data_agendamento']
+
+    def __str__(self):
+        return f"Acompanhamento de {self.aluno.nome_completo} em {self.data_agendamento.strftime('%d/%m/%Y')}"
+    
 
 class TesteStage(models.Model):
     aluno = models.ForeignKey(Aluno, on_delete=models.CASCADE, related_name="testes_stage")
@@ -240,3 +280,19 @@ class Lead(models.Model):
     def __str__(self):
         return f"{self.nome_completo} ({self.get_status_display()})"
     
+class TokenAtualizacaoAluno(models.Model):
+    """
+    Armazena um token seguro e de uso único para um aluno atualizar seus dados.
+    """
+    aluno = models.ForeignKey(Aluno, on_delete=models.CASCADE, related_name="tokens_atualizacao")
+    token = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    usado = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Token para {self.aluno.nome_completo} criado em {self.criado_em.strftime('%d/%m/%Y %H:%M')}"
+
+    @property
+    def is_expired(self):
+        """Verifica se o token expirou (válido por 24 horas)."""
+        return self.criado_em + timedelta(hours=24) < timezone.now()

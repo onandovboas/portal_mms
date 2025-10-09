@@ -38,8 +38,20 @@
       </ol>
     </nav>
 
+    {% if messages %}
+      <div class="messages-container mb-3">
+        {% for message in messages %}
+          <div class="alert {% if message.tags %}alert-{{ message.tags }}{% else %}alert-info{% endif %} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
     <!-- Header -->
-    <header class="d-flex align-items-center justify-content-between bg-white rounded-3 p-3 shadow-sm">
+
+<header class="d-flex align-items-center justify-content-between bg-white rounded-3 p-3 shadow-sm">
       <div class="d-flex align-items-center gap-3">
         <div class="avatar" aria-hidden="true">
           {% with aluno.nome_completo|slice:":1" as ini1 %}{{ ini1|upper }}{% endwith %}
@@ -52,17 +64,38 @@
           </div>
         </div>
       </div>
-      <div class="d-flex gap-2">
-        {% url 'cadastros:editar_aluno' aluno.pk as editar_url %}
-        {% if editar_url %}
-          <a href="{{ editar_url }}" class="btn btn-outline-secondary btn-icon" aria-label="Editar aluno">
-            <i class="bi bi-pencil-square"></i><span>Editar</span>
-          </a>
+      <div class="d-flex gap-2 align-items-center flex-wrap justify-content-end">
+        
+        {% if aluno.usuario %}
+          <div class="text-end">
+            <small class="d-block text-muted">Acesso ao Portal:</small>
+            <span class="badge bg-light text-dark border me-2" title="Nome de Utilizador">
+              <i class="bi bi-person"></i> {{ aluno.usuario.username }}
+            </span>
+            <form action="{% url 'cadastros:redefinir_senha_aluno' aluno_pk=aluno.pk %}" method="post" class="d-inline">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-warning btn-sm btn-icon" title="Gerar uma nova senha temporária para este aluno.">
+                <i class="bi bi-shield-lock-fill"></i><span>Redefinir Senha</span>
+              </button>
+            </form>
+          </div>
         {% else %}
-          <button type="button" class="btn btn-outline-secondary" disabled aria-disabled="true">
-            <i class="bi bi-pencil-square me-1"></i> Editar
-          </button>
+          <form action="{% url 'cadastros:criar_acesso_portal' aluno_pk=aluno.pk %}" method="post">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-success btn-icon" title="Criar login e senha para o aluno aceder ao portal.">
+              <i class="bi bi-key-fill"></i><span>Criar Acesso</span>
+            </button>
+          </form>
         {% endif %}
+
+        <a href="{% url 'cadastros:gerar_link_atualizacao' aluno_pk=aluno.pk %}" class="btn btn-outline-primary btn-icon" title="Gerar e exibir um link seguro para o aluno atualizar o próprio cadastro.">
+          <i class="bi bi-link-45deg"></i><span>Enviar Link</span>
+        </a>
+
+        <a href="{% url 'cadastros:editar_aluno' aluno.pk %}" class="btn btn-outline-secondary btn-icon" aria-label="Editar aluno">
+          <i class="bi bi-pencil-square"></i><span>Editar</span>
+        </a>
+
       </div>
     </header>
 
@@ -295,11 +328,13 @@
 
         <!-- Acompanhamento Pedagógico -->
         <div class="card shadow-sm mt-3">
-          <div class="card-header bg-white">
+          <div class="card-header bg-white d-flex justify-content-between align-items-center">
             <h2 class="h6 mb-0">Acompanhamento Pedagógico</h2>
+            <a href="{% url 'cadastros:historico_acompanhamentos_aluno' aluno.pk %}" class="btn btn-outline-secondary btn-sm btn-icon">
+              <i class="bi bi-clock-history"></i><span>Ver Histórico</span>
+            </a>
           </div>
           <div class="card-body">
-            <!-- Estatísticas de Frequência -->
             <div class="row mb-3">
               <div class="col-md-6">
                 <div class="card kpi {% if percentual_frequencia < 80 %}danger{% elif percentual_frequencia < 90 %}warn{% endif %}">
@@ -320,7 +355,6 @@
               </div>
             </div>
 
-            <!-- Lista de Acompanhamentos -->
             <h6 class="card-section-title mb-2">Acompanhamentos de Faltas</h6>
             {% for acompanhamento in acompanhamentos %}
             <div class="border rounded p-3 mb-2 {% if acompanhamento.status == 'pendente' %}bg-light{% endif %}">
@@ -347,7 +381,7 @@
             {% empty %}
             <div class="text-center py-3 text-muted">
               <i class="bi bi-check-circle fs-1 d-block mb-2"></i>
-              Nenhum acompanhamento de falta registrado.
+              Nenhum acompanhamento de falta registado.
             </div>
             {% endfor %}
           </div>

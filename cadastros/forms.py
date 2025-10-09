@@ -1,9 +1,10 @@
 import re
 from django import forms
-from .models import Aluno, Pagamento, Turma, Contrato, RegistroAula, Inscricao, Lead
+from .models import Aluno, Pagamento, Turma, Contrato, RegistroAula, Inscricao, Lead, AcompanhamentoPedagogico
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import PasswordChangeForm
 
 UF_CHOICES = [
     ("", "—"),
@@ -136,3 +137,35 @@ class LeadForm(forms.ModelForm):
             'disponibilidade_horarios': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'observacoes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
+
+class AcompanhamentoPedagogicoForm(forms.ModelForm):
+    class Meta:
+        model = AcompanhamentoPedagogico
+        # Campos que o utilizador irá preencher. 'aluno' e 'criado_por' são definidos na view.
+        fields = [
+            'status', 'data_agendamento', 'data_realizacao', 'stage_no_momento',
+            'dificuldades', 'relacao_lingua', 'objetivo_estudo', 'correcao_ditados',
+            'pontos_fortes', 'pontos_melhorar', 'estrategia', 'comentarios_extras'
+        ]
+
+        widgets = {
+            'status': forms.Select(attrs={'class': 'form-select'}),
+            'data_agendamento': forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-control'}),
+            'data_realizacao': forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-control'}),
+            'stage_no_momento': forms.NumberInput(attrs={'class': 'form-control'}),
+            'dificuldades': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'relacao_lingua': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'objetivo_estudo': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'correcao_ditados': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'pontos_fortes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'pontos_melhorar': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'estrategia': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'comentarios_extras': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+
+class MyPasswordChangeForm(PasswordChangeForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['old_password'].widget.attrs.update({'class': 'form-control', 'placeholder': ' '})
+        self.fields['new_password1'].widget.attrs.update({'class': 'form-control', 'placeholder': ' '})
+        self.fields['new_password2'].widget.attrs.update({'class': 'form-control', 'placeholder': ' '})

@@ -104,9 +104,14 @@
     <!-- Card de Relatórios -->
     <div class="card mb-4">
       <div class="card-header">
-        Relatórios
+        Relatórios e Módulos
       </div>
       <div class="list-group list-group-flush">
+        
+        <a href="{% url 'cadastros:lista_acompanhamento_pedagogico' %}" class="list-group-item list-group-item-action">
+          <i class="bi bi-journal-check me-2"></i>Acompanhamento Pedagógico
+        </a>
+        
         <a href="{% url 'cadastros:lista_alunos' %}" class="list-group-item list-group-item-action">Listagem Geral de Alunos</a>
         <a href="{% url 'cadastros:relatorio_professores' %}" class="list-group-item list-group-item-action">Aulas por Professor</a>
         <a href="{% url 'cadastros:relatorio_alunos_pendentes' %}" class="list-group-item list-group-item-action text-danger fw-bold">

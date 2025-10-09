@@ -1,8 +1,8 @@
 # cadastros/views.py
 from django.core.paginator import Paginator
 from django.contrib.auth.decorators import login_required
-from .models import Turma, Inscricao, RegistroAula, Professor, Presenca, Pagamento, Contrato, AcompanhamentoFalta, Aluno, Inscricao, RegistroAula, Presenca, Lead
-from .forms import AlunoForm, PagamentoForm, AlunoExperimentalForm, ContratoForm, RegistroAulaForm, LeadForm
+from .models import Turma, Inscricao, RegistroAula, Professor, Presenca, Pagamento, Contrato, AcompanhamentoFalta, Aluno, Inscricao, RegistroAula, Presenca, Lead, TokenAtualizacaoAluno, AcompanhamentoPedagogico
+from .forms import AlunoForm, PagamentoForm, AlunoExperimentalForm, ContratoForm, RegistroAulaForm, LeadForm, AcompanhamentoPedagogicoForm
 from django.utils import timezone
 from datetime import date, timedelta
 from django.db.models import F, Sum, Count, Min, Q, Subquery, OuterRef, Max, DecimalField, Exists
@@ -18,6 +18,12 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from django.contrib import messages
 from django.db.models.functions import ExtractWeek
+from django.contrib.auth.models import User # <-- Adicione este import
+import re
+from django.utils.crypto import get_random_string
+from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth import login, authenticate
+
 
 
 # --- Views do Portal do Professor ---
@@ -100,13 +106,43 @@ def detalhe_turma(request, pk):
     hoje = timezone.now().date()
     ano_selecionado = int(request.GET.get('ano', hoje.year))
     mes_selecionado = int(request.GET.get('mes', hoje.month))
-    historico_aulas = RegistroAula.objects.filter(turma=turma, data_aula__year=ano_selecionado, data_aula__month=mes_selecionado).order_by('-data_aula')
     data_atual = date(ano_selecionado, mes_selecionado, 1)
+    # ✅ MUDANÇA 1: Query otimizada com prefetch_related
+    # Buscamos as aulas e, de forma eficiente, já "anexamos" a elas
+    # todos os registros de presença e os alunos correspondentes.
+    historico_aulas = RegistroAula.objects.filter(
+    turma=turma, 
+    data_aula__year=ano_selecionado, 
+    data_aula__month=mes_selecionado
+    ).select_related('professor').prefetch_related('presenca_set__aluno').order_by('-data_aula')
     
-    paginator = Paginator(historico_aulas, 5) 
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+
+    alunos_ativos_na_turma = Aluno.objects.filter(
+        inscricao__turma=turma, 
+        inscricao__status__in=['matriculado', 'experimental', 'acompanhando']
+    ).distinct()
     
+    mapa_alunos_ativos = {aluno.pk: aluno for aluno in alunos_ativos_na_turma}
+    set_ids_alunos_ativos = set(mapa_alunos_ativos.keys())
+
+    for aula in historico_aulas:
+        aula.alunos_ausentes = [
+            p.aluno.nome_completo.split(' ')[0]  # <-- MUDANÇA AQUI
+            for p in aula.presenca_set.all() 
+            if not p.presente
+        ]
+
+    faltas_do_mes = Presenca.objects.filter(
+        registro_aula__turma=turma,
+        registro_aula__data_aula__year=ano_selecionado,
+        registro_aula__data_aula__month=mes_selecionado,
+        presente=False
+    ).values(
+        'aluno__nome_completo'  # Agrupa por este campo
+    ).annotate(
+        total_faltas=Count('id')  # Conta as ocorrências em cada grupo
+    ).order_by('-total_faltas') # Ordena para mostrar quem mais faltou primeiro
+
     data_atual = date(ano_selecionado, mes_selecionado, 1)
 
     # ... (lógica de navegação de meses continua a mesma) ...
@@ -126,11 +162,11 @@ def detalhe_turma(request, pk):
         'turma': turma,
         # 👇 Enviamos as listas separadas para o template 👇
         'matriculados': inscritos_matriculados,
-        'page_obj': page_obj,
+        'aulas_do_mes': historico_aulas,
         'experimentais': inscritos_experimentais,
         'acompanhando': inscritos_acompanhando,
         'trancados': inscritos_trancados,
-        
+        'faltas_do_mes': faltas_do_mes,
         'historico_aulas': historico_aulas,
         'data_selecionada': data_atual,
         'nav': {
@@ -904,3 +940,349 @@ def converter_lead(request, pk):
     parametros = f'?lead_id={lead.pk}&nome_completo={lead.nome_completo}&email={lead.email or ""}&telefone={lead.telefone or ""}'
     
     return redirect(url_destino + parametros)
+
+@login_required
+def gerar_link_atualizacao(request, aluno_pk):
+    """
+    View para o administrador gerar um link de atualização para um aluno.
+    """
+    aluno = get_object_or_404(Aluno, pk=aluno_pk)
+    
+    # Cria um novo token no banco de dados associado ao aluno
+    token_obj = TokenAtualizacaoAluno.objects.create(aluno=aluno)
+    
+    # Constrói a URL completa que será enviada ao aluno
+    link_atualizacao = request.build_absolute_uri(
+        reverse('cadastros:atualizar_dados_aluno', args=[token_obj.token])
+    )
+    
+    # Adiciona uma mensagem de sucesso com o link para o admin copiar
+    messages.success(
+        request, 
+        f"Link de atualização gerado para {aluno.nome_completo}. "
+        f"Envie este link para o aluno: {link_atualizacao}"
+    )
+    
+    # Redireciona de volta para o perfil do aluno
+    return redirect('cadastros:perfil_aluno', pk=aluno.pk)
+
+
+def atualizar_dados_aluno(request, token):
+    """
+    View pública que o aluno acessa para atualizar seus dados.
+    """
+    # Tenta encontrar um token que seja válido (não usado e não expirado)
+    try:
+        token_obj = TokenAtualizacaoAluno.objects.get(token=token, usado=False)
+        if token_obj.is_expired:
+            # Se o token expirou, renderiza uma página de erro
+            return render(request, 'cadastros/token_invalido.html', {'motivo': 'Este link expirou.'})
+    except TokenAtualizacaoAluno.DoesNotExist:
+        # Se o token não existe ou já foi usado, renderiza uma página de erro
+        return render(request, 'cadastros/token_invalido.html', {'motivo': 'Este link é inválido ou já foi utilizado.'})
+
+    aluno = token_obj.aluno
+
+    if request.method == 'POST':
+        form = AlunoForm(request.POST, instance=aluno)
+        if form.is_valid():
+            form.save()
+            # Marca o token como usado para que não possa ser utilizado novamente
+            token_obj.usado = True
+            token_obj.save()
+            # Renderiza uma página de sucesso
+            return render(request, 'cadastros/atualizacao_sucesso.html')
+    else:
+        # Se for um GET, exibe o formulário preenchido com os dados do aluno
+        form = AlunoForm(instance=aluno)
+
+    context = {
+        'form': form,
+        'aluno': aluno
+    }
+    return render(request, 'cadastros/atualizar_cadastro_form.html', context)
+
+@login_required
+def lista_acompanhamento_pedagogico(request):
+    """
+    Página principal do módulo, mostrando agendamentos e a lista de alunos.
+    """
+    # Área Priorizada: Acompanhamentos com status 'agendado'
+    agendamentos_pendentes = AcompanhamentoPedagogico.objects.filter(
+        status='agendado'
+    ).select_related('aluno', 'criado_por').order_by('data_agendamento')
+
+    # Subquery para buscar a data do último acompanhamento realizado para cada aluno
+    ultimo_acompanhamento_subquery = AcompanhamentoPedagogico.objects.filter(
+        aluno=OuterRef('pk'),
+        status='realizado'
+    ).order_by('-data_realizacao').values('data_realizacao')[:1]
+
+    # Lista de todos os alunos ativos, com a data do seu último acompanhamento
+    alunos_list = Aluno.objects.filter(status='ativo').annotate(
+        ultimo_acompanhamento=Subquery(ultimo_acompanhamento_subquery)
+    ).order_by('nome_completo')
+
+    context = {
+        'agendamentos_pendentes': agendamentos_pendentes,
+        'alunos': alunos_list,
+    }
+    return render(request, 'cadastros/lista_acompanhamento.html', context)
+
+
+@login_required
+def adicionar_acompanhamento(request, aluno_pk):
+    """
+    View para agendar ou registrar um novo acompanhamento para um aluno.
+    """
+    aluno = get_object_or_404(Aluno, pk=aluno_pk)
+    
+    if request.method == 'POST':
+        form = AcompanhamentoPedagogicoForm(request.POST)
+        if form.is_valid():
+            acompanhamento = form.save(commit=False)
+            acompanhamento.aluno = aluno
+            try:
+                # Tenta associar o professor que está logado
+                acompanhamento.criado_por = Professor.objects.get(usuario=request.user)
+            except Professor.DoesNotExist:
+                # Se não for um professor, não associa ninguém (pode ser um admin)
+                pass
+            
+            # Se a data de realização for preenchida, o status muda para 'realizado'
+            if acompanhamento.data_realizacao:
+                acompanhamento.status = 'realizado'
+
+            acompanhamento.save()
+            messages.success(request, f"Acompanhamento para {aluno.nome_completo} salvo com sucesso.")
+            return redirect('cadastros:lista_acompanhamento_pedagogico')
+    else:
+        form = AcompanhamentoPedagogicoForm()
+
+    context = {
+        'form': form,
+        'aluno': aluno,
+    }
+    return render(request, 'cadastros/form_acompanhamento.html', context)
+
+
+@login_required
+def editar_acompanhamento(request, pk):
+    """
+    View para editar um acompanhamento existente.
+    """
+    acompanhamento = get_object_or_404(AcompanhamentoPedagogico, pk=pk)
+    aluno = acompanhamento.aluno
+
+    if request.method == 'POST':
+        form = AcompanhamentoPedagogicoForm(request.POST, instance=acompanhamento)
+        if form.is_valid():
+            acompanhamento = form.save(commit=False)
+            # Se a data de realização for preenchida, o status muda para 'realizado'
+            if acompanhamento.data_realizacao:
+                acompanhamento.status = 'realizado'
+            acompanhamento.save()
+
+            messages.success(request, f"Acompanhamento de {aluno.nome_completo} atualizado com sucesso.")
+            return redirect('cadastros:lista_acompanhamento_pedagogico')
+    else:
+        form = AcompanhamentoPedagogicoForm(instance=acompanhamento)
+    
+    context = {
+        'form': form,
+        'aluno': aluno,
+        'acompanhamento': acompanhamento,
+    }
+    return render(request, 'cadastros/form_acompanhamento.html', context)
+
+@login_required
+def historico_acompanhamentos_aluno(request, aluno_pk):
+    """
+    Exibe o histórico completo de acompanhamentos pedagógicos de um aluno.
+    """
+    aluno = get_object_or_404(Aluno, pk=aluno_pk)
+    
+    # Busca todos os acompanhamentos do aluno, ordenados do mais recente para o mais antigo
+    acompanhamentos = AcompanhamentoPedagogico.objects.filter(
+        aluno=aluno
+    ).select_related('criado_por').order_by('-data_agendamento')
+    
+    context = {
+        'aluno': aluno,
+        'acompanhamentos': acompanhamentos,
+    }
+    
+    return render(request, 'cadastros/historico_acompanhamentos.html', context)
+
+@login_required
+def portal_aluno(request):
+    """
+    Página principal (dashboard) do Portal do Aluno.
+    """
+    try:
+        aluno = request.user.perfil_aluno
+    except Aluno.DoesNotExist:
+        messages.error(request, "Acesso negado. Esta área é exclusiva para alunos.")
+        return redirect('cadastros:dashboard_admin')
+
+    # --- DADOS FINANCEIROS (já existentes) ---
+    kpis_financeiros = Pagamento.objects.filter(aluno=aluno).aggregate(
+        total_pendente=Sum('valor', filter=Q(status__in=['pendente', 'parcial', 'atrasado'])),
+        total_atrasado=Sum('valor', filter=Q(status='atrasado')),
+        contagem_atrasados=Count('id', filter=Q(status='atrasado'))
+    )
+    pagamentos_abertos = Pagamento.objects.filter(aluno=aluno, status__in=['pendente', 'parcial', 'atrasado']).order_by('data_vencimento')[:5]
+    ultimos_pagos = Pagamento.objects.filter(aluno=aluno, status='pago').order_by('-data_pagamento')[:5]
+
+    # --- ✅ NOVAS CONSULTAS DE FREQUÊNCIA ✅ ---
+    hoje = timezone.now().date()
+    ano_selecionado = int(request.GET.get('ano', hoje.year))
+    mes_selecionado = int(request.GET.get('mes', hoje.month))
+    data_selecionada = date(ano_selecionado, mes_selecionado, 1)
+
+    mes_anterior = (data_selecionada.month - 2 + 12) % 12 + 1
+    ano_anterior = data_selecionada.year if data_selecionada.month > 1 else data_selecionada.year - 1
+    mes_seguinte = data_selecionada.month % 12 + 1
+    ano_seguinte = data_selecionada.year if data_selecionada.month < 12 else data_selecionada.year + 1
+
+    # 1. Estatísticas Gerais de Frequência
+    presencas_stats = Presenca.objects.filter(aluno=aluno).aggregate(
+        total_aulas=Count('id'),
+        total_presencas=Count('id', filter=Q(presente=True))
+    )
+    total_aulas = presencas_stats['total_aulas'] or 1
+    percentual_frequencia = (presencas_stats['total_presencas'] / total_aulas) * 100
+
+    # 2. Histórico das últimas 5 aulas
+    historico_aulas_mes = Presenca.objects.filter(
+        aluno=aluno,
+        registro_aula__data_aula__year=ano_selecionado,
+        registro_aula__data_aula__month=mes_selecionado
+    ).select_related('registro_aula__turma').order_by('-registro_aula__data_aula')
+
+    # 3. Dados para o gráfico de frequência (últimos 6 meses)
+    meses_frequencia_data = []
+    hoje = timezone.now().date()
+    for i in range(5, -1, -1):
+        mes_data = hoje - relativedelta(months=i)
+        mes_inicio, mes_fim = mes_data.replace(day=1), (mes_data.replace(day=1) + relativedelta(months=1)) - timedelta(days=1)
+        
+        presencas_mes = Presenca.objects.filter(
+            aluno=aluno, registro_aula__data_aula__range=[mes_inicio, mes_fim]
+        ).aggregate(total=Count('id'), presentes=Count('id', filter=Q(presente=True)))
+        
+        percentual_mes = (presencas_mes['presentes'] / presencas_mes['total'] * 100) if presencas_mes['total'] > 0 else 0
+        
+        meses_frequencia_data.append({
+            'mes': mes_inicio.strftime('%b/%Y'),
+            'percentual': round(percentual_mes, 1),
+        })
+
+    context = {
+        'aluno': aluno,
+        'kpis': kpis_financeiros,
+        'pagamentos_abertos': pagamentos_abertos,
+        'ultimos_pagos': ultimos_pagos,
+        'percentual_frequencia': percentual_frequencia,
+        'historico_aulas': historico_aulas_mes, # <-- Usando a nova variável
+        'meses_frequencia': meses_frequencia_data,
+        'data_selecionada': data_selecionada, # <-- Nova variável para o template
+        'nav': { # <-- Nova variável para a navegação
+            'mes_anterior': mes_anterior, 'ano_anterior': ano_anterior,
+            'mes_seguinte': mes_seguinte, 'ano_seguinte': ano_seguinte,
+        }
+    }
+    return render(request, 'cadastros/portal_aluno.html', context)
+
+@login_required
+@require_POST # Garante que esta ação só pode ser feita via POST, por segurança
+def criar_acesso_portal(request, aluno_pk):
+    """
+    Cria um User do Django para um Aluno que ainda não tem acesso ao portal.
+    """
+    aluno = get_object_or_404(Aluno, pk=aluno_pk)
+
+    if aluno.usuario:
+        messages.warning(request, f"O aluno {aluno.nome_completo} já possui um acesso ao portal.")
+        return redirect('cadastros:perfil_aluno', pk=aluno.pk)
+
+    username = aluno.email or re.sub(r'\D', '', aluno.cpf or '') or f"aluno{aluno.pk}"
+    if User.objects.filter(username=username).exists():
+        username = f"{username}{aluno.pk}"
+
+    # ✅ LINHA CORRIGIDA ✅
+    # Usamos get_random_string para gerar uma palavra-passe aleatória de 8 caracteres.
+    password = get_random_string(length=8)
+
+    try:
+        novo_usuario = User.objects.create_user(username=username, password=password)
+        aluno.usuario = novo_usuario
+        aluno.save()
+
+        messages.success(
+            request,
+            f"Acesso ao portal criado para {aluno.nome_completo}. "
+            f"Envie as seguintes credenciais para o aluno de forma segura: "
+            f"Utilizador: {username} | Palavra-passe Temporária: {password}"
+        )
+    except Exception as e:
+        messages.error(request, f"Ocorreu um erro ao criar o acesso: {e}")
+
+    return redirect('cadastros:perfil_aluno', pk=aluno.pk)
+
+def portal_login_view(request):
+    if request.method == 'POST':
+        form = AuthenticationForm(request, data=request.POST)
+        if form.is_valid():
+            username = form.cleaned_data.get('username')
+            password = form.cleaned_data.get('password')
+            user = authenticate(username=username, password=password)
+            if user is not None:
+                login(request, user)
+                # A MÁGICA ACONTECE AQUI: Verificamos o tipo de utilizador
+                if hasattr(user, 'professor'):
+                    # Se for um professor, vai para o portal do professor
+                    return redirect('cadastros:portal_professor')
+                elif hasattr(user, 'perfil_aluno'):
+                    # Se for um aluno, vai para o portal do aluno
+                    return redirect('cadastros:portal_aluno')
+                else:
+                    # Se for outro tipo de user (ex: admin), vai para o dashboard
+                    return redirect('cadastros:dashboard_admin')
+        else:
+            messages.error(request, "Nome de utilizador ou palavra-passe inválidos.")
+    else:
+        form = AuthenticationForm()
+    
+    return render(request, 'cadastros/portal_login.html', {'form': form})
+
+login_required
+@require_POST
+def redefinir_senha_aluno(request, aluno_pk):
+    """
+    Redefine a senha de um Aluno que já possui um User, gerando uma nova senha temporária.
+    """
+    aluno = get_object_or_404(Aluno, pk=aluno_pk)
+
+    if not aluno.usuario:
+        messages.error(request, "Este aluno ainda não possui um acesso ao portal para que a senha seja redefinida.")
+        return redirect('cadastros:perfil_aluno', pk=aluno.pk)
+
+    # Gera uma nova palavra-passe aleatória e segura
+    nova_senha = get_random_string(length=8)
+    
+    try:
+        usuario = aluno.usuario
+        usuario.set_password(nova_senha) # Define a nova senha de forma segura (com hash)
+        usuario.save()
+
+        messages.success(
+            request,
+            f"Senha redefinida para {aluno.nome_completo}. "
+            f"As novas credenciais são: "
+            f"Utilizador: {usuario.username} | Nova Senha Temporária: {nova_senha}"
+        )
+    except Exception as e:
+        messages.error(request, f"Ocorreu um erro ao redefinir a senha: {e}")
+
+    return redirect('cadastros:perfil_aluno', pk=aluno.pk)

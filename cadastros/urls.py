@@ -1,7 +1,8 @@
 # cadastros/urls.py
-
+from django.contrib.auth import views as auth_views
 from django.urls import path
 from . import views
+from .forms import MyPasswordChangeForm
 
 app_name = 'cadastros'
 
@@ -19,6 +20,30 @@ urlpatterns = [
     path('aluno/<int:pk>/quitar-dividas/', views.quitar_dividas_aluno, name='quitar_dividas_aluno'),
     path('aluno/novo-experimental/', views.novo_aluno_experimental, name='novo_aluno_experimental'),
     path('aluno/<int:aluno_pk>/criar-contrato/', views.criar_contrato, name='criar_contrato'),
+    path('aluno/atualizar/<uuid:token>/', views.atualizar_dados_aluno, name='atualizar_dados_aluno'),
+
+    # Rotas Acompanhamentos Pedagogicos
+    path('acompanhamento-pedagogico/', views.lista_acompanhamento_pedagogico, name='lista_acompanhamento_pedagogico'),
+    path('aluno/<int:aluno_pk>/acompanhamento/novo/', views.adicionar_acompanhamento, name='adicionar_acompanhamento'),
+    path('acompanhamento/<int:pk>/editar/', views.editar_acompanhamento, name='editar_acompanhamento'),
+    path('aluno/<int:aluno_pk>/acompanhamentos/', views.historico_acompanhamentos_aluno, name='historico_acompanhamentos_aluno'),
+
+    # Rotas Portal Aluno
+    path('portal/', views.portal_aluno, name='portal_aluno'),
+    path('portal/login/', views.portal_login_view, name='portal_login'),
+    path('portal/logout/', auth_views.LogoutView.as_view(next_page='cadastros:portal_login'), name='portal_logout'),
+    path('aluno/<int:aluno_pk>/criar-acesso/', views.criar_acesso_portal, name='criar_acesso_portal'),
+    path('portal/mudar-senha/', auth_views.PasswordChangeView.as_view(
+        template_name='cadastros/password_change_form.html',
+        success_url='/portal/mudar-senha/concluido/',
+        form_class=MyPasswordChangeForm # ✅ ADICIONE ESTA LINHA ✅
+    ), name='password_change'),
+    path('portal/mudar-senha/concluido/', auth_views.PasswordChangeDoneView.as_view(
+        template_name='cadastros/password_change_done.html'
+    ), name='password_change_done'),
+     path('aluno/<int:aluno_pk>/redefinir-senha/', views.redefinir_senha_aluno, name='redefinir_senha_aluno'),
+
+
 
     # Rota para Leads
     path('leads/', views.lista_leads, name='lista_leads'),
@@ -39,6 +64,7 @@ urlpatterns = [
     path('inscricao/', views.formulario_inscricao, name='formulario_inscricao'),
     path('pagamento/quitar/<int:pk>/', views.quitar_pagamento_especifico, name='quitar_pagamento'),
     path('pagamento/editar/<int:pk>/', views.editar_pagamento, name='editar_pagamento'),
+    path('aluno/<int:aluno_pk>/gerar-link/', views.gerar_link_atualizacao, name='gerar_link_atualizacao'),
 
 
     

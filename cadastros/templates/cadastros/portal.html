@@ -24,15 +24,20 @@
 </head>
 <body class="bg-light">
   <header class="sticky-top-blur">
-    <div class="container content-wrap d-flex justify-content-between align-items-center py-2">
+    <div class="container content-wrap d-flex justify-content-between align-items-center py-2 flex-wrap gap-2">
       <div class="d-flex flex-column">
         <h1 class="h4 mb-0">Portal do Professor</h1>
         <p class="mb-0 text-muted small">Bem-vindo, {{ user.get_full_name|default:user.username }}!</p>
       </div>
-      <form action="{% url 'logout' %}" method="post" class="m-0">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-outline-danger btn-sm">Sair</button>
-      </form>
+      <div class="d-flex align-items-center gap-2">
+        <a href="{% url 'cadastros:lista_acompanhamento_pedagogico' %}" class="btn btn-outline-primary btn-sm">
+          <i class="bi bi-journal-check me-1"></i> Acompanhamento Pedagógico
+        </a>
+        <form action="{% url 'logout' %}" method="post" class="m-0">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-outline-danger btn-sm">Sair</button>
+        </form>
+      </div>
     </div>
   </header>
 
