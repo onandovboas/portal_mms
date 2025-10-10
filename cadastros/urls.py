@@ -41,8 +41,16 @@ urlpatterns = [
     path('portal/mudar-senha/concluido/', auth_views.PasswordChangeDoneView.as_view(
         template_name='cadastros/password_change_done.html'
     ), name='password_change_done'),
-     path('aluno/<int:aluno_pk>/redefinir-senha/', views.redefinir_senha_aluno, name='redefinir_senha_aluno'),
+    path('aluno/<int:aluno_pk>/redefinir-senha/', views.redefinir_senha_aluno, name='redefinir_senha_aluno'),
 
+    # Rotas para Provas
+    path('aluno/<int:aluno_pk>/liberar-prova/', views.liberar_prova, name='liberar_prova'),
+    path('turma/<int:turma_pk>/liberar-prova/', views.liberar_prova_turma, name='liberar_prova_turma'),
+    path('portal/prova/<int:aluno_prova_pk>/iniciar/', views.iniciar_prova, name='iniciar_prova'),
+    path('portal/prova/<int:aluno_prova_pk>/secao/<int:secao_num>/', views.realizar_prova_secao, name='realizar_prova_secao'),
+    path('portal/prova/<int:aluno_prova_pk>/concluida/', views.prova_concluida, name='prova_concluida'),
+    path('prova/correcao/<int:aluno_prova_pk>/', views.corrigir_prova, name='corrigir_prova'),
+    path('prova/resultado/<int:aluno_prova_pk>/', views.ver_resultado_prova, name='ver_resultado_prova'),
 
 
     # Rota para Leads
@@ -51,7 +59,7 @@ urlpatterns = [
     path('leads/<int:pk>/editar/', views.editar_lead, name='editar_lead'),
     path('leads/<int:pk>/converter/', views.converter_lead, name='converter_lead'),
 
-    #Rotas de Turmas
+    # Rotas de Turmas
     path('turma/<int:pk>/', views.detalhe_turma, name='detalhe_turma'),
     path('registro-aula/editar/<int:pk>/', views.editar_registro_aula, name='editar_registro_aula'),
 

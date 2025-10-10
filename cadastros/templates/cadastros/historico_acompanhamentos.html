@@ -10,96 +10,56 @@
 <body class="bg-light">
   <div class="container my-4">
 
-    <header class="d-flex align-items-center justify-content-between mb-4">
+    <header class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
       <div>
         <h1 class="h3 mb-1">Histórico Pedagógico</h1>
         <p class="text-muted mb-0">Aluno: <strong>{{ aluno.nome_completo }}</strong></p>
       </div>
-      <a href="{% url 'cadastros:perfil_aluno' aluno.pk %}" class="btn btn-outline-secondary">
-        &larr; Voltar ao Perfil do Aluno
-      </a>
+      <div class="d-flex gap-2">
+        <a href="{% url 'cadastros:liberar_prova' aluno.pk %}" class="btn btn-primary">
+          <i class="bi bi-send me-1"></i> Liberar Nova Prova
+        </a>
+        <a href="{% url 'cadastros:perfil_aluno' aluno.pk %}" class="btn btn-outline-secondary">
+          &larr; Voltar ao Perfil
+        </a>
+      </div>
     </header>
 
-    <div class="accordion" id="accordionAcompanhamentos">
-      {% for acomp in acompanhamentos %}
-        <div class="accordion-item">
-          <h2 class="accordion-header" id="heading-{{ acomp.pk }}">
-            <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ acomp.pk }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}" aria-controls="collapse-{{ acomp.pk }}">
-              <div class="d-flex justify-content-between w-100 me-3">
-                <span>
-                  <i class="bi bi-calendar-event me-2"></i>
-                  Acompanhamento de <strong>{{ acomp.data_agendamento|date:"d/m/Y" }}</strong>
-                </span>
-                <span class="badge 
-                  {% if acomp.status == 'realizado' %}text-bg-success
-                  {% elif acomp.status == 'agendado' %}text-bg-warning
-                  {% else %}text-bg-secondary{% endif %}">
-                  {{ acomp.get_status_display }}
-                </span>
-              </div>
-            </button>
-          </h2>
-          <div id="collapse-{{ acomp.pk }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" aria-labelledby="heading-{{ acomp.pk }}" data-bs-parent="#accordionAcompanhamentos">
-            <div class="accordion-body">
-              <div class="d-flex justify-content-end mb-3">
-                <a href="{% url 'cadastros:editar_acompanhamento' acomp.pk %}" class="btn btn-sm btn-outline-primary">
-                  <i class="bi bi-pencil-square me-1"></i> Editar este Registo
-                </a>
-              </div>
-
-              <dl class="row">
-                <dt class="col-sm-3">Data Agendada:</dt>
-                <dd class="col-sm-9">{{ acomp.data_agendamento|date:"d/m/Y, H:i" }}</dd>
-
-                <dt class="col-sm-3">Data de Realização:</dt>
-                <dd class="col-sm-9">{{ acomp.data_realizacao|date:"d/m/Y, H:i"|default:"<span class='text-muted'>Não realizado</span>" }}</dd>
-                
-                <dt class="col-sm-3">Stage no Momento:</dt>
-                <dd class="col-sm-9">{{ acomp.stage_no_momento }}</dd>
-
-                <dt class="col-sm-3">Registado por:</dt>
-                <dd class="col-sm-9">{{ acomp.criado_por.nome_completo|default:"-" }}</dd>
-              </dl>
-              <hr>
-              
-              <h5 class="mt-4">Detalhes da Entrevista</h5>
-              
-              <h6>Dificuldades</h6>
-              <p class="text-muted border-start border-3 ps-3">{{ acomp.dificuldades|linebreaksbr|default:"Nenhum registo." }}</p>
-
-              <h6>Relação com a língua</h6>
-              <p class="text-muted border-start border-3 ps-3">{{ acomp.relacao_lingua|linebreaksbr|default:"Nenhum registo." }}</p>
-              
-              <h6>Objetivo do estudo</h6>
-              <p class="text-muted border-start border-3 ps-3">{{ acomp.objetivo_estudo|linebreaksbr|default:"Nenhum registo." }}</p>
-              
-              <h6>Correção de ditados</h6>
-              <p class="text-muted border-start border-3 ps-3">{{ acomp.correcao_ditados|linebreaksbr|default:"Nenhum registo." }}</p>
-              
-              <h6>Pontos fortes</h6>
-              <p class="text-muted border-start border-3 ps-3">{{ acomp.pontos_fortes|linebreaksbr|default:"Nenhum registo." }}</p>
-              
-              <h6>Pontos a serem melhorados</h6>
-              <p class="text-muted border-start border-3 ps-3">{{ acomp.pontos_melhorar|linebreaksbr|default:"Nenhum registo." }}</p>
-              
-              <h6>Estratégia</h6>
-              <p class="text-muted border-start border-3 ps-3">{{ acomp.estrategia|linebreaksbr|default:"Nenhum registo." }}</p>
-              
-              <h6>Comentários extras</h6>
-              <p class="text-muted border-start border-3 ps-3">{{ acomp.comentarios_extras|linebreaksbr|default:"Nenhum registo." }}</p>
-
+    <section class="card mb-4">
+      <div class="card-header"><h2 class="h5 mb-0">Avaliações e Provas</h2></div>
+      <div class="list-group list-group-flush">
+        {% for prova in provas %}
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+              <h6 class="mb-1">{{ prova.prova_template.titulo }}</h6>
+              <small class="text-muted">Liberada em: {{ prova.data_realizacao|date:"d/m/Y" }}</small>
             </div>
+            <span class="badge 
+              {% if prova.status == 'nao_iniciada' %}text-bg-secondary
+              {% elif prova.status == 'em_progresso' %}text-bg-info
+              {% elif prova.status == 'aguardando_correcao' %}text-bg-warning
+              {% elif prova.status == 'finalizada' %}text-bg-success
+              {% endif %}">
+              {{ prova.get_status_display }}
+            </span>
           </div>
-        </div>
-      {% empty %}
-        <div class="card">
-          <div class="card-body text-center text-muted">
-            <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-            Nenhum acompanhamento pedagógico registado para este aluno.
-          </div>
-        </div>
-      {% endfor %}
-    </div>
+        {% empty %}
+          <div class="card-body text-center text-muted">Nenhuma prova liberada para este aluno.</div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-header"><h2 class="h5 mb-0">Acompanhamentos Individuais</h2></div>
+      <div class="accordion" id="accordionAcompanhamentos">
+        {% for acomp in acompanhamentos %}
+          <div class="accordion-item">
+            </div>
+        {% empty %}
+          <div class="card-body text-center text-muted">Nenhum acompanhamento individual registado.</div>
+        {% endfor %}
+      </div>
+    </section>
 
   </div>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

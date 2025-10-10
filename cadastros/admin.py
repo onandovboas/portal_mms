@@ -3,7 +3,7 @@
 from django.contrib import admin
 from .models import (
     Aluno, Professor, Turma, Inscricao, RegistroAula, Presenca, 
-    Contrato, Pagamento, AcompanhamentoFalta, HorarioAula
+    Contrato, Pagamento, AcompanhamentoFalta, HorarioAula, ProvaTemplate, Questao, AlunoProva
 )
 
 class InscricaoInline(admin.TabularInline):
@@ -41,6 +41,39 @@ class PagamentoAdmin(admin.ModelAdmin):
     list_display = ('descricao', 'aluno', 'valor', 'status', 'data_vencimento')
     list_filter = ('status', 'tipo', 'mes_referencia')
     search_fields = ('aluno__nome_completo', 'descricao')
+
+class QuestaoInline(admin.StackedInline):
+    """Permite adicionar e editar Questões diretamente na página do ProvaTemplate."""
+    model = Questao
+    extra = 1  # Mostra 1 formulário em branco para adicionar uma nova questão.
+    fields = ('ordem', 'tipo_questao', 'enunciado', 'pontos', 'dados_questao')
+    ordering = ('ordem',)
+
+
+@admin.register(ProvaTemplate)
+class ProvaTemplateAdmin(admin.ModelAdmin):
+    """Configuração da admin para os Gabaritos de Prova."""
+    list_display = ('titulo', 'stage_referencia')
+    inlines = [QuestaoInline]  # A mágica acontece aqui!
+    search_fields = ['titulo']
+    list_filter = ['stage_referencia']
+
+
+@admin.register(Questao)
+class QuestaoAdmin(admin.ModelAdmin):
+    """Permite gerir todas as questões de forma individual (opcional)."""
+    list_display = ('__str__', 'prova_template', 'tipo_questao', 'pontos')
+    list_filter = ('prova_template', 'tipo_questao')
+
+
+@admin.register(AlunoProva)
+class AlunoProvaAdmin(admin.ModelAdmin):
+    """Configuração da admin para visualizar as Provas dos Alunos."""
+    list_display = ('aluno', 'prova_template', 'status', 'nota_final', 'data_realizacao')
+    list_filter = ('status', 'prova_template__stage_referencia', 'aluno')
+    search_fields = ('aluno__nome_completo', 'prova_template__titulo')
+    autocomplete_fields = ['aluno', 'prova_template'] # Facilita a seleção
+
 
 # Registra os modelos no site de administração.
 admin.site.register(Aluno, AlunoAdmin)

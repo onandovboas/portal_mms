@@ -1,6 +1,6 @@
 import re
 from django import forms
-from .models import Aluno, Pagamento, Turma, Contrato, RegistroAula, Inscricao, Lead, AcompanhamentoPedagogico
+from .models import Aluno, Pagamento, Turma, Contrato, RegistroAula, Inscricao, Lead, AcompanhamentoPedagogico, ProvaTemplate
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -169,3 +169,13 @@ class MyPasswordChangeForm(PasswordChangeForm):
         self.fields['old_password'].widget.attrs.update({'class': 'form-control', 'placeholder': ' '})
         self.fields['new_password1'].widget.attrs.update({'class': 'form-control', 'placeholder': ' '})
         self.fields['new_password2'].widget.attrs.update({'class': 'form-control', 'placeholder': ' '})
+
+class LiberarProvaForm(forms.Form):
+    """
+    Formulário para o professor selecionar qual ProvaTemplate aplicar a um aluno.
+    """
+    prova_template = forms.ModelChoiceField(
+        queryset=ProvaTemplate.objects.all().order_by('stage_referencia', 'titulo'),
+        label="Selecione o Gabarito da Prova",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )

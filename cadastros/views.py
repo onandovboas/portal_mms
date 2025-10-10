@@ -1,8 +1,8 @@
 # cadastros/views.py
 from django.core.paginator import Paginator
 from django.contrib.auth.decorators import login_required
-from .models import Turma, Inscricao, RegistroAula, Professor, Presenca, Pagamento, Contrato, AcompanhamentoFalta, Aluno, Inscricao, RegistroAula, Presenca, Lead, TokenAtualizacaoAluno, AcompanhamentoPedagogico
-from .forms import AlunoForm, PagamentoForm, AlunoExperimentalForm, ContratoForm, RegistroAulaForm, LeadForm, AcompanhamentoPedagogicoForm
+from .models import Turma, Inscricao, RegistroAula, Professor, Presenca, Pagamento, Contrato, AcompanhamentoFalta, Aluno, Inscricao, RegistroAula, Presenca, Lead, TokenAtualizacaoAluno, AcompanhamentoPedagogico, AlunoProva, Questao, ProvaTemplate, RespostaAluno
+from .forms import AlunoForm, PagamentoForm, AlunoExperimentalForm, ContratoForm, RegistroAulaForm, LeadForm, AcompanhamentoPedagogicoForm, LiberarProvaForm
 from django.utils import timezone
 from datetime import date, timedelta
 from django.db.models import F, Sum, Count, Min, Q, Subquery, OuterRef, Max, DecimalField, Exists
@@ -23,6 +23,7 @@ import re
 from django.utils.crypto import get_random_string
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth import login, authenticate
+from django import forms
 
 
 
@@ -102,6 +103,11 @@ def detalhe_turma(request, pk):
 
         return redirect('cadastros:detalhe_turma', pk=turma.pk)
 
+    alunos_da_turma_ids = Inscricao.objects.filter(turma=turma).values_list('aluno_id', flat=True)
+    provas_da_turma = AlunoProva.objects.filter(
+        aluno_id__in=alunos_da_turma_ids
+    ).select_related('aluno', 'prova_template').order_by('-data_realizacao')
+
     # --- LÓGICA GET ATUALIZADA ---
     hoje = timezone.now().date()
     ano_selecionado = int(request.GET.get('ano', hoje.year))
@@ -169,6 +175,7 @@ def detalhe_turma(request, pk):
         'faltas_do_mes': faltas_do_mes,
         'historico_aulas': historico_aulas,
         'data_selecionada': data_atual,
+        'provas_da_turma': provas_da_turma,
         'nav': {
             'mes_anterior': mes_anterior, 'ano_anterior': ano_anterior,
             'mes_seguinte': mes_seguinte, 'ano_seguinte': ano_seguinte,
@@ -887,11 +894,28 @@ def editar_registro_aula(request, pk):
 
 @login_required
 def lista_leads(request):
-    # Por padrão, vamos mostrar apenas os leads que precisam de atenção (não convertidos ou perdidos)
-    leads_ativos = Lead.objects.exclude(status__in=['convertido', 'perdido'])
+    # A ordem das colunas no Kanban será definida por esta lista
+    ordem_status = ['novo', 'contatado', 'agendado', 'convertido', 'perdido']
     
+    # Busca todos os leads e transforma-os num dicionário agrupado por status
+    leads_todos = Lead.objects.all().order_by('-data_criacao')
+    leads_por_status = {status: [] for status, _ in Lead.STATUS_CHOICES}
+    for lead in leads_todos:
+        leads_por_status[lead.status].append(lead)
+    
+    # Monta a estrutura de dados para o template, respeitando a ordem definida
+    colunas_kanban = []
+    for status_key in ordem_status:
+        # Encontra o nome legível do status (ex: 'Novo Contato')
+        status_display = dict(Lead.STATUS_CHOICES).get(status_key)
+        colunas_kanban.append({
+            'id': status_key,
+            'titulo': status_display,
+            'leads': leads_por_status.get(status_key, [])
+        })
+
     context = {
-        'leads': leads_ativos,
+        'colunas': colunas_kanban,
     }
     return render(request, 'cadastros/lista_leads.html', context)
 
@@ -1005,26 +1029,28 @@ def atualizar_dados_aluno(request, token):
 @login_required
 def lista_acompanhamento_pedagogico(request):
     """
-    Página principal do módulo, mostrando agendamentos e a lista de alunos.
+    Página principal do módulo, mostrando agendamentos, provas para corrigir e a lista de alunos.
     """
-    # Área Priorizada: Acompanhamentos com status 'agendado'
     agendamentos_pendentes = AcompanhamentoPedagogico.objects.filter(
         status='agendado'
     ).select_related('aluno', 'criado_por').order_by('data_agendamento')
 
-    # Subquery para buscar a data do último acompanhamento realizado para cada aluno
-    ultimo_acompanhamento_subquery = AcompanhamentoPedagogico.objects.filter(
-        aluno=OuterRef('pk'),
-        status='realizado'
-    ).order_by('-data_realizacao').values('data_realizacao')[:1]
+    # ✅ NOVA CONSULTA PARA PROVAS AGUARDANDO CORREÇÃO ✅
+    provas_para_corrigir = AlunoProva.objects.filter(
+        status='aguardando_correcao'
+    ).select_related('aluno', 'prova_template').order_by('data_realizacao')
 
-    # Lista de todos os alunos ativos, com a data do seu último acompanhamento
+    ultimo_acompanhamento_subquery = AcompanhamentoPedagogico.objects.filter(
+        aluno=OuterRef('pk'), status='realizado'
+    ).order_by('-data_realizacao').values('data_realizacao')[:1]
+    
     alunos_list = Aluno.objects.filter(status='ativo').annotate(
         ultimo_acompanhamento=Subquery(ultimo_acompanhamento_subquery)
     ).order_by('nome_completo')
 
     context = {
         'agendamentos_pendentes': agendamentos_pendentes,
+        'provas_para_corrigir': provas_para_corrigir, # <-- Enviando para o template
         'alunos': alunos_list,
     }
     return render(request, 'cadastros/lista_acompanhamento.html', context)
@@ -1106,10 +1132,15 @@ def historico_acompanhamentos_aluno(request, aluno_pk):
     acompanhamentos = AcompanhamentoPedagogico.objects.filter(
         aluno=aluno
     ).select_related('criado_por').order_by('-data_agendamento')
-    
+
+    provas_do_aluno = AlunoProva.objects.filter(
+        aluno=aluno
+    ).select_related('prova_template').order_by('-data_realizacao')
+
     context = {
         'aluno': aluno,
         'acompanhamentos': acompanhamentos,
+        'provas': provas_do_aluno
     }
     
     return render(request, 'cadastros/historico_acompanhamentos.html', context)
@@ -1178,6 +1209,13 @@ def portal_aluno(request):
             'percentual': round(percentual_mes, 1),
         })
 
+    provas_aluno = AlunoProva.objects.filter(
+        aluno=aluno
+    ).select_related('prova_template').order_by('-data_realizacao')
+    
+    provas_pendentes = provas_aluno.filter(status='nao_iniciada')
+    provas_finalizadas = provas_aluno.filter(status='finalizada')
+
     context = {
         'aluno': aluno,
         'kpis': kpis_financeiros,
@@ -1187,6 +1225,8 @@ def portal_aluno(request):
         'historico_aulas': historico_aulas_mes, # <-- Usando a nova variável
         'meses_frequencia': meses_frequencia_data,
         'data_selecionada': data_selecionada, # <-- Nova variável para o template
+        'provas_pendentes': provas_pendentes,
+        'provas_finalizadas': provas_finalizadas,
         'nav': { # <-- Nova variável para a navegação
             'mes_anterior': mes_anterior, 'ano_anterior': ano_anterior,
             'mes_seguinte': mes_seguinte, 'ano_seguinte': ano_seguinte,
@@ -1286,3 +1326,370 @@ def redefinir_senha_aluno(request, aluno_pk):
         messages.error(request, f"Ocorreu um erro ao redefinir a senha: {e}")
 
     return redirect('cadastros:perfil_aluno', pk=aluno.pk)
+
+@login_required
+def iniciar_prova(request, aluno_prova_pk):
+    """
+    Ponto de entrada para uma prova. Verifica as condições e redireciona para a primeira secção.
+    """
+    aluno_prova = get_object_or_404(AlunoProva, pk=aluno_prova_pk, aluno__usuario=request.user)
+    
+    # Mudar status para "Em Progresso"
+    if aluno_prova.status == 'nao_iniciada':
+        aluno_prova.status = 'em_progresso'
+        aluno_prova.save()
+
+    # Redireciona para a primeira secção da prova
+    return redirect('cadastros:realizar_prova_secao', aluno_prova_pk=aluno_prova.pk, secao_num=1)
+
+
+@login_required
+def realizar_prova_secao(request, aluno_prova_pk, secao_num):
+    # ... (a lógica inicial da view continua a mesma)
+    aluno_prova = get_object_or_404(AlunoProva, pk=aluno_prova_pk, aluno__usuario=request.user)
+    prova_template = aluno_prova.prova_template
+    ordem_sessoes = prova_template.ordem_sessoes
+    
+    if secao_num > len(ordem_sessoes):
+        # ... (a lógica de finalização da prova continua a mesma)
+        if aluno_prova.status != 'finalizada':
+            aluno_prova.status = 'aguardando_correcao'
+            aluno_prova.save()
+        return redirect('cadastros:prova_concluida', aluno_prova_pk=aluno_prova.pk)
+
+    tipo_secao_atual = ordem_sessoes[secao_num - 1]
+    questoes_da_secao = Questao.objects.filter(
+        prova_template=prova_template, tipo_questao=tipo_secao_atual
+    ).order_by('ordem')
+    
+    # ✅ LÓGICA ADICIONADA PARA BUSCAR A INSTRUÇÃO DA SECÇÃO ✅
+    instrucao_da_secao = prova_template.instrucoes_sessoes.get(tipo_secao_atual, "")
+
+    # ... (a lógica de formulário dinâmico e POST continua a mesma) ...
+    respostas_qs = RespostaAluno.objects.filter(aluno_prova=aluno_prova, questao__in=questoes_da_secao)
+    respostas_anteriores = {resposta.questao_id: resposta for resposta in respostas_qs}
+    form_fields = {}
+    for questao in questoes_da_secao:
+        # ... (criação dos campos do formulário)
+        field_name = f'questao_{questao.pk}'
+        initial_value = ''
+        resposta_obj = respostas_anteriores.get(questao.pk)
+        if questao.tipo_questao in ['dictation', 'error_correction', 'gap_fill', 'dissertativa']:
+            if resposta_obj: initial_value = resposta_obj.resposta_texto
+            widget = forms.Textarea(attrs={'class': 'form-control', 'rows': 4}) if questao.tipo_questao in ['dictation', 'dissertativa'] else forms.TextInput(attrs={'class': 'form-control'})
+            form_fields[field_name] = forms.CharField(label=f"Q{questao.ordem}: {questao.enunciado}", required=False, widget=widget, initial=initial_value)
+        elif questao.tipo_questao in ['yes_no', 'multiple_choice', 'oral_multiple_choice']:
+            if resposta_obj: initial_value = resposta_obj.resposta_opcao
+            opcoes = list(questao.dados_questao.get('opcoes', {}).items()) if questao.tipo_questao != 'yes_no' else [('sim', 'Sim'), ('nao', 'Não')]
+            form_fields[field_name] = forms.ChoiceField(label=f"Q{questao.ordem}: {questao.enunciado}", choices=opcoes, widget=forms.RadioSelect, required=False, initial=initial_value)
+    ProvaSecaoForm = type('ProvaSecaoForm', (forms.Form,), form_fields)
+    
+    if request.method == 'POST':
+        # ... (lógica do POST)
+        form = ProvaSecaoForm(request.POST)
+        if form.is_valid():
+            for questao in questoes_da_secao:
+                field_name = f'questao_{questao.pk}'
+                resposta_dada = form.cleaned_data.get(field_name, '')
+                resposta_a_guardar = {}
+                if questao.tipo_questao in ['dictation', 'error_correction', 'gap_fill', 'dissertativa']:
+                    resposta_a_guardar['resposta_texto'] = resposta_dada
+                else:
+                    resposta_a_guardar['resposta_opcao'] = resposta_dada
+                RespostaAluno.objects.update_or_create(aluno_prova=aluno_prova, questao=questao, defaults=resposta_a_guardar)
+            return redirect('cadastros:realizar_prova_secao', aluno_prova_pk=aluno_prova.pk, secao_num=secao_num + 1)
+    else:
+        form = ProvaSecaoForm()
+
+    context = {
+        'aluno_prova': aluno_prova,
+        'form': form,
+        'secao_atual_num': secao_num,
+        'secao_atual_titulo': dict(Questao.TIPO_QUESTAO_CHOICES).get(tipo_secao_atual),
+        'total_secoes': len(ordem_sessoes),
+        'proxima_secao_num': secao_num + 1,
+        'instrucao_da_secao': instrucao_da_secao, # <-- ✅ ENVIANDO A INSTRUÇÃO PARA O TEMPLATE
+    }
+    return render(request, 'cadastros/realizar_prova.html', context)
+
+@login_required
+def prova_concluida(request, aluno_prova_pk):
+    """
+    Página simples de confirmação de que a prova foi enviada.
+    """
+    aluno_prova = get_object_or_404(AlunoProva, pk=aluno_prova_pk, aluno__usuario=request.user)
+    context = {
+        'aluno_prova': aluno_prova
+    }
+    return render(request, 'cadastros/prova_concluida.html', context)
+
+@login_required
+def realizar_prova_secao(request, aluno_prova_pk, secao_num):
+    """
+    View principal que controla a exibição e o salvamento de cada secção da prova.
+    """
+    aluno_prova = get_object_or_404(AlunoProva, pk=aluno_prova_pk, aluno__usuario=request.user)
+    prova_template = aluno_prova.prova_template
+    ordem_sessoes = prova_template.ordem_sessoes
+    
+    if secao_num > len(ordem_sessoes):
+        if aluno_prova.status != 'finalizada':
+            aluno_prova.status = 'aguardando_correcao'
+            aluno_prova.save()
+        return redirect('cadastros:prova_concluida', aluno_prova_pk=aluno_prova.pk)
+
+    tipo_secao_atual = ordem_sessoes[secao_num - 1]
+    questoes_da_secao = Questao.objects.filter(
+        prova_template=prova_template, tipo_questao=tipo_secao_atual
+    ).order_by('ordem')
+
+    # --- LÓGICA DE FORMULÁRIO DINÂMICO ---
+    
+    # ✅ --- BLOCO CORRIGIDO --- ✅
+    # Em vez de .in_bulk(), buscamos o queryset e criamos o dicionário em Python.
+    respostas_qs = RespostaAluno.objects.filter(
+        aluno_prova=aluno_prova, questao__in=questoes_da_secao
+    )
+    respostas_anteriores = {resposta.questao_id: resposta for resposta in respostas_qs}
+    # ✅ --- FIM DO BLOCO CORRIGIDO --- ✅
+
+    form_fields = {}
+    for questao in questoes_da_secao:
+        field_name = f'questao_{questao.pk}'
+        initial_value = ''
+        resposta_obj = respostas_anteriores.get(questao.pk)
+
+        if questao.tipo_questao in ['dictation', 'error_correction', 'gap_fill', 'dissertativa']:
+            if resposta_obj: initial_value = resposta_obj.resposta_texto
+            widget = forms.Textarea(attrs={'class': 'form-control', 'rows': 4}) if questao.tipo_questao in ['dictation', 'dissertativa'] else forms.TextInput(attrs={'class': 'form-control'})
+            form_fields[field_name] = forms.CharField(label=f"Q{questao.ordem}: {questao.enunciado}", required=False, widget=widget, initial=initial_value)
+        
+        elif questao.tipo_questao in ['yes_no', 'multiple_choice', 'oral_multiple_choice']:
+            if resposta_obj: initial_value = resposta_obj.resposta_opcao
+            opcoes = list(questao.dados_questao.get('opcoes', {}).items()) if questao.tipo_questao != 'yes_no' else [('yes', 'Yes'), ('no', 'No')]
+            form_fields[field_name] = forms.ChoiceField(label=f"Q{questao.ordem}: {questao.enunciado}", choices=opcoes, widget=forms.RadioSelect, required=False, initial=initial_value)
+    
+    ProvaSecaoForm = type('ProvaSecaoForm', (forms.Form,), form_fields)
+    
+    if request.method == 'POST':
+        form = ProvaSecaoForm(request.POST)
+        if form.is_valid():
+            for questao in questoes_da_secao:
+                field_name = f'questao_{questao.pk}'
+                resposta_dada = form.cleaned_data.get(field_name, '')
+                
+                resposta_a_guardar = {}
+                if questao.tipo_questao in ['dictation', 'error_correction', 'gap_fill', 'dissertativa']:
+                    resposta_a_guardar['resposta_texto'] = resposta_dada
+                else:
+                    resposta_a_guardar['resposta_opcao'] = resposta_dada
+
+                RespostaAluno.objects.update_or_create(
+                    aluno_prova=aluno_prova,
+                    questao=questao,
+                    defaults=resposta_a_guardar
+                )
+            
+            return redirect('cadastros:realizar_prova_secao', aluno_prova_pk=aluno_prova.pk, secao_num=secao_num + 1)
+    else:
+        form = ProvaSecaoForm()
+
+    context = {
+        'aluno_prova': aluno_prova,
+        'form': form,
+        'secao_atual_num': secao_num,
+        'secao_atual_titulo': dict(Questao.TIPO_QUESTAO_CHOICES).get(tipo_secao_atual),
+        'total_secoes': len(ordem_sessoes),
+        'proxima_secao_num': secao_num + 1,
+    }
+    return render(request, 'cadastros/realizar_prova.html', context)
+
+@login_required
+def liberar_prova(request, aluno_pk):
+    """
+    View para um professor 'liberar' uma ProvaTemplate para um aluno,
+    criando uma instância de AlunoProva.
+    """
+    aluno = get_object_or_404(Aluno, pk=aluno_pk)
+    
+    if request.method == 'POST':
+        form = LiberarProvaForm(request.POST)
+        if form.is_valid():
+            prova_template_selecionada = form.cleaned_data['prova_template']
+            
+            # Cria a instância da prova para o aluno
+            aluno_prova = AlunoProva.objects.create(
+                aluno=aluno,
+                prova_template=prova_template_selecionada,
+                # O status 'nao_iniciada' é o default do modelo
+            )
+            
+            messages.success(request, f'Prova "{prova_template_selecionada.titulo}" liberada para {aluno.nome_completo}.')
+            # Redireciona para o histórico, onde a nova prova aparecerá
+            return redirect('cadastros:historico_acompanhamentos_aluno', aluno_pk=aluno.pk)
+    else:
+        form = LiberarProvaForm()
+
+    context = {
+        'form': form,
+        'aluno': aluno,
+    }
+    return render(request, 'cadastros/liberar_prova.html', context)
+
+@login_required
+def liberar_prova_turma(request, turma_pk):
+    """
+    View para um professor 'liberar' uma ProvaTemplate para todos os alunos
+    de uma turma específica.
+    """
+    turma = get_object_or_404(Turma, pk=turma_pk)
+    
+    if request.method == 'POST':
+        form = LiberarProvaForm(request.POST)
+        if form.is_valid():
+            prova_template_selecionada = form.cleaned_data['prova_template']
+            
+            # Encontra todos os alunos matriculados na turma
+            inscricoes = Inscricao.objects.filter(turma=turma, status='matriculado')
+            
+            # Cria uma instância de AlunoProva para cada aluno
+            for inscricao in inscricoes:
+                AlunoProva.objects.get_or_create(
+                    aluno=inscricao.aluno,
+                    prova_template=prova_template_selecionada,
+                    defaults={'status': 'nao_iniciada'} # Só cria se não existir
+                )
+            
+            messages.success(request, f'Prova "{prova_template_selecionada.titulo}" liberada para {inscricoes.count()} aluno(s) da turma {turma.nome}.')
+            return redirect('cadastros:detalhe_turma', pk=turma.pk)
+    else:
+        form = LiberarProvaForm()
+
+    context = {
+        'form': form,
+        'turma': turma,
+    }
+    # Usaremos o mesmo template de liberar prova, mas com contexto de turma
+    return render(request, 'cadastros/liberar_prova.html', context)
+
+@login_required
+def corrigir_prova(request, aluno_prova_pk):
+    aluno_prova = get_object_or_404(AlunoProva.objects.select_related('aluno', 'prova_template'), pk=aluno_prova_pk)
+    
+    if aluno_prova.status == 'finalizada':
+        messages.info(request, "Esta prova já foi corrigida e finalizada.")
+        return redirect('cadastros:lista_acompanhamento_pedagogico')
+
+    prova_template = aluno_prova.prova_template
+    ordem_sessoes = prova_template.ordem_sessoes
+    
+    respostas_qs = RespostaAluno.objects.filter(aluno_prova=aluno_prova)
+    respostas_map = {resposta.questao_id: resposta for resposta in respostas_qs}
+
+    if request.method == 'POST':
+        nota_total = Decimal('0.0')
+        questoes_todas = Questao.objects.filter(prova_template=prova_template)
+
+        # ✅ 1. CALCULA A PONTUAÇÃO MÁXIMA POSSÍVEL DA PROVA ✅
+        pontuacao_maxima = questoes_todas.aggregate(total=Sum('pontos'))['total'] or Decimal('0.0')
+
+        for questao in questoes_todas:
+            resposta = respostas_map.get(questao.id)
+            if not resposta: continue
+
+            pontos_str = request.POST.get(f'pontos_{questao.id}', '0').replace(',', '.')
+            pontos = Decimal(pontos_str)
+            feedback = request.POST.get(f'feedback_{questao.id}', '')
+
+            resposta.pontos_obtidos = pontos
+            resposta.feedback_professor = feedback
+            resposta.corrigido = True
+            resposta.save()
+            
+            nota_total += pontos
+        
+        aluno_prova.nota_final = nota_total
+        aluno_prova.status = 'finalizada'
+        
+        # ✅ 2. SALVA A PONTUAÇÃO MÁXIMA NO REGISTO DA PROVA ✅
+        aluno_prova.pontuacao_total = pontuacao_maxima
+
+        if hasattr(request.user, 'professor'):
+            aluno_prova.corrigido_por = request.user.professor
+        aluno_prova.save()
+        
+        messages.success(request, f"Prova de {aluno_prova.aluno.nome_completo} corrigida com sucesso!")
+        return redirect('cadastros:lista_acompanhamento_pedagogico')
+
+    # (A lógica GET para exibir o formulário de correção continua a mesma)
+    secoes_para_correcao = []
+    for tipo_secao in ordem_sessoes:
+        questoes_da_secao = Questao.objects.filter(
+            prova_template=prova_template, tipo_questao=tipo_secao
+        ).order_by('ordem')
+        
+        dados_da_secao = {
+            'titulo': dict(Questao.TIPO_QUESTAO_CHOICES).get(tipo_secao),
+            'questoes': []
+        }
+        for questao in questoes_da_secao:
+            dados_da_secao['questoes'].append({
+                'questao': questao,
+                'resposta': respostas_map.get(questao.id)
+            })
+        secoes_para_correcao.append(dados_da_secao)
+
+    context = {
+        'aluno_prova': aluno_prova,
+        'secoes_para_correcao': secoes_para_correcao,
+    }
+    return render(request, 'cadastros/corrigir_prova.html', context)
+
+
+@login_required
+def ver_resultado_prova(request, aluno_prova_pk):
+    """
+    Página para o aluno ou professor ver o resultado detalhado de uma prova finalizada.
+    """
+    aluno_prova = get_object_or_404(
+        AlunoProva.objects.select_related('aluno', 'prova_template'), 
+        pk=aluno_prova_pk, 
+        status='finalizada'
+    )
+    
+    if not (hasattr(request.user, 'professor') or aluno_prova.aluno.usuario == request.user):
+        messages.error(request, "Você não tem permissão para ver este resultado.")
+        return redirect('cadastros:portal_aluno' if hasattr(request.user, 'perfil_aluno') else 'cadastros:portal_professor')
+
+    # ✅ LÓGICA DE SEGURANÇA PARA PONTUAÇÃO TOTAL ✅
+    # Se a pontuação total não foi guardada (para provas antigas), calcula-a agora para exibição.
+    if aluno_prova.pontuacao_total is None:
+        pontuacao_maxima = aluno_prova.prova_template.questoes.aggregate(total=Sum('pontos'))['total'] or Decimal('0.0')
+        aluno_prova.pontuacao_total = pontuacao_maxima
+        # Não salvamos no banco de dados aqui para não modificar dados num GET,
+        # apenas garantimos que o valor seja exibido no template.
+
+    # Reutiliza a mesma lógica de agrupamento por secção
+    ordem_sessoes = aluno_prova.prova_template.ordem_sessoes
+    respostas_qs = RespostaAluno.objects.filter(aluno_prova=aluno_prova)
+    respostas_map = {resposta.questao_id: resposta for resposta in respostas_qs}
+    
+    secoes_resultado = []
+    for tipo_secao in ordem_sessoes:
+        questoes_da_secao = Questao.objects.filter(
+            prova_template=aluno_prova.prova_template, tipo_questao=tipo_secao
+        ).order_by('ordem')
+        
+        dados_da_secao = { 'titulo': dict(Questao.TIPO_QUESTAO_CHOICES).get(tipo_secao), 'questoes': [] }
+        for questao in questoes_da_secao:
+            dados_da_secao['questoes'].append({
+                'questao': questao,
+                'resposta': respostas_map.get(questao.id)
+            })
+        secoes_resultado.append(dados_da_secao)
+
+    context = {
+        'aluno_prova': aluno_prova,
+        'secoes_resultado': secoes_resultado,
+    }
+    return render(request, 'cadastros/ver_resultado_prova.html', context)

@@ -15,11 +15,41 @@
         <h1 class="h3 mb-1">Acompanhamento Pedagógico</h1>
         <p class="text-muted mb-0">Gestão do desenvolvimento individual dos alunos.</p>
       </div>
-      <a href="{% url 'cadastros:dashboard_admin' %}" class="btn btn-outline-secondary">
-        &larr; Voltar ao Dashboard
+      <a href="{% url 'cadastros:portal_professor' %}" class="btn btn-outline-secondary">
+        &larr; Voltar ao Portal
       </a>
     </header>
 
+    <section class="card mb-4">
+      <div class="card-header bg-primary text-white">
+        <h2 class="h5 mb-0"><i class="bi bi-pencil-fill me-2"></i>Provas Aguardando Correção</h2>
+      </div>
+      <div class="card-body">
+        {% if provas_para_corrigir %}
+          <div class="list-group">
+            {% for prova in provas_para_corrigir %}
+              <div class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                  <h6 class="mb-1">{{ prova.aluno.nome_completo }}</h6>
+                  <small class="text-muted">
+                    Prova: <strong>{{ prova.prova_template.titulo }}</strong> - Realizada em: {{ prova.data_realizacao|date:"d/m/Y" }}
+                  </small>
+                </div>
+                <a href="{% url 'cadastros:corrigir_prova' prova.pk %}" class="btn btn-primary btn-sm">
+                  <i class="bi bi-pencil-square me-1"></i> Corrigir
+                </a>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-center text-muted p-3">
+            <i class="bi bi-check-all fs-1 d-block mb-2"></i>
+            Nenhuma prova aguardando correção. Tudo em dia!
+          </div>
+        {% endif %}
+      </div>
+    </section>
+    
     <section class="card mb-4">
       <div class="card-header bg-warning-subtle border-warning">
         <h2 class="h5 mb-0"><i class="bi bi-clock-history me-2"></i>Área Priorizada: Agendamentos</h2>

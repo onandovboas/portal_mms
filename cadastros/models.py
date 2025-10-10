@@ -296,3 +296,117 @@ class TokenAtualizacaoAluno(models.Model):
     def is_expired(self):
         """Verifica se o token expirou (válido por 24 horas)."""
         return self.criado_em + timedelta(hours=24) < timezone.now()
+    
+class ProvaTemplate(models.Model):
+    """
+    O "gabarito" ou molde de uma prova, associado a um Stage.
+    """
+    titulo = models.CharField("Título da Prova", max_length=200)
+    stage_referencia = models.IntegerField("Stage de Referência")
+    instrucoes = models.TextField("Instruções Gerais", blank=True)
+    pontos_para_aprovar = models.IntegerField("Pontos para Aprovar", null=True, blank=True)
+    ordem_sessoes = models.JSONField(
+        "Ordem das Secções", 
+        default=list,
+        help_text="Lista com a ordem dos tipos de questão. Ex: [\"dictation\", \"yes_no\"]"
+    )
+    # ✅ NOVO CAMPO PARA INSTRUÇÕES DAS SECÇÕES ✅
+    instrucoes_sessoes = models.JSONField(
+        "Instruções das Secções",
+        default=dict, # Define um dicionário vazio como padrão
+        blank=True,
+        help_text='Dicionário com instruções por tipo de questão. Ex: {"yes_no": "Ouça e marque Sim ou Não."}'
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['stage_referencia', 'titulo']
+        verbose_name = "Gabarito de Prova"
+        verbose_name_plural = "Gabaritos de Provas"
+
+    def __str__(self):
+        return f"Prova - Stage {self.stage_referencia}: {self.titulo}"
+
+
+
+class Questao(models.Model):
+    """
+    Uma única questão dentro de um ProvaTemplate.
+    """
+    TIPO_QUESTAO_CHOICES = [
+        ('dictation', 'Dictation'),
+        ('yes_no', 'Yes/No Quiz'),
+        ('multiple_choice', 'Multiple Choice (Escrito)'),
+        ('error_correction', 'Error Correction'),
+        ('oral_multiple_choice', 'Multiple Choice (Oral)'),
+        ('gap_fill', 'Gap Fill'),
+        ('dissertativa', 'Escrita / Dissertativa'), # ✅ NOVO TIPO DE QUESTÃO ✅
+    ]
+    prova_template = models.ForeignKey(ProvaTemplate, on_delete=models.CASCADE, related_name="questoes")
+    ordem = models.PositiveIntegerField("Ordem")
+    tipo_questao = models.CharField("Tipo da Questão", max_length=30, choices=TIPO_QUESTAO_CHOICES)
+    enunciado = models.TextField("Enunciado/Instrução")
+    pontos = models.IntegerField("Pontos", default=1)
+    dados_questao = models.JSONField(null=True, blank=True, help_text="Ex: {\"opcoes\": {\"a\": \"A\", \"b\": \"B\"}, \"resposta_correta\": \"b\"}")
+
+    class Meta:
+        ordering = ['prova_template', 'ordem']
+        verbose_name = "Questão"
+        verbose_name_plural = "Questões"
+
+    def __str__(self):
+        return f"Q{self.ordem}: {self.get_tipo_questao_display()} ({self.prova_template.titulo})"
+
+
+class AlunoProva(models.Model):
+    """
+    O registo de uma prova realizada por um aluno, com seus resultados.
+    """
+    STATUS_CHOICES = [
+        ('nao_iniciada', 'Não Iniciada'),
+        ('em_progresso', 'Em Progresso'),
+        ('aguardando_correcao', 'Aguardando Correção'),
+        ('finalizada', 'Finalizada'),
+    ]
+    aluno = models.ForeignKey(Aluno, on_delete=models.CASCADE, related_name="provas")
+    prova_template = models.ForeignKey(ProvaTemplate, on_delete=models.PROTECT, verbose_name="Gabarito da Prova")
+    # ✅ DEFAULT ATUALIZADO ✅
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='nao_iniciada')
+    data_realizacao = models.DateField("Data de Realização", default=timezone.now)
+    corrigido_por = models.ForeignKey(Professor, on_delete=models.SET_NULL, null=True, blank=True)
+    nota_final = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    resultados = models.JSONField(null=True, blank=True)
+    observacoes_gerais = models.TextField("Observações Gerais do Professor", blank=True)
+    
+    pontuacao_total = models.DecimalField("Pontuação Máxima da Prova", max_digits=5, decimal_places=2, null=True, blank=True)
+
+    class Meta:
+        ordering = ['-data_realizacao']
+        verbose_name = "Prova do Aluno"
+        verbose_name_plural = "Provas dos Alunos"
+
+    def __str__(self):
+        return f"Prova de {self.aluno.nome_completo} - {self.prova_template.titulo}"
+class RespostaAluno(models.Model):
+    """
+    Armazena a resposta de um aluno para uma única questão de uma prova.
+    """
+    aluno_prova = models.ForeignKey(AlunoProva, on_delete=models.CASCADE, related_name="respostas")
+    questao = models.ForeignKey(Questao, on_delete=models.CASCADE)
+    
+    # A resposta pode ser um texto (para ditado, gap-fill) ou uma opção (para múltipla escolha)
+    resposta_texto = models.TextField("Resposta em Texto", blank=True, null=True)
+    resposta_opcao = models.CharField("Opção Selecionada", max_length=10, blank=True, null=True)
+
+    # Campos preenchidos pelo professor durante a correção
+    pontos_obtidos = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    feedback_professor = models.TextField("Feedback do Professor", blank=True, null=True)
+    corrigido = models.BooleanField(default=False)
+
+    class Meta:
+        # Garante que um aluno só pode ter uma resposta por questão em cada prova
+        unique_together = ('aluno_prova', 'questao')
+        ordering = ['questao__ordem']
+
+    def __str__(self):
+        return f"Resposta de {self.aluno_prova.aluno.nome_completo} para Q{self.questao.ordem}"

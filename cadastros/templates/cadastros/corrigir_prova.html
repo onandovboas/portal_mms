@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Corrigir Prova</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+  <div class="container my-4">
+    <header class="mb-4">
+      <h1 class="h3">Folha de Correção Digital</h1>
+      <p class="text-muted">Aluno: <strong>{{ aluno_prova.aluno.nome_completo }}</strong> | Prova: <strong>{{ aluno_prova.prova_template.titulo }}</strong></p>
+    </header>
+
+    <form method="post">
+      {% csrf_token %}
+      
+      <div class="accordion" id="accordionCorrecao">
+        {% for secao in secoes_para_correcao %}
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="heading-{{ forloop.counter }}">
+              <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ forloop.counter }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}">
+                <strong>Part: {{ secao.titulo }}</strong>
+              </button>
+            </h2>
+            <div id="collapse-{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" data-bs-parent="#accordionCorrecao">
+              <div class="list-group list-group-flush">
+                {% for item in secao.questoes %}
+                  <div class="list-group-item py-3">
+                    <h5 class="mb-1">Q{{ item.questao.ordem }}: {{ item.questao.enunciado }}</h5>
+                    <small class="text-muted">({{ item.questao.get_tipo_questao_display }} - Vale: {{ item.questao.pontos }} pontos)</small>
+                    
+                    <div class="card bg-light mt-2">
+                      <div class="card-header small">Resposta do Aluno</div>
+                      <div class="card-body">
+                        <p class="card-text">
+                          {% if item.resposta %}
+                            {% if item.resposta.resposta_texto %}
+                              {{ item.resposta.resposta_texto|linebreaksbr }}
+                            {% elif item.resposta.resposta_opcao %}
+                              Opção selecionada: <strong>{{ item.resposta.resposta_opcao|upper }}</strong>
+                            {% else %}<em class="text-muted">Não respondeu.</em>{% endif %}
+                          {% else %}<em class="text-muted">Não respondeu.</em>{% endif %}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div class="row g-2 mt-2 align-items-center">
+                      {% if item.questao.tipo_questao == 'dictation' or item.questao.tipo_questao == 'dissertativa' %}
+                        <div class="col-md-3">
+                          <label for="pontos_{{ item.questao.id }}" class="form-label">Nota da Questão:</label>
+                          <input type="number" step="0.5" name="pontos_{{ item.questao.id }}" id="pontos_{{ item.questao.id }}" class="form-control" max="{{ item.questao.pontos }}" min="0" value="0">
+                        </div>
+                      {% else %}
+                        <div class="col-md-3">
+                          <label class="form-label">Correção:</label>
+                          <div class="btn-group w-100">
+                            <input type="radio" class="btn-check" name="pontos_{{ item.questao.id }}" id="certo-{{ item.questao.id }}" value="{{ item.questao.pontos }}" autocomplete="off">
+                            <label class="btn btn-outline-success" for="certo-{{ item.questao.id }}">Certo</label>
+                            
+                            <input type="radio" class="btn-check" name="pontos_{{ item.questao.id }}" id="errado-{{ item.questao.id }}" value="0" autocomplete="off" checked>
+                            <label class="btn btn-outline-danger" for="errado-{{ item.questao.id }}">Errado</label>
+                          </div>
+                        </div>
+                      {% endif %}
+                      <div class="col-md-9">
+                        <label for="feedback_{{ item.questao.id }}" class="form-label">Feedback (opcional):</label>
+                        <input type="text" name="feedback_{{ item.questao.id }}" id="feedback_{{ item.questao.id }}" class="form-control" placeholder="Ex: A resposta correta era 'goes'">
+                      </div>
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+
+      <div class="d-flex justify-content-end gap-2 mt-4">
+        <a href="{% url 'cadastros:lista_acompanhamento_pedagogico' %}" class="btn btn-secondary">Cancelar</a>
+        <button type="submit" class="btn btn-success btn-lg">Finalizar Correção</button>
+      </div>
+    </form>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
