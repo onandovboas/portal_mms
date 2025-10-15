@@ -24,6 +24,8 @@ from django.utils.crypto import get_random_string
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth import login, authenticate
 from django import forms
+from django.db import transaction
+from django.utils.html import format_html
 
 
 
@@ -1040,12 +1042,21 @@ def lista_acompanhamento_pedagogico(request):
         status='aguardando_correcao'
     ).select_related('aluno', 'prova_template').order_by('data_realizacao')
 
+
     ultimo_acompanhamento_subquery = AcompanhamentoPedagogico.objects.filter(
         aluno=OuterRef('pk'), status='realizado'
     ).order_by('-data_realizacao').values('data_realizacao')[:1]
+
+    
+    turma_atual_subquery = Inscricao.objects.filter(
+        aluno=OuterRef('pk'),
+        status__in=['matriculado', 'experimental', 'acompanhando']
+    ).values('turma__nome')[:1]
+
     
     alunos_list = Aluno.objects.filter(status='ativo').annotate(
-        ultimo_acompanhamento=Subquery(ultimo_acompanhamento_subquery)
+        ultimo_acompanhamento=Subquery(ultimo_acompanhamento_subquery),
+        turma_atual=Subquery(turma_atual_subquery)  
     ).order_by('nome_completo')
 
     context = {
@@ -1693,3 +1704,37 @@ def ver_resultado_prova(request, aluno_prova_pk):
         'secoes_resultado': secoes_resultado,
     }
     return render(request, 'cadastros/ver_resultado_prova.html', context)
+
+@login_required
+def copiar_prova_template(request, pk):
+    """
+    Cria uma cópia de um ProvaTemplate existente e de todas as suas Questões associadas.
+    """
+    try:
+        original_template = ProvaTemplate.objects.get(pk=pk)
+        questoes_originais = list(original_template.questoes.all())
+
+        with transaction.atomic():
+            # Clona o ProvaTemplate
+            novo_template = original_template
+            novo_template.pk = None  # Força a criação de um novo objeto
+            novo_template.titulo = f"{original_template.titulo} (Cópia)"
+            novo_template.save()
+
+            # Clona todas as Questões associadas
+            for questao in questoes_originais:
+                nova_questao = questao
+                nova_questao.pk = None
+                nova_questao.prova_template = novo_template
+                nova_questao.save()
+        
+        messages.success(request, f'O gabarito "{original_template.titulo}" foi copiado com sucesso. Agora você está a editar a cópia.')
+        # Redireciona para a página de edição do NOVO template no admin
+        return redirect(reverse('admin:cadastros_provatemplate_change', args=[novo_template.pk]))
+
+    except ProvaTemplate.DoesNotExist:
+        messages.error(request, "O gabarito de prova que tentou copiar não existe.")
+    except Exception as e:
+        messages.error(request, f"Ocorreu um erro inesperado ao copiar o gabarito: {e}")
+    
+    return redirect(reverse('admin:cadastros_provatemplate_changelist'))

@@ -5,6 +5,8 @@ from .models import (
     Aluno, Professor, Turma, Inscricao, RegistroAula, Presenca, 
     Contrato, Pagamento, AcompanhamentoFalta, HorarioAula, ProvaTemplate, Questao, AlunoProva
 )
+from django.urls import reverse # ✅ ADICIONE ESTA LINHA
+from django.utils.html import format_html 
 
 class InscricaoInline(admin.TabularInline):
     model = Inscricao
@@ -53,11 +55,16 @@ class QuestaoInline(admin.StackedInline):
 @admin.register(ProvaTemplate)
 class ProvaTemplateAdmin(admin.ModelAdmin):
     """Configuração da admin para os Gabaritos de Prova."""
-    list_display = ('titulo', 'stage_referencia')
+    list_display = ('titulo', 'stage_referencia', 'copiar_gabarito_link')
     inlines = [QuestaoInline]  # A mágica acontece aqui!
     search_fields = ['titulo']
     list_filter = ['stage_referencia']
 
+    @admin.display(description='Ações')
+    def copiar_gabarito_link(self, obj):
+        """Cria um link 'Copiar' na lista de objetos."""
+        url = reverse('cadastros:copiar_prova_template', args=[obj.pk])
+        return format_html(f'<a href="{url}" class="button">Copiar</a>')
 
 @admin.register(Questao)
 class QuestaoAdmin(admin.ModelAdmin):

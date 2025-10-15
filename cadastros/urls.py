@@ -51,6 +51,8 @@ urlpatterns = [
     path('portal/prova/<int:aluno_prova_pk>/concluida/', views.prova_concluida, name='prova_concluida'),
     path('prova/correcao/<int:aluno_prova_pk>/', views.corrigir_prova, name='corrigir_prova'),
     path('prova/resultado/<int:aluno_prova_pk>/', views.ver_resultado_prova, name='ver_resultado_prova'),
+    path('prova-template/<int:pk>/copiar/', views.copiar_prova_template, name='copiar_prova_template'),
+
 
 
     # Rota para Leads
