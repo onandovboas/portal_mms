@@ -1,14 +1,26 @@
 {% for item in items %}
-<tr data-aluno="{{ item.aluno.nome_completo|lower }}">
-  <td>
+<tr class="data-row" data-search-terms="{{ item.aluno.nome_completo|lower }} {{ item.aluno.telefone }}">
+  <td data-label="Aluno">
     <a href="{% url 'cadastros:perfil_aluno' item.aluno.pk %}">{{ item.aluno.nome_completo }}</a>
   </td>
-  <td>{{ item.aluno.telefone|default:'--' }}</td>
-  <td>{{ item.turma.nome }}</td>
-  <td>
-    <a href="{% url 'cadastros:criar_contrato' item.aluno.pk %}" class="btn btn-success btn-sm">
-        <i class="bi bi-file-text me-1"></i> Criar Contrato
-    </a>
+  <td data-label="Telefone">{{ item.aluno.telefone|default:'-' }}</td>
+  <td data-label="Turma">{{ item.turma.nome }}</td>
+  <td data-label="Ações">
+    
+    <div class="d-flex flex-wrap gap-1">
+      
+      <a href="{% url 'cadastros:criar_contrato' item.aluno.pk %}" class="btn btn-success btn-sm" title="Converter em Aluno (Criar Contrato)">
+        <i class="bi bi-check2-circle"></i> Converter
+      </a>
+      
+      <form action="{% url 'cadastros:marcar_experimental_desistiu' item.pk %}" method="POST" class="d-inline" onsubmit="return confirm('Tem certeza que deseja marcar este aluno como desistente? Esta ação inativará o aluno se ele não tiver outras matrículas.');">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger btn-sm" title="Marcar como Desistente">
+          <i class="bi bi-x-circle"></i> Desistiu
+        </button>
+      </form>
+
+    </div>
   </td>
 </tr>
 {% endfor %}

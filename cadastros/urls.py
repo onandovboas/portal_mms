@@ -21,6 +21,7 @@ urlpatterns = [
     path('aluno/novo-experimental/', views.novo_aluno_experimental, name='novo_aluno_experimental'),
     path('aluno/<int:aluno_pk>/criar-contrato/', views.criar_contrato, name='criar_contrato'),
     path('aluno/atualizar/<uuid:token>/', views.atualizar_dados_aluno, name='atualizar_dados_aluno'),
+    path('contrato/<int:contrato_pk>/editar/', views.editar_contrato, name='editar_contrato'),
 
     # Rotas Acompanhamentos Pedagogicos
     path('acompanhamento-pedagogico/', views.lista_acompanhamento_pedagogico, name='lista_acompanhamento_pedagogico'),
@@ -60,6 +61,8 @@ urlpatterns = [
     path('leads/adicionar/', views.adicionar_lead, name='adicionar_lead'), 
     path('leads/<int:pk>/editar/', views.editar_lead, name='editar_lead'),
     path('leads/<int:pk>/converter/', views.converter_lead, name='converter_lead'),
+    path('inscricao/<int:inscricao_pk>/desistiu/', views.marcar_experimental_desistiu, name='marcar_experimental_desistiu'),
+    path('leads/atualizar-status/', views.atualizar_status_lead, name='atualizar_status_lead'),
 
     # Rotas de Turmas
     path('turma/<int:pk>/', views.detalhe_turma, name='detalhe_turma'),

@@ -56,12 +56,6 @@
         <div class="form-section-title mt-4 mb-2">Contato</div>
         <div class="row g-3">
           <div class="col-md-4">
-            <label class="form-label">CPF</label>
-            {{ form.cpf }}
-            <div class="form-text">Somente números; formatamos para 000.000.000-00.</div>
-            {% if form.cpf.errors %}<div class="invalid-feedback d-block">{{ form.cpf.errors|striptags }}</div>{% endif %}
-          </div>
-          <div class="col-md-4">
             <label class="form-label">Telefone</label>
             {{ form.telefone }}
             {% if form.telefone.errors %}<div class="invalid-feedback d-block">{{ form.telefone.errors|striptags }}</div>{% endif %}
@@ -73,24 +67,6 @@
           </div>
         </div>
 
-        <div class="form-section-title mt-4 mb-2">Endereço</div>
-        <div class="row g-3">
-          <div class="col-md-8">
-            <label class="form-label">Logradouro</label>
-            {{ form.logradouro }}
-            {% if form.logradouro.errors %}<div class="invalid-feedback d-block">{{ form.logradouro.errors|striptags }}</div>{% endif %}
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">Cidade</label>
-            {{ form.cidade }}
-            {% if form.cidade.errors %}<div class="invalid-feedback d-block">{{ form.cidade.errors|striptags }}</div>{% endif %}
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">UF</label>
-            {{ form.estado }}
-            {% if form.estado.errors %}<div class="invalid-feedback d-block">{{ form.estado.errors|striptags }}</div>{% endif %}
-          </div>
-        </div>
 
         <div class="d-flex justify-content-end gap-2 mt-4">
           <a href="{% url 'cadastros:perfil_aluno' aluno.pk %}" class="btn btn-outline-secondary">

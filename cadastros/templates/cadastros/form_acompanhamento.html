@@ -41,7 +41,12 @@
             <div class="col-md-6">{{ form.pontos_melhorar.label_tag }} {{ form.pontos_melhorar }}</div>
             <div class="col-12">{{ form.estrategia.label_tag }} {{ form.estrategia }}</div>
             <div class="col-12">{{ form.comentarios_extras.label_tag }} {{ form.comentarios_extras }}</div>
-          </div>
+            
+            <div class="col-12">
+              {{ form.atividades_recomendadas.label_tag }}
+              {{ form.atividades_recomendadas }}
+            </div>
+            </div>
 
           <div class="d-flex justify-content-end gap-2 mt-4">
             <a href="{% url 'cadastros:lista_acompanhamento_pedagogico' %}" class="btn btn-secondary">Cancelar</a>

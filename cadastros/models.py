@@ -50,6 +50,7 @@ class Inscricao(models.Model):
         ('acompanhando', 'Acompanhando'),
         ('experimental', 'Experimental'),
         ('trancado', 'Trancado'),
+        ('desistiu', 'Desistiu'),
     ]
     aluno = models.ForeignKey(Aluno, on_delete=models.CASCADE)
     turma = models.ForeignKey(Turma, on_delete=models.CASCADE)
@@ -199,6 +200,7 @@ class AcompanhamentoPedagogico(models.Model):
     pontos_melhorar = models.TextField("Pontos a serem melhorados", blank=True)
     estrategia = models.TextField("Estratégia", blank=True)
     comentarios_extras = models.TextField(blank=True)
+    atividades_recomendadas = models.TextField("Atividades e Recomendações", blank=True, null=True)
 
     # Rastreabilidade
     criado_por = models.ForeignKey(Professor, on_delete=models.SET_NULL, null=True, related_name="acompanhamentos_criados")
@@ -252,6 +254,7 @@ class Lead(models.Model):
         ('novo', 'Novo Contato'),
         ('contatado', 'Contato Realizado'),
         ('agendado', 'Aula Experimental Agendada'),
+        ('congelado', 'Congelado'),
         ('convertido', 'Convertido em Aluno'),
         ('perdido', 'Perdido'),
     ]
@@ -401,6 +404,7 @@ class RespostaAluno(models.Model):
     # Campos preenchidos pelo professor durante a correção
     pontos_obtidos = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     feedback_professor = models.TextField("Feedback do Professor", blank=True, null=True)
+    resposta_corrigida_html = models.TextField("Resposta Corrigida (HTML)", blank=True, null=True)
     corrigido = models.BooleanField(default=False)
 
     class Meta:

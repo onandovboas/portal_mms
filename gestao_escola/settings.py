@@ -115,12 +115,16 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 
 # MUDANÇA NECESSÁRIA PARA DEPLOY:
 # STATIC_ROOT é a pasta para onde o Django irá copiar todos os arquivos estáticos
 # quando você rodar o comando `python manage.py collectstatic`.
 # O servidor de produção (Nginx, Apache) será configurado para usar esta pasta.
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'), # BASE_DIR aponta para mms_portal/
+]
+
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 

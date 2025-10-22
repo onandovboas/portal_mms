@@ -1,0 +1,171 @@
+/* cadastros/static/cadastros/mms_style.css */
+
+/* 1. Importar Fontes do Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Work+Sans:wght@400;500&display=swap');
+
+/* 2. Definir Variáveis de Cor (Baseado no Manual) */
+:root {
+  --mms-blue: #125895; /* Cor Primária Azul */
+  --mms-yellow: #FFB805; /* Cor Primária Amarelo */
+  --mms-text-dark: #333333; /* Neutro - Texto Principal */
+  --mms-text-light: #6c757d; /* Cinza Bootstrap para texto secundário */
+  --mms-bg-soft: #F8F7F4; /* Neutro - Fundo Quente */
+  --mms-border-light: #EAEAEA; /* Neutro - Bordas/Divisórias */
+
+  --mms-success: #198754; /* Verde Bootstrap */
+  --mms-danger: #DC3840; /* Vermelho da Paleta Provocar [cite: 260] */
+  --mms-warning: #FFB805; /* Amarelo Primário (também usado como aviso) [cite: 226] */
+  --mms-info: #0dcaf0; /* Azul Claro Bootstrap */
+
+  /* Fontes */
+  --mms-font-primary: 'Poppins', sans-serif;
+  --mms-font-secondary: 'Work Sans', sans-serif;
+
+  /* Outros */
+  --mms-border-radius: 0.5rem; /* Bordas levemente arredondadas */
+  --mms-shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.05); /* Sombra suave */
+}
+
+/* 3. Estilos Base Globais */
+body {
+  font-family: var(--mms-font-secondary);
+  background-color: var(--mms-bg-soft); /* Fundo suave [cite: 239] */
+  color: var(--mms-text-dark); /* Cor de texto principal [cite: 240] */
+}
+
+/* Títulos usam Poppins */
+h1, h2, h3, h4, h5, h6,
+.h1, .h2, .h3, .h4, .h5, .h6 {
+  font-family: var(--mms-font-primary);
+  font-weight: 600; /* Um pouco mais de peso */
+  color: var(--mms-blue); /* Títulos em azul primário [cite: 225] */
+}
+
+/* Links */
+a {
+  color: var(--mms-blue); /* Links em azul primário [cite: 225] */
+  text-decoration: none;
+  transition: opacity 0.2s ease;
+}
+a:hover, a:focus {
+  color: #0e4470; /* Azul um pouco mais escuro no hover */
+  text-decoration: underline;
+  opacity: 0.9;
+}
+
+/* Botões */
+.btn {
+  border-radius: var(--mms-border-radius);
+  font-family: var(--mms-font-secondary); /* Work Sans nos botões */
+  font-weight: 500;
+  padding: 0.5rem 1rem; /* Ajuste leve no padding */
+  transition: all 0.2s ease;
+}
+
+.btn-primary {
+  background-color: var(--mms-yellow); /* Botão primário Amarelo [cite: 226] */
+  border-color: var(--mms-yellow);
+  color: var(--mms-text-dark); /* Texto escuro para contraste */
+}
+.btn-primary:hover, .btn-primary:focus {
+  background-color: #e6a604; /* Amarelo mais escuro */
+  border-color: #e6a604;
+  color: var(--mms-text-dark);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+}
+.btn-primary:active {
+   background-color: #cc9503;
+   border-color: #cc9503;
+}
+
+.btn-secondary {
+  background-color: var(--mms-border-light); /* Cinza claro [cite: 241] */
+  border-color: var(--mms-border-light);
+  color: var(--mms-text-dark);
+}
+.btn-secondary:hover, .btn-secondary:focus {
+   background-color: #d3d3d3;
+   border-color: #d3d3d3;
+   color: var(--mms-text-dark);
+}
+
+.btn-outline-primary {
+   border-color: var(--mms-yellow);
+   color: var(--mms-text-dark); /* Texto escuro para contraste no outline */
+}
+.btn-outline-primary:hover, .btn-outline-primary:focus {
+   background-color: var(--mms-yellow);
+   border-color: var(--mms-yellow);
+   color: var(--mms-text-dark);
+}
+
+ .btn-outline-secondary {
+   border-color: #ced4da; /* Cinza padrão Bootstrap */
+   color: var(--mms-text-light);
+ }
+ .btn-outline-secondary:hover, .btn-outline-secondary:focus {
+   background-color: #e9ecef;
+   border-color: #ced4da;
+   color: var(--mms-text-dark);
+ }
+
+ /* Cores funcionais para botões */
+ .btn-success { background-color: var(--mms-success); border-color: var(--mms-success); }
+ .btn-danger { background-color: var(--mms-danger); border-color: var(--mms-danger); }
+ .btn-warning { background-color: var(--mms-warning); border-color: var(--mms-warning); color: var(--mms-text-dark); }
+ .btn-info { background-color: var(--mms-info); border-color: var(--mms-info); }
+
+
+/* Cards */
+.card {
+  border: 1px solid var(--mms-border-light); /* Borda subtil [cite: 241] */
+  border-radius: var(--mms-border-radius);
+  box-shadow: var(--mms-shadow-sm);
+  background-color: #fff; /* Fundo branco padrão */
+}
+.card-header {
+  background-color: #fff; /* Fundo branco para header */
+  border-bottom: 1px solid var(--mms-border-light); /* Linha divisória [cite: 241] */
+  padding: 0.75rem 1rem;
+}
+.card-header h1, .card-header h2, .card-header h3, .card-header h4, .card-header h5, .card-header h6 {
+   margin-bottom: 0; /* Remove margem inferior dos títulos no header */
+}
+.card-footer {
+   background-color: #fff;
+   border-top: 1px solid var(--mms-border-light);
+}
+
+/* Formulários */
+.form-control, .form-select {
+  border-radius: var(--mms-border-radius);
+  border-color: var(--mms-border-light); /* Borda clara [cite: 241] */
+  font-family: var(--mms-font-secondary); /* Work Sans nos inputs */
+}
+.form-control:focus, .form-select:focus {
+  border-color: var(--mms-yellow); /* Foco amarelo [cite: 226] */
+  box-shadow: 0 0 0 0.25rem rgba(255, 184, 5, 0.25);
+}
+.form-label {
+  font-weight: 500;
+  color: var(--mms-text-dark);
+  margin-bottom: 0.3rem; /* Espaço ligeiramente menor */
+}
+
+/* Badges */
+.badge {
+  font-weight: 500;
+  padding: 0.4em 0.6em; /* Padding ajustado */
+}
+.text-bg-primary { background-color: var(--mms-blue) !important; color: #fff !important; }
+.text-bg-secondary { background-color: #6c757d !important; color: #fff !important; }
+.text-bg-success { background-color: var(--mms-success) !important; color: #fff !important; }
+.text-bg-danger { background-color: var(--mms-danger) !important; color: #fff !important; }
+.text-bg-warning { background-color: var(--mms-warning) !important; color: var(--mms-text-dark) !important; }
+.text-bg-info { background-color: var(--mms-info) !important; color: var(--mms-text-dark) !important; }
+.text-bg-light { background-color: var(--mms-border-light) !important; color: var(--mms-text-dark) !important; border: 1px solid #dee2e6; }
+.text-bg-dark { background-color: var(--mms-text-dark) !important; color: #fff !important; }
+
+/* Utilitários */
+.text-muted { color: var(--mms-text-light) !important; }
+.border-light { border-color: var(--mms-border-light) !important; }

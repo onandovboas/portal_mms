@@ -14,7 +14,7 @@ from django.views.decorators.http import require_POST
 from django.shortcuts import get_object_or_404, render, redirect
 import csv
 from django.utils.encoding import smart_str
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.urls import reverse
 from django.contrib import messages
 from django.db.models.functions import ExtractWeek
@@ -26,6 +26,7 @@ from django.contrib.auth import login, authenticate
 from django import forms
 from django.db import transaction
 from django.utils.html import format_html
+import json
 
 
 
@@ -89,6 +90,42 @@ def detalhe_turma(request, pk):
                     presente=(str(inscricao.aluno.pk) in alunos_presentes_ids)
                 )
 
+        elif 'salvar_aula_atrasada' in request.POST:
+            # Esta é a nova lógica para a aula ATRASADA
+            try:
+                professor_id = request.POST.get('professor_aula_atrasada')
+                professor = Professor.objects.get(pk=professor_id)
+            except Professor.DoesNotExist:
+                messages.error(request, 'Professor selecionado inválido.')
+                return redirect('cadastros:detalhe_turma', pk=turma.pk)
+
+            data_aula_str = request.POST.get('data_aula_atrasada')
+            if not data_aula_str:
+                messages.error(request, 'A data da aula é obrigatória.')
+                return redirect('cadastros:detalhe_turma', pk=turma.pk)
+
+            novo_registro = RegistroAula.objects.create(
+                turma=turma, 
+                professor=professor, 
+                data_aula=data_aula_str, # Data vinda do formulário
+                last_word=request.POST.get('last_word_atrasada'),
+                last_parag=request.POST.get('last_parag_atrasada') or None,
+                new_dictation=request.POST.get('new_dictation_atrasada') or None,
+                old_dictation=request.POST.get('old_dictation_atrasada') or None,
+                new_reading=request.POST.get('new_reading_atrasada') or None,
+                old_reading=request.POST.get('old_reading_atrasada') or None,
+                lesson_check=request.POST.get('lesson_check_atrasada'),
+            )
+            
+            # A lógica de presença é a mesma, mas lê os campos com prefixo 'atrasada_'
+            alunos_presentes_ids = request.POST.getlist('presenca_atrasada')
+            todos_os_inscritos = list(turma.inscricao_set.filter(status__in=['matriculado', 'experimental', 'acompanhando']))
+            for inscricao in todos_os_inscritos:
+                Presenca.objects.create(
+                    registro_aula=novo_registro, aluno=inscricao.aluno,
+                    presente=(str(inscricao.aluno.pk) in alunos_presentes_ids)
+                )
+        
         elif 'salvar_anotacoes' in request.POST:
             novas_anotacoes = request.POST.get('anotacoes_gerais')
             turma.anotacoes_gerais = novas_anotacoes
@@ -123,7 +160,7 @@ def detalhe_turma(request, pk):
     data_aula__year=ano_selecionado, 
     data_aula__month=mes_selecionado
     ).select_related('professor').prefetch_related('presenca_set__aluno').order_by('-data_aula')
-    
+    todos_professores = Professor.objects.all().order_by('nome_completo')
 
     alunos_ativos_na_turma = Aluno.objects.filter(
         inscricao__turma=turma, 
@@ -178,6 +215,7 @@ def detalhe_turma(request, pk):
         'historico_aulas': historico_aulas,
         'data_selecionada': data_atual,
         'provas_da_turma': provas_da_turma,
+        'todos_professores': todos_professores,
         'nav': {
             'mes_anterior': mes_anterior, 'ano_anterior': ano_anterior,
             'mes_seguinte': mes_seguinte, 'ano_seguinte': ano_seguinte,
@@ -824,8 +862,6 @@ def novo_aluno_experimental(request):
             if lead_id:
                 try:
                     lead = Lead.objects.get(pk=lead_id)
-                    lead.status = 'convertido'
-                    lead.save()
                     messages.success(request, f'Lead "{lead.nome_completo}" convertido com sucesso em aluno experimental!')
                 except Lead.DoesNotExist:
                     pass # Se o lead não for encontrado, não faz nada
@@ -874,6 +910,34 @@ def criar_contrato(request, aluno_pk):
     return render(request, 'cadastros/criar_contrato.html', context)
 
 @login_required
+def editar_contrato(request, contrato_pk):
+    """
+    View para editar um contrato existente.
+    """
+    contrato = get_object_or_404(Contrato, pk=contrato_pk)
+    aluno_pk = contrato.aluno.pk # Guarda o PK do aluno para redirecionar
+
+    if request.method == 'POST':
+        form = ContratoForm(request.POST, instance=contrato)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Contrato atualizado com sucesso!')
+            # Redireciona de volta para o perfil do aluno
+            return redirect('cadastros:perfil_aluno', pk=aluno_pk)
+        else:
+            messages.error(request, 'Por favor, corrija os erros no formulário.')
+    else:
+        form = ContratoForm(instance=contrato)
+
+    context = {
+        'form': form,
+        'contrato': contrato, # Passa o contrato para o template
+        'aluno': contrato.aluno
+    }
+    # Reutiliza o template de criação, que agora também servirá para edição
+    return render(request, 'cadastros/criar_contrato.html', context)
+
+@login_required
 def editar_registro_aula(request, pk):
     registro_aula = get_object_or_404(RegistroAula, pk=pk)
     turma_pk = registro_aula.turma.pk # Guarda o ID da turma para o redirecionamento
@@ -897,8 +961,8 @@ def editar_registro_aula(request, pk):
 @login_required
 def lista_leads(request):
     # A ordem das colunas no Kanban será definida por esta lista
-    ordem_status = ['novo', 'contatado', 'agendado', 'convertido', 'perdido']
-    
+    ordem_status = ['novo', 'contatado', 'agendado', 'congelado', 'convertido', 'perdido']
+
     # Busca todos os leads e transforma-os num dicionário agrupado por status
     leads_todos = Lead.objects.all().order_by('-data_criacao')
     leads_por_status = {status: [] for status, _ in Lead.STATUS_CHOICES}
@@ -1166,6 +1230,10 @@ def portal_aluno(request):
     except Aluno.DoesNotExist:
         messages.error(request, "Acesso negado. Esta área é exclusiva para alunos.")
         return redirect('cadastros:dashboard_admin')
+    
+    ultimo_acompanhamento = AcompanhamentoPedagogico.objects.filter(
+        aluno=aluno, status='realizado'
+    ).order_by('-data_realizacao').first()
 
     # --- DADOS FINANCEIROS (já existentes) ---
     kpis_financeiros = Pagamento.objects.filter(aluno=aluno).aggregate(
@@ -1238,6 +1306,7 @@ def portal_aluno(request):
         'data_selecionada': data_selecionada, # <-- Nova variável para o template
         'provas_pendentes': provas_pendentes,
         'provas_finalizadas': provas_finalizadas,
+        'ultimo_acompanhamento': ultimo_acompanhamento,
         'nav': { # <-- Nova variável para a navegação
             'mes_anterior': mes_anterior, 'ano_anterior': ano_anterior,
             'mes_seguinte': mes_seguinte, 'ano_seguinte': ano_seguinte,
@@ -1612,12 +1681,20 @@ def corrigir_prova(request, aluno_prova_pk):
             pontos = Decimal(pontos_str)
             feedback = request.POST.get(f'feedback_{questao.id}', '')
 
+            
+            resposta_corrigida = request.POST.get(f'resposta_corrigida_{questao.id}')
             resposta.pontos_obtidos = pontos
             resposta.feedback_professor = feedback
             resposta.corrigido = True
+
+            if resposta_corrigida:
+                    resposta.resposta_corrigida_html = resposta_corrigida
+
             resposta.save()
             
             nota_total += pontos
+
+            
         
         aluno_prova.nota_final = nota_total
         aluno_prova.status = 'finalizada'
@@ -1738,3 +1815,60 @@ def copiar_prova_template(request, pk):
         messages.error(request, f"Ocorreu um erro inesperado ao copiar o gabarito: {e}")
     
     return redirect(reverse('admin:cadastros_provatemplate_changelist'))
+
+@login_required
+@require_POST # Garante que esta view só aceite requisições POST
+def marcar_experimental_desistiu(request, inscricao_pk):
+    """
+    Muda o status de uma inscrição experimental para 'desistiu'.
+    """
+    inscricao = get_object_or_404(Inscricao, pk=inscricao_pk, status='experimental')
+    
+    # Atualiza o status
+    inscricao.status = 'desistiu'
+    inscricao.save()
+    
+    # Também é uma boa prática de UX inativar o Aluno, se ele não tiver outras matrículas
+    outras_inscricoes_ativas = Inscricao.objects.filter(
+        aluno=inscricao.aluno,
+        status__in=['matriculado', 'acompanhando']
+    ).exclude(pk=inscricao.pk).exists()
+
+    if not outras_inscricoes_ativas:
+        inscricao.aluno.status = 'inativo' # Define o Aluno como 'inativo'
+        inscricao.aluno.save()
+        messages.success(request, f'Aluno "{inscricao.aluno.nome_completo}" marcado como desistente e inativado.')
+    else:
+        messages.success(request, f'Inscrição experimental de "{inscricao.aluno.nome_completo}" marcada como desistente.')
+
+    return redirect('cadastros:dashboard_admin')
+
+@login_required
+@require_POST
+def atualizar_status_lead(request):
+    """
+    View para atualizar o status de um lead via AJAX (Drag-and-Drop).
+    """
+    try:
+        data = json.loads(request.body)
+        lead_pk = data.get('lead_pk')
+        novo_status = data.get('novo_status')
+
+        # Validação
+        status_validos = [choice[0] for choice in Lead.STATUS_CHOICES]
+        if novo_status not in status_validos:
+            return JsonResponse({'status': 'erro', 'mensagem': 'Status inválido'}, status=400)
+            
+        lead = get_object_or_404(Lead, pk=lead_pk)
+        
+        # Atualiza apenas se o status for diferente
+        if lead.status != novo_status:
+            lead.status = novo_status
+            lead.save()
+            
+        return JsonResponse({'status': 'sucesso', 'lead': lead.nome_completo, 'novo_status': lead.get_status_display()})
+
+    except json.JSONDecodeError:
+        return JsonResponse({'status': 'erro', 'mensagem': 'Request mal formatado'}, status=400)
+    except Exception as e:
+        return JsonResponse({'status': 'erro', 'mensagem': str(e)}, status=500)
