@@ -80,7 +80,11 @@ urlpatterns = [
     path('aluno/<int:aluno_pk>/gerar-link/', views.gerar_link_atualizacao, name='gerar_link_atualizacao'),
 
 
-    
+    # Rotas para Exportação
+    path('exportar/', views.exportar_dados_page, name='exportar_dados_page'),
+    path('exportar/contratos/', views.exportar_contratos_csv, name='exportar_contratos_csv'),
+    path('exportar/pagamentos/', views.exportar_pagamentos_csv, name='exportar_pagamentos_csv'),
+    path('exportar/registros-aula-por-turma/', views.exportar_registros_aula_por_turma_zip, name='exportar_registros_aula_por_turma_zip'),
     
     # Relatórios
     path('relatorios/professores/', views.relatorio_pagamento_professores, name='relatorio_professores'),

@@ -27,6 +27,8 @@ from django import forms
 from django.db import transaction
 from django.utils.html import format_html
 import json
+import io
+import zipfile
 
 
 
@@ -1872,3 +1874,139 @@ def atualizar_status_lead(request):
         return JsonResponse({'status': 'erro', 'mensagem': 'Request mal formatado'}, status=400)
     except Exception as e:
         return JsonResponse({'status': 'erro', 'mensagem': str(e)}, status=500)
+
+# --- VIEWS DE EXPORTAÇÃO ---
+
+@login_required
+def exportar_dados_page(request):
+    """ Exibe a página com os botões para exportar dados. """
+    return render(request, 'cadastros/exportar_dados.html')
+
+@login_required
+def exportar_contratos_csv(request):
+    """ Gera e baixa um CSV com todos os contratos. """
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="mms_contratos.csv"'
+    writer = csv.writer(response)
+
+    writer.writerow([
+        'ID Contrato', 'ID Aluno', 'Nome Aluno', 'Plano', 'Data Início', 'Data Fim',
+        'Valor Mensalidade', 'Valor Matrícula', 'Parcelas Matrícula', 'Ativo', 'Observações'
+    ])
+    response.write('\ufeff'.encode('utf-8')) # Adiciona o BOM do UTF-8
+
+    contratos = Contrato.objects.select_related('aluno').all()
+    for c in contratos:
+        writer.writerow([
+            c.id, c.aluno.id, smart_str(c.aluno.nome_completo), c.get_plano_display(),
+            c.data_inicio.strftime('%Y-%m-%d') if c.data_inicio else '',
+            c.data_fim.strftime('%Y-%m-%d') if c.data_fim else '',
+            f"{c.valor_mensalidade:.2f}", f"{c.valor_matricula:.2f}", c.parcelas_matricula,
+            'Sim' if c.ativo else 'Não', smart_str(c.observacoes)
+        ])
+
+    response['charset'] = 'utf-8' # Garante que o charset está na resposta final
+    return response
+
+@login_required
+def exportar_pagamentos_csv(request):
+    """ Gera e baixa um CSV com todos os pagamentos. """
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="mms_pagamentos.csv"'
+    writer = csv.writer(response)
+
+    writer.writerow([
+        'ID Pagamento', 'ID Aluno', 'Nome Aluno', 'ID Contrato', 'Tipo', 'Descrição',
+        'Valor Total', 'Valor Pago', 'Status', 'Mês Referência', 'Data Vencimento', 'Data Pagamento'
+    ])
+    response.write('\ufeff'.encode('utf-8')) # Adiciona o BOM do UTF-8
+
+    pagamentos = Pagamento.objects.select_related('aluno', 'contrato').all()
+    for p in pagamentos:
+        writer.writerow([
+            p.id, p.aluno.id, smart_str(p.aluno.nome_completo), p.contrato.id if p.contrato else '',
+            p.get_tipo_display(), smart_str(p.descricao), f"{p.valor:.2f}", f"{p.valor_pago:.2f}",
+            p.get_status_display(), p.mes_referencia.strftime('%Y-%m-%d') if p.mes_referencia else '',
+            p.data_vencimento.strftime('%Y-%m-%d') if p.data_vencimento else '',
+            p.data_pagamento.strftime('%Y-%m-%d') if p.data_pagamento else ''
+        ])
+    response['charset'] = 'utf-8' # Garante que o charset está na resposta final
+    return response
+
+@login_required
+def exportar_registros_aula_csv(request):
+    """ Gera e baixa um CSV com todos os registros de aula. """
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="mms_registros_aula.csv"'
+    writer = csv.writer(response)
+    response.write('\ufeff'.encode('utf-8')) # Adiciona o BOM do UTF-8
+
+    writer.writerow([
+        'ID Registro', 'ID Turma', 'Nome Turma', 'Data Aula', 'ID Professor', 'Nome Professor',
+        'Último Parágrafo', 'Última Palavra', 'Ditado Novo', 'Ditado Antigo',
+        'Leitura Nova', 'Leitura Antiga', 'Lesson Check'
+    ])
+
+    registros = RegistroAula.objects.select_related('turma', 'professor').all()
+    for r in registros:
+        writer.writerow([
+            r.id, r.turma.id, smart_str(r.turma.nome), r.data_aula.strftime('%Y-%m-%d') if r.data_aula else '',
+            r.professor.id if r.professor else '', smart_str(r.professor.nome_completo) if r.professor else '',
+            r.last_parag, smart_str(r.last_word), r.new_dictation, r.old_dictation,
+            r.new_reading, r.old_reading, smart_str(r.lesson_check)
+        ])
+    response['charset'] = 'utf-8' # Garante que o charset está na resposta final
+    return response
+
+@login_required
+def exportar_registros_aula_por_turma_zip(request):
+    """
+    Gera um arquivo ZIP contendo um CSV para cada turma com seus registros de aula.
+    """
+    # Cria um buffer de bytes em memória para o arquivo ZIP
+    zip_buffer = io.BytesIO()
+
+    # Cria o arquivo ZIP em memória
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        turmas = Turma.objects.all().order_by('nome')
+
+        for turma in turmas:
+            registros = RegistroAula.objects.filter(turma=turma).select_related('professor').order_by('data_aula')
+            
+            if not registros.exists():
+                continue # Pula turmas sem registros
+
+            # Cria um buffer de texto em memória para o CSV da turma
+            csv_buffer = io.StringIO()
+            writer = csv.writer(csv_buffer)
+
+            # Escreve o BOM e o cabeçalho
+            csv_buffer.write('\ufeff') # BOM para UTF-8
+            writer.writerow([
+                'ID Registro', 'Data Aula', 'ID Professor', 'Nome Professor',
+                'Último Parágrafo', 'Última Palavra', 'Ditado Novo', 'Ditado Antigo',
+                'Leitura Nova', 'Leitura Antiga', 'Lesson Check'
+            ])
+
+            # Escreve os dados
+            for r in registros:
+                writer.writerow([
+                    r.id, r.data_aula.strftime('%Y-%m-%d') if r.data_aula else '',
+                    r.professor.id if r.professor else '', smart_str(r.professor.nome_completo) if r.professor else '',
+                    r.last_parag, smart_str(r.last_word), r.new_dictation, r.old_dictation,
+                    r.new_reading, r.old_reading, smart_str(r.lesson_check)
+                ])
+            
+            # Prepara o nome do arquivo CSV dentro do ZIP
+            # Remove caracteres inválidos para nomes de arquivo
+            nome_turma_seguro = re.sub(r'[^\w\-]+', '_', turma.nome)
+            csv_filename = f'registros_turma_{nome_turma_seguro}.csv'
+            
+            # Adiciona o conteúdo do CSV (como bytes UTF-8) ao ZIP
+            zip_file.writestr(csv_filename, csv_buffer.getvalue().encode('utf-8'))
+
+    # Prepara a resposta HTTP para o ZIP
+    zip_buffer.seek(0)
+    response = HttpResponse(zip_buffer, content_type='application/zip')
+    response['Content-Disposition'] = 'attachment; filename="mms_registros_aula_por_turma.zip"'
+    return response

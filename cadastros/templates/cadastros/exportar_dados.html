@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Exportar Dados</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+  <div class="container my-4" style="max-width: 700px;">
+    <header class="d-flex align-items-center justify-content-between mb-4">
+      <div>
+        <h1 class="h3 mb-1">Exportação de Dados</h1>
+        <p class="text-muted mb-0">Faça o download dos dados essenciais do sistema em formato CSV.</p>
+      </div>
+      <a href="{% url 'cadastros:dashboard_admin' %}" class="btn btn-outline-secondary">
+        &larr; Voltar ao Dashboard
+      </a>
+    </header>
+
+    <div class="card shadow-sm">
+      <div class="list-group list-group-flush">
+        
+        <a href="{% url 'cadastros:exportar_contratos_csv' %}" class="list-group-item list-group-item-action">
+          <div class="d-flex w-100 justify-content-between">
+            <h5 class="mb-1"><i class="bi bi-file-earmark-text me-2"></i>Exportar Contratos</h5>
+            <small>Formato CSV</small>
+          </div>
+          <p class="mb-1">Descarrega um ficheiro com todos os contratos (ativos e inativos).</p>
+        </a>
+
+        <a href="{% url 'cadastros:exportar_pagamentos_csv' %}" class="list-group-item list-group-item-action">
+          <div class="d-flex w-100 justify-content-between">
+            <h5 class="mb-1"><i class="bi bi-receipt me-2"></i>Exportar Pagamentos</h5>
+            <small>Formato CSV</small>
+          </div>
+          <p class="mb-1">Descarrega o histórico completo de todas as cobranças (mensalidades, matrículas, etc.).</p>
+        </a>
+
+        <a href="{% url 'cadastros:exportar_registros_aula_por_turma_zip' %}" class="list-group-item list-group-item-action">
+          <div class="d-flex w-100 justify-content-between">
+            <h5 class="mb-1"><i class="bi bi-calendar-check me-2"></i>Exportar Registos de Aula por Turma</h5>
+            <small>Formato ZIP (contém CSVs)</small>
+          </div>
+          <p class="mb-1">Descarrega um ficheiro ZIP com um CSV separado para cada turma, contendo os seus registos de aula.</p>
+        </a>
+
+      </div>
+    </div>
+    
+    <div class="alert alert-warning mt-4">
+      <h4 class="alert-heading">Recomendação</h4>
+      <p>É recomendado realizar estas exportações periodicamente (ex: mensalmente) e guardar os ficheiros num local seguro como parte da sua estratégia de backup.</p>
+    </div>
+
+  </div>
+</body>
+</html>
