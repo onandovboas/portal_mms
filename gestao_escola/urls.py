@@ -11,7 +11,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
 
     # Rotas de Autenticação
-    path('login/', auth_views.LoginView.as_view(template_name='cadastros/login.html'), name='login'),
+    # path('login/', auth_views.LoginView.as_view(template_name='cadastros/login.html'), name='login'),
+    path('login/', views.portal_login_view, name='login'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
 
     # Inclui TODAS as outras URLs do seu app sob o prefixo '' (raiz do site)

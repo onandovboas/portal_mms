@@ -46,6 +46,8 @@
                           {% if item.resposta %}
                             {% if item.resposta.resposta_texto %}
                               {{ item.resposta.resposta_texto|linebreaksbr }}
+                            {% elif item.texto_da_opcao %}
+                              Opção selecionada: <strong>{{ item.texto_da_opcao }}</strong>
                             {% elif item.resposta.resposta_opcao %}
                               Opção selecionada: <strong>{{ item.resposta.resposta_opcao|upper }}</strong>
                             {% else %}<em class="text-muted">Não respondeu.</em>{% endif %}

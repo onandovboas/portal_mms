@@ -2,7 +2,7 @@
 from django.core.paginator import Paginator
 from django.contrib.auth.decorators import login_required
 from .models import Turma, Inscricao, RegistroAula, Professor, Presenca, Pagamento, Contrato, AcompanhamentoFalta, Aluno, Inscricao, RegistroAula, Presenca, Lead, TokenAtualizacaoAluno, AcompanhamentoPedagogico, AlunoProva, Questao, ProvaTemplate, RespostaAluno
-from .forms import AlunoForm, PagamentoForm, AlunoExperimentalForm, ContratoForm, RegistroAulaForm, LeadForm, AcompanhamentoPedagogicoForm, LiberarProvaForm
+from .forms import AlunoForm, PagamentoForm, AlunoExperimentalForm, ContratoForm, RegistroAulaForm, LeadForm, AcompanhamentoPedagogicoForm, LiberarProvaForm, PlanoAulaForm
 from django.utils import timezone
 from datetime import date, timedelta
 from django.db.models import F, Sum, Count, Min, Q, Subquery, OuterRef, Max, DecimalField, Exists
@@ -29,14 +29,14 @@ from django.utils.html import format_html
 import json
 import io
 import zipfile
+from .decorators import admin_required, professor_required, aluno_required
 
 
 
 # --- Views do Portal do Professor ---
 
-
 @login_required
-@login_required
+@professor_required
 def portal_professor(request):
     # 👇 A MUDANÇA ESTÁ NESTA LINHA 👇
     turmas_qs = Turma.objects.all().prefetch_related(
@@ -61,42 +61,68 @@ def portal_professor(request):
 
 
 @login_required
+@professor_required
 def detalhe_turma(request, pk):
     turma = get_object_or_404(Turma, pk=pk)
-    
-    if request.method == 'POST':
-        # ... (A lógica do POST para salvar anotações e aulas continua a mesma) ...
-        if 'salvar_aula' in request.POST:
-            try:
-                professor = Professor.objects.get(usuario=request.user)
-            except Professor.DoesNotExist:
-                return redirect('cadastros:portal_professor')
+    hoje = timezone.now().date() # Definido 'hoje' no topo
 
-            novo_registro = RegistroAula.objects.create(
-                turma=turma, professor=professor, data_aula=date.today(),
-                last_word=request.POST.get('last_word'),
-                last_parag=request.POST.get('last_parag') or None,
-                new_dictation=request.POST.get('new_dictation') or None,
-                old_dictation=request.POST.get('old_dictation') or None,
-                new_reading=request.POST.get('new_reading') or None,
-                old_reading=request.POST.get('old_reading') or None,
-                lesson_check=request.POST.get('lesson_check'),
-            )
+    # =====================================================
+    # CORREÇÃO 1: Lógica POST unificada num só bloco
+    # =====================================================
+    if request.method == 'POST':
+        # Tenta buscar o professor logado primeiro
+        try:
+            professor = Professor.objects.get(usuario=request.user)
+        except Professor.DoesNotExist:
+            # Se não for professor (ex: admin), define como None
+            professor = None
+        
+        # --- Lógica para 'salvar_aula' (Aula de Hoje) ---
+        if 'salvar_aula' in request.POST:
             
+            # 1. Procura se já existe um plano para hoje
+            novo_registro = RegistroAula.objects.filter(turma=turma, data_aula=hoje).first()
+
+            dados_aula = {
+                'turma': turma,
+                'professor': professor, # Usa o professor logado
+                'data_aula': hoje,
+                'last_word': request.POST.get('last_word'),
+                'last_parag': request.POST.get('last_parag') or None,
+                'new_dictation': request.POST.get('new_dictation') or None,
+                'old_dictation': request.POST.get('old_dictation') or None,
+                'new_reading': request.POST.get('new_reading') or None,
+                'old_reading': request.POST.get('old_reading') or None,
+                'lesson_check': request.POST.get('lesson_check'),
+            }
+            
+            if novo_registro:
+                # 2. Se existe (era um plano), ATUALIZA
+                for key, value in dados_aula.items():
+                    setattr(novo_registro, key, value)
+                novo_registro.save()
+            else:
+                # 3. Se não existe, CRIA
+                novo_registro = RegistroAula.objects.create(**dados_aula)
+
+            # 4. A lógica de presença é executada DEPOIS
             alunos_presentes_ids = request.POST.getlist('presenca')
-            # Usamos a união das listas de alunos para registrar a presença
             todos_os_inscritos = list(turma.inscricao_set.filter(status__in=['matriculado', 'experimental', 'acompanhando']))
+            
+            Presenca.objects.filter(registro_aula=novo_registro).delete() # Limpa presenças antigas, se houver
+            
             for inscricao in todos_os_inscritos:
                 Presenca.objects.create(
                     registro_aula=novo_registro, aluno=inscricao.aluno,
                     presente=(str(inscricao.aluno.pk) in alunos_presentes_ids)
                 )
 
+        # --- Lógica para 'salvar_aula_atrasada' ---
         elif 'salvar_aula_atrasada' in request.POST:
-            # Esta é a nova lógica para a aula ATRASADA
             try:
+                # Aqui usamos o 'professor_selecionado' do formulário
                 professor_id = request.POST.get('professor_aula_atrasada')
-                professor = Professor.objects.get(pk=professor_id)
+                professor_selecionado = Professor.objects.get(pk=professor_id)
             except Professor.DoesNotExist:
                 messages.error(request, 'Professor selecionado inválido.')
                 return redirect('cadastros:detalhe_turma', pk=turma.pk)
@@ -108,8 +134,8 @@ def detalhe_turma(request, pk):
 
             novo_registro = RegistroAula.objects.create(
                 turma=turma, 
-                professor=professor, 
-                data_aula=data_aula_str, # Data vinda do formulário
+                professor=professor_selecionado, # <-- Usa o professor do formulário
+                data_aula=data_aula_str,
                 last_word=request.POST.get('last_word_atrasada'),
                 last_parag=request.POST.get('last_parag_atrasada') or None,
                 new_dictation=request.POST.get('new_dictation_atrasada') or None,
@@ -119,7 +145,6 @@ def detalhe_turma(request, pk):
                 lesson_check=request.POST.get('lesson_check_atrasada'),
             )
             
-            # A lógica de presença é a mesma, mas lê os campos com prefixo 'atrasada_'
             alunos_presentes_ids = request.POST.getlist('presenca_atrasada')
             todos_os_inscritos = list(turma.inscricao_set.filter(status__in=['matriculado', 'experimental', 'acompanhando']))
             for inscricao in todos_os_inscritos:
@@ -128,11 +153,34 @@ def detalhe_turma(request, pk):
                     presente=(str(inscricao.aluno.pk) in alunos_presentes_ids)
                 )
         
-        elif 'salvar_anotacoes' in request.POST:
-            novas_anotacoes = request.POST.get('anotacoes_gerais')
-            turma.anotacoes_gerais = novas_anotacoes
-            turma.save()
+        # --- Lógica para 'salvar_plano_aula' ---
+        elif 'salvar_plano_aula' in request.POST:
+            form_plano_aula = PlanoAulaForm(request.POST) # Define a variável no POST
+            if form_plano_aula.is_valid():
+                data_planejada = form_plano_aula.cleaned_data['data_aula']
+                if data_planejada <= hoje:
+                    messages.error(request, 'A data do planejamento deve ser no futuro.')
+                else:
+                    plano = RegistroAula.objects.filter(turma=turma, data_aula=data_planejada).first()
+                    if not plano:
+                        plano = form_plano_aula.save(commit=False)
+                    else:
+                        plano.last_parag = form_plano_aula.cleaned_data['last_parag']
+                        plano.last_word = form_plano_aula.cleaned_data['last_word']
+                        plano.new_dictation = form_plano_aula.cleaned_data['new_dictation']
+                        plano.old_dictation = form_plano_aula.cleaned_data['old_dictation']
+                        plano.new_reading = form_plano_aula.cleaned_data['new_reading']
+                        plano.old_reading = form_plano_aula.cleaned_data['old_reading']
+                        plano.lesson_check = form_plano_aula.cleaned_data['lesson_check']
 
+                    plano.turma = turma
+                    plano.professor = professor # Usa o professor logado
+                    plano.save()
+                    messages.success(request, f'Aula para {data_planejada.strftime("%d/%m/%Y")} planejada com sucesso.')
+            else:
+                messages.error(request, 'Erro no formulário de planejamento. Verifique os dados.')
+
+        # --- Lógica para 'salvar_detalhes_turma' ---
         elif 'salvar_detalhes_turma' in request.POST:
             novo_nome = request.POST.get('nome_turma')
             novo_stage = request.POST.get('stage_turma')
@@ -142,26 +190,42 @@ def detalhe_turma(request, pk):
                 turma.stage = novo_stage
             turma.save()
 
+        # Redireciona no final de qualquer ação POST
         return redirect('cadastros:detalhe_turma', pk=turma.pk)
+
+    # --- INÍCIO DA LÓGICA GET ---
+    # (Ocorre se request.method != 'POST')
+
+    plano_de_hoje = RegistroAula.objects.filter(turma=turma, data_aula=hoje).first()
+    aulas_planejadas = RegistroAula.objects.filter(
+        turma=turma, 
+        data_aula__gt=hoje
+    ).select_related('professor').order_by('data_aula')
 
     alunos_da_turma_ids = Inscricao.objects.filter(turma=turma).values_list('aluno_id', flat=True)
     provas_da_turma = AlunoProva.objects.filter(
         aluno_id__in=alunos_da_turma_ids
     ).select_related('aluno', 'prova_template').order_by('-data_realizacao')
 
-    # --- LÓGICA GET ATUALIZADA ---
-    hoje = timezone.now().date()
     ano_selecionado = int(request.GET.get('ano', hoje.year))
     mes_selecionado = int(request.GET.get('mes', hoje.month))
     data_atual = date(ano_selecionado, mes_selecionado, 1)
-    # ✅ MUDANÇA 1: Query otimizada com prefetch_related
-    # Buscamos as aulas e, de forma eficiente, já "anexamos" a elas
-    # todos os registros de presença e os alunos correspondentes.
+
     historico_aulas = RegistroAula.objects.filter(
-    turma=turma, 
-    data_aula__year=ano_selecionado, 
-    data_aula__month=mes_selecionado
-    ).select_related('professor').prefetch_related('presenca_set__aluno').order_by('-data_aula')
+        turma=turma,
+        data_aula__year=ano_selecionado, 
+        data_aula__month=mes_selecionado,
+        data_aula__lte=hoje
+    ).select_related('professor').prefetch_related(
+        'presenca_set__aluno'
+    ).annotate(
+        # 1. Contamos quantos registos de presença CADA aula tem
+        presenca_count=Count('presenca')
+    ).filter(
+        # 2. Filtramos para mostrar APENAS aulas que têm 1 ou mais registos de presença
+        presenca_count__gt=0
+    ).order_by('-data_aula')
+    
     todos_professores = Professor.objects.all().order_by('nome_completo')
 
     alunos_ativos_na_turma = Aluno.objects.filter(
@@ -174,7 +238,7 @@ def detalhe_turma(request, pk):
 
     for aula in historico_aulas:
         aula.alunos_ausentes = [
-            p.aluno.nome_completo.split(' ')[0]  # <-- MUDANÇA AQUI
+            p.aluno.nome_completo.split(' ')[0]
             for p in aula.presenca_set.all() 
             if not p.presente
         ]
@@ -185,36 +249,40 @@ def detalhe_turma(request, pk):
         registro_aula__data_aula__month=mes_selecionado,
         presente=False
     ).values(
-        'aluno__nome_completo'  # Agrupa por este campo
+        'aluno__nome_completo'
     ).annotate(
-        total_faltas=Count('id')  # Conta as ocorrências em cada grupo
-    ).order_by('-total_faltas') # Ordena para mostrar quem mais faltou primeiro
+        total_faltas=Count('id')
+    ).order_by('-total_faltas')
 
-    data_atual = date(ano_selecionado, mes_selecionado, 1)
-
-    # ... (lógica de navegação de meses continua a mesma) ...
+    # Lógica de navegação de meses
     mes_anterior = (data_atual.month - 2 + 12) % 12 + 1
     ano_anterior = data_atual.year if data_atual.month > 1 else data_atual.year - 1
     mes_seguinte = data_atual.month % 12 + 1
     ano_seguinte = data_atual.year if data_atual.month < 12 else data_atual.year + 1
     
-    # 👇 A GRANDE MUDANÇA ESTÁ AQUI 👇
-    # Em vez de uma lista, agora temos listas separadas por status.
+    # Listas de alunos separadas por status
     inscritos_matriculados = Inscricao.objects.filter(turma=turma, status='matriculado')
     inscritos_experimentais = Inscricao.objects.filter(turma=turma, status='experimental')
     inscritos_acompanhando = Inscricao.objects.filter(turma=turma, status='acompanhando')
     inscritos_trancados = Inscricao.objects.filter(turma=turma, status='trancado')
     
+    # =====================================================
+    # CORREÇÃO 2: Definir 'form_plano_aula' para o GET
+    # =====================================================
+    form_plano_aula = PlanoAulaForm()
+    
     context = {
         'turma': turma,
-        # 👇 Enviamos as listas separadas para o template 👇
         'matriculados': inscritos_matriculados,
         'aulas_do_mes': historico_aulas,
         'experimentais': inscritos_experimentais,
         'acompanhando': inscritos_acompanhando,
         'trancados': inscritos_trancados,
+        'plano_de_hoje': plano_de_hoje,
+        'aulas_planejadas': aulas_planejadas,
+        'form_plano_aula': form_plano_aula, # <-- Agora esta linha é válida
         'faltas_do_mes': faltas_do_mes,
-        'historico_aulas': historico_aulas,
+        'historico_aulas': historico_aulas, # (Variável duplicada, mas ok)
         'data_selecionada': data_atual,
         'provas_da_turma': provas_da_turma,
         'todos_professores': todos_professores,
@@ -230,6 +298,7 @@ def detalhe_turma(request, pk):
 
 
 @login_required
+@admin_required
 def dashboard_admin(request):
     hoje = timezone.now().date()
     
@@ -348,6 +417,8 @@ def dashboard_admin(request):
 
 
 @login_required
+@admin_required
+@professor_required
 def resolver_acompanhamento(request, pk):
     if request.method == 'POST':
         acompanhamento = get_object_or_404(AcompanhamentoFalta, pk=pk)
@@ -361,6 +432,7 @@ def resolver_acompanhamento(request, pk):
     return redirect('cadastros:dashboard_admin')
 
 @login_required
+@admin_required
 def lancamento_recebimento(request):
     if request.method == 'POST':
         aluno_id = request.POST.get('aluno')
@@ -391,6 +463,7 @@ def lancamento_recebimento(request):
     return render(request, 'cadastros/lancamento_form.html', {'alunos': alunos})
 
 @login_required
+@admin_required
 def relatorio_pagamento_professores(request):
     # --- Parte 1: Lógica de Filtro e Navegação (sem alterações) ---
     hoje = timezone.now().date()
@@ -457,6 +530,7 @@ def relatorio_pagamento_professores(request):
     return render(request, 'cadastros/relatorio_professores.html', context)
 
 @login_required
+@admin_required
 def venda_livro(request):
     if request.method == 'POST':
         aluno_id = request.POST.get('aluno')
@@ -495,6 +569,7 @@ def venda_livro(request):
     return render(request, 'cadastros/venda_livro_form.html', context)
 
 @login_required
+@admin_required
 @require_POST
 def pagamentos_bulk(request):
     ids = request.POST.getlist('ids')  # lista de pagamentos selecionados
@@ -519,6 +594,7 @@ def pagamentos_bulk(request):
     return redirect('cadastros:dashboard_admin')
 
 @login_required
+@admin_required
 def quitar_pagamento_especifico(request, pk):
     # 1. Encontra o pagamento EXATO que foi clicado, usando o ID (pk).
     pagamento = get_object_or_404(Pagamento, pk=pk)
@@ -533,6 +609,7 @@ def quitar_pagamento_especifico(request, pk):
     return redirect('cadastros:dashboard_admin')
 
 @login_required
+@admin_required
 def perfil_aluno(request, pk):
     # CONSULTA OTIMIZADA - Evita problemas N+1
     aluno = get_object_or_404(
@@ -630,7 +707,9 @@ def perfil_aluno(request, pk):
     }
 
     return render(request, 'cadastros/perfil_aluno.html', context)
+
 @login_required
+@admin_required
 def exportar_pagamentos_aluno(request, pk):
     aluno = get_object_or_404(Aluno, pk=pk)
     qs = (Pagamento.objects
@@ -662,6 +741,7 @@ def exportar_pagamentos_aluno(request, pk):
     return response
 
 @login_required
+@admin_required
 def novo_pagamento(request, pk):
     """
     Atalho: redireciona para o formulário de lançamento existente,
@@ -674,7 +754,8 @@ def novo_pagamento(request, pk):
 
 
 
-
+@login_required
+@admin_required
 def formulario_inscricao(request):
     # Por enquanto, esta view apenas exibe a página.
     # A lógica para salvar os dados virá depois.
@@ -685,6 +766,7 @@ def formulario_inscricao(request):
     return render(request, 'cadastros/inscricao_form.html')
 
 @login_required
+@admin_required
 def editar_aluno(request, pk):
     aluno = get_object_or_404(Aluno, pk=pk)
 
@@ -705,6 +787,7 @@ def editar_aluno(request, pk):
     })
 
 @login_required
+@admin_required
 def relatorio_alunos_pendentes(request):
     # Esta consulta é o coração da funcionalidade.
     # 1. Filtramos apenas alunos que têm pagamentos com status de pendência.
@@ -738,6 +821,7 @@ def relatorio_alunos_pendentes(request):
     return render(request, 'cadastros/relatorio_alunos_pendentes.html', context)
 
 @login_required
+@admin_required
 def lista_alunos(request):
     # Usamos Subquery para buscar informações de outros modelos de forma eficiente,
     # evitando o problema de N+1 queries.
@@ -774,6 +858,7 @@ def lista_alunos(request):
     return render(request, 'cadastros/lista_alunos.html', context)
 
 @login_required
+@admin_required
 def editar_pagamento(request, pk):
     pagamento = get_object_or_404(Pagamento, pk=pk)
     
@@ -794,6 +879,7 @@ def editar_pagamento(request, pk):
     return render(request, 'cadastros/editar_pagamento.html', context)
 
 @login_required
+@admin_required
 def pagamentos_acoes_em_lote(request):
     if request.method == 'POST':
         pagamento_ids = request.POST.getlist('pagamento_ids')
@@ -820,6 +906,7 @@ def pagamentos_acoes_em_lote(request):
 
 @require_POST # Garante que esta view só pode ser acessada via método POST, por segurança
 @login_required
+@admin_required
 def quitar_dividas_aluno(request, pk):
     aluno = get_object_or_404(Aluno, pk=pk)
     
@@ -842,7 +929,7 @@ def quitar_dividas_aluno(request, pk):
     return redirect('cadastros:perfil_aluno', pk=aluno.pk)
 
 @login_required
-@login_required
+@admin_required
 def novo_aluno_experimental(request):
     lead_id = request.GET.get('lead_id') # Verifica se estamos vindo de uma conversão
 
@@ -887,6 +974,7 @@ def novo_aluno_experimental(request):
     return render(request, 'cadastros/novo_aluno_experimental.html', context)
 
 @login_required
+@admin_required
 def criar_contrato(request, aluno_pk):
     aluno = get_object_or_404(Aluno, pk=aluno_pk)
     if request.method == 'POST':
@@ -912,6 +1000,7 @@ def criar_contrato(request, aluno_pk):
     return render(request, 'cadastros/criar_contrato.html', context)
 
 @login_required
+@admin_required
 def editar_contrato(request, contrato_pk):
     """
     View para editar um contrato existente.
@@ -940,6 +1029,7 @@ def editar_contrato(request, contrato_pk):
     return render(request, 'cadastros/criar_contrato.html', context)
 
 @login_required
+@professor_required
 def editar_registro_aula(request, pk):
     registro_aula = get_object_or_404(RegistroAula, pk=pk)
     turma_pk = registro_aula.turma.pk # Guarda o ID da turma para o redirecionamento
@@ -961,6 +1051,7 @@ def editar_registro_aula(request, pk):
     return render(request, 'cadastros/editar_registro_aula.html', context)
 
 @login_required
+@admin_required
 def lista_leads(request):
     # A ordem das colunas no Kanban será definida por esta lista
     ordem_status = ['novo', 'contatado', 'agendado', 'congelado', 'convertido', 'perdido']
@@ -988,6 +1079,7 @@ def lista_leads(request):
     return render(request, 'cadastros/lista_leads.html', context)
 
 @login_required
+@admin_required
 def adicionar_lead(request):
     if request.method == 'POST':
         form = LeadForm(request.POST)
@@ -1004,6 +1096,7 @@ def adicionar_lead(request):
     return render(request, 'cadastros/adicionar_lead.html', context)
 
 @login_required
+@admin_required
 def editar_lead(request, pk):
     lead = get_object_or_404(Lead, pk=pk)
     if request.method == 'POST':
@@ -1022,6 +1115,7 @@ def editar_lead(request, pk):
     return render(request, 'cadastros/editar_lead.html', context)
 
 @login_required
+@admin_required
 def converter_lead(request, pk):
     lead = get_object_or_404(Lead, pk=pk)
     
@@ -1034,6 +1128,7 @@ def converter_lead(request, pk):
     return redirect(url_destino + parametros)
 
 @login_required
+@admin_required
 def gerar_link_atualizacao(request, aluno_pk):
     """
     View para o administrador gerar um link de atualização para um aluno.
@@ -1058,7 +1153,8 @@ def gerar_link_atualizacao(request, aluno_pk):
     # Redireciona de volta para o perfil do aluno
     return redirect('cadastros:perfil_aluno', pk=aluno.pk)
 
-
+@login_required
+@admin_required
 def atualizar_dados_aluno(request, token):
     """
     View pública que o aluno acessa para atualizar seus dados.
@@ -1094,7 +1190,9 @@ def atualizar_dados_aluno(request, token):
     }
     return render(request, 'cadastros/atualizar_cadastro_form.html', context)
 
+
 @login_required
+@professor_required
 def lista_acompanhamento_pedagogico(request):
     """
     Página principal do módulo, mostrando agendamentos, provas para corrigir e a lista de alunos.
@@ -1134,6 +1232,7 @@ def lista_acompanhamento_pedagogico(request):
 
 
 @login_required
+@professor_required
 def adicionar_acompanhamento(request, aluno_pk):
     """
     View para agendar ou registrar um novo acompanhamento para um aluno.
@@ -1170,6 +1269,7 @@ def adicionar_acompanhamento(request, aluno_pk):
 
 
 @login_required
+@professor_required
 def editar_acompanhamento(request, pk):
     """
     View para editar um acompanhamento existente.
@@ -1199,6 +1299,7 @@ def editar_acompanhamento(request, pk):
     return render(request, 'cadastros/form_acompanhamento.html', context)
 
 @login_required
+@professor_required
 def historico_acompanhamentos_aluno(request, aluno_pk):
     """
     Exibe o histórico completo de acompanhamentos pedagógicos de um aluno.
@@ -1223,6 +1324,7 @@ def historico_acompanhamentos_aluno(request, aluno_pk):
     return render(request, 'cadastros/historico_acompanhamentos.html', context)
 
 @login_required
+@aluno_required
 def portal_aluno(request):
     """
     Página principal (dashboard) do Portal do Aluno.
@@ -1317,6 +1419,7 @@ def portal_aluno(request):
     return render(request, 'cadastros/portal_aluno.html', context)
 
 @login_required
+@aluno_required
 @require_POST # Garante que esta ação só pode ser feita via POST, por segurança
 def criar_acesso_portal(request, aluno_pk):
     """
@@ -1378,7 +1481,8 @@ def portal_login_view(request):
     
     return render(request, 'cadastros/portal_login.html', {'form': form})
 
-login_required
+@login_required
+@admin_required
 @require_POST
 def redefinir_senha_aluno(request, aluno_pk):
     """
@@ -1409,7 +1513,9 @@ def redefinir_senha_aluno(request, aluno_pk):
 
     return redirect('cadastros:perfil_aluno', pk=aluno.pk)
 
+
 @login_required
+@aluno_required
 def iniciar_prova(request, aluno_prova_pk):
     """
     Ponto de entrada para uma prova. Verifica as condições e redireciona para a primeira secção.
@@ -1587,6 +1693,7 @@ def realizar_prova_secao(request, aluno_prova_pk, secao_num):
     return render(request, 'cadastros/realizar_prova.html', context)
 
 @login_required
+@professor_required
 def liberar_prova(request, aluno_pk):
     """
     View para um professor 'liberar' uma ProvaTemplate para um aluno,
@@ -1619,6 +1726,7 @@ def liberar_prova(request, aluno_pk):
     return render(request, 'cadastros/liberar_prova.html', context)
 
 @login_required
+@professor_required
 def liberar_prova_turma(request, turma_pk):
     """
     View para um professor 'liberar' uma ProvaTemplate para todos os alunos
@@ -1723,9 +1831,26 @@ def corrigir_prova(request, aluno_prova_pk):
             'questoes': []
         }
         for questao in questoes_da_secao:
+            
+            # --- LÓGICA ADICIONADA (TAREFA 1) ---
+            resposta_obj = respostas_map.get(questao.id)
+            texto_da_opcao = None
+            if (resposta_obj and 
+                resposta_obj.resposta_opcao and 
+                questao.tipo_questao in ['multiple_choice', 'oral_multiple_choice', 'yes_no']):
+                
+                # Busca o dicionário de opções corretas (baseado na view realizar_prova_secao)
+                opcoes_list = list(questao.dados_questao.get('opcoes', {}).items()) if questao.tipo_questao != 'yes_no' else [('yes', 'Yes'), ('no', 'No')]
+                opcoes_dict = dict(opcoes_list)
+                
+                # Encontra o texto
+                texto_da_opcao = opcoes_dict.get(resposta_obj.resposta_opcao, resposta_obj.resposta_opcao)
+            # --- FIM DA LÓGICA ADICIONADA ---
+
             dados_da_secao['questoes'].append({
                 'questao': questao,
-                'resposta': respostas_map.get(questao.id)
+                'resposta': resposta_obj,
+                'texto_da_opcao': texto_da_opcao # <-- Enviando para o template
             })
         secoes_para_correcao.append(dados_da_secao)
 
@@ -1772,9 +1897,23 @@ def ver_resultado_prova(request, aluno_prova_pk):
         
         dados_da_secao = { 'titulo': dict(Questao.TIPO_QUESTAO_CHOICES).get(tipo_secao), 'questoes': [] }
         for questao in questoes_da_secao:
+            
+            # --- LÓGICA ADICIONADA (TAREFA 1) ---
+            resposta_obj = respostas_map.get(questao.id)
+            texto_da_opcao = None
+            if (resposta_obj and 
+                resposta_obj.resposta_opcao and 
+                questao.tipo_questao in ['multiple_choice', 'oral_multiple_choice', 'yes_no']):
+                
+                opcoes_list = list(questao.dados_questao.get('opcoes', {}).items()) if questao.tipo_questao != 'yes_no' else [('yes', 'Yes'), ('no', 'No')]
+                opcoes_dict = dict(opcoes_list)
+                texto_da_opcao = opcoes_dict.get(resposta_obj.resposta_opcao, resposta_obj.resposta_opcao)
+            # --- FIM DA LÓGICA ADICIONADA ---
+
             dados_da_secao['questoes'].append({
                 'questao': questao,
-                'resposta': respostas_map.get(questao.id)
+                'resposta': resposta_obj,
+                'texto_da_opcao': texto_da_opcao # <-- Enviando para o template
             })
         secoes_resultado.append(dados_da_secao)
 
@@ -1878,11 +2017,13 @@ def atualizar_status_lead(request):
 # --- VIEWS DE EXPORTAÇÃO ---
 
 @login_required
+@admin_required
 def exportar_dados_page(request):
     """ Exibe a página com os botões para exportar dados. """
     return render(request, 'cadastros/exportar_dados.html')
 
 @login_required
+@admin_required
 def exportar_contratos_csv(request):
     """ Gera e baixa um CSV com todos os contratos. """
     response = HttpResponse(content_type='text/csv')
@@ -1909,6 +2050,7 @@ def exportar_contratos_csv(request):
     return response
 
 @login_required
+@admin_required
 def exportar_pagamentos_csv(request):
     """ Gera e baixa um CSV com todos os pagamentos. """
     response = HttpResponse(content_type='text/csv')
@@ -1934,6 +2076,7 @@ def exportar_pagamentos_csv(request):
     return response
 
 @login_required
+@admin_required
 def exportar_registros_aula_csv(request):
     """ Gera e baixa um CSV com todos os registros de aula. """
     response = HttpResponse(content_type='text/csv')
@@ -1959,6 +2102,7 @@ def exportar_registros_aula_csv(request):
     return response
 
 @login_required
+@admin_required
 def exportar_registros_aula_por_turma_zip(request):
     """
     Gera um arquivo ZIP contendo um CSV para cada turma com seus registros de aula.
@@ -2009,4 +2153,49 @@ def exportar_registros_aula_por_turma_zip(request):
     zip_buffer.seek(0)
     response = HttpResponse(zip_buffer, content_type='application/zip')
     response['Content-Disposition'] = 'attachment; filename="mms_registros_aula_por_turma.zip"'
+    return response
+
+@login_required
+@admin_required # Apenas administradores podem exportar dados pedagógicos
+def exportar_acompanhamentos_csv(request):
+    """ Gera e baixa um CSV com todos os acompanhamentos pedagógicos. """
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="mms_acompanhamentos_pedagogicos.csv"'
+    response.write('\ufeff'.encode('utf-8')) # Adiciona o BOM do UTF-8
+    writer = csv.writer(response)
+
+    # Define os cabeçalhos
+    writer.writerow([
+        'ID Acompanhamento', 'ID Aluno', 'Nome Aluno', 'Status', 'Data Agendamento', 
+        'Data Realização', 'Stage no Momento', 'Criado por (Professor)', 
+        'Dificuldades', 'Relação Língua', 'Objetivo Estudo', 'Correção Ditados', 
+        'Pontos Fortes', 'Pontos a Melhorar', 'Estratégia', 'Comentários Extras', 
+        'Atividades Recomendadas'
+    ])
+
+    # Busca os dados
+    acompanhamentos = AcompanhamentoPedagogico.objects.select_related('aluno', 'criado_por').all().order_by('-data_agendamento')
+
+    for a in acompanhamentos:
+        writer.writerow([
+            a.id,
+            a.aluno.id,
+            smart_str(a.aluno.nome_completo),
+            a.get_status_display(),
+            a.data_agendamento.strftime('%Y-%m-%d %H:%M') if a.data_agendamento else '',
+            a.data_realizacao.strftime('%Y-%m-%d %H:%M') if a.data_realizacao else '',
+            a.stage_no_momento,
+            smart_str(a.criado_por.nome_completo) if a.criado_por else 'N/A',
+            smart_str(a.dificuldades),
+            smart_str(a.relacao_lingua),
+            smart_str(a.objetivo_estudo),
+            smart_str(a.correcao_ditados),
+            smart_str(a.pontos_fortes),
+            smart_str(a.pontos_melhorar),
+            smart_str(a.estrategia),
+            smart_str(a.comentarios_extras),
+            smart_str(a.atividades_recomendadas),
+        ])
+    
+    response['charset'] = 'utf-8'
     return response
