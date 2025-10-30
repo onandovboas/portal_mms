@@ -89,6 +89,13 @@ class ContratoForm(forms.ModelForm):
         }
 
 class RegistroAulaForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        """
+        Pré-preenche o campo de data no formato correto que o HTML5 'date' espera.
+        """
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.data_aula:
+            self.initial['data_aula'] = self.instance.data_aula.strftime('%Y-%m-%d')        
     class Meta:
         model = RegistroAula
         # 1. Adicionado 'data_aula' à lista de campos
@@ -110,10 +117,10 @@ class RegistroAulaForm(forms.ModelForm):
             'data_aula': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'last_parag': forms.NumberInput(attrs={'class': 'form-control'}),
             'last_word': forms.TextInput(attrs={'class': 'form-control'}),
-            'new_dictation': forms.NumberInput(attrs={'class': 'form-control'}),
-            'old_dictation': forms.NumberInput(attrs={'class': 'form-control'}),
-            'new_reading': forms.NumberInput(attrs={'class': 'form-control'}),
-            'old_reading': forms.NumberInput(attrs={'class': 'form-control'}),
+            'new_dictation': forms.TextInput(attrs={'class': 'form-control'}),
+            'old_dictation': forms.TextInput(attrs={'class': 'form-control'}),
+            'new_reading': forms.TextInput(attrs={'class': 'form-control'}),
+            'old_reading': forms.TextInput(attrs={'class': 'form-control'}),
             'lesson_check': forms.TextInput(attrs={'class': 'form-control'}),
         }
 

@@ -38,7 +38,6 @@ import zipfile
 @login_required
 @login_required
 def portal_professor(request):
-    # 👇 A MUDANÇA ESTÁ NESTA LINHA 👇
     turmas_qs = Turma.objects.all().prefetch_related(
         'inscricao_set__aluno',  # Isso já existia
         'horarios'               # <-- Adicionamos isso para buscar os horários
@@ -70,22 +69,36 @@ def detalhe_turma(request, pk):
             try:
                 professor = Professor.objects.get(usuario=request.user)
             except Professor.DoesNotExist:
+                messages.error(request, "Apenas professores podem registrar aulas.")
                 return redirect('cadastros:portal_professor')
 
-            novo_registro = RegistroAula.objects.create(
-                turma=turma, professor=professor, data_aula=date.today(),
-                last_word=request.POST.get('last_word'),
-                last_parag=request.POST.get('last_parag') or None,
-                new_dictation=request.POST.get('new_dictation') or None,
-                old_dictation=request.POST.get('old_dictation') or None,
-                new_reading=request.POST.get('new_reading') or None,
-                old_reading=request.POST.get('old_reading') or None,
-                lesson_check=request.POST.get('lesson_check'),
+            hoje = date.today()
+
+            # 1. Tenta encontrar um registro existente para hoje. Se não existir, CRIA.
+            novo_registro, criado = RegistroAula.objects.get_or_create(
+                turma=turma,
+                data_aula=hoje,
+                defaults={'professor': professor} # Define o professor apenas se estiver criando
             )
+
+            # 2. ATUALIZA o registro (novo ou existente) com os dados do formulário
+            novo_registro.professor = professor # Atualiza o professor (pode ter mudado)
+            novo_registro.last_word = request.POST.get('last_word')
+            novo_registro.last_parag = request.POST.get('last_parag') or None
+            novo_registro.new_dictation = request.POST.get('new_dictation') or None
+            novo_registro.old_dictation = request.POST.get('old_dictation') or None
+            novo_registro.new_reading = request.POST.get('new_reading') or None
+            novo_registro.old_reading = request.POST.get('old_reading') or None
+            novo_registro.lesson_check = request.POST.get('lesson_check')
+            novo_registro.save()
             
+            # 3. Recria os registros de presença
             alunos_presentes_ids = request.POST.getlist('presenca')
-            # Usamos a união das listas de alunos para registrar a presença
             todos_os_inscritos = list(turma.inscricao_set.filter(status__in=['matriculado', 'experimental', 'acompanhando']))
+            
+            # Apaga presenças antigas deste registro de aula e recria
+            Presenca.objects.filter(registro_aula=novo_registro).delete() 
+            
             for inscricao in todos_os_inscritos:
                 Presenca.objects.create(
                     registro_aula=novo_registro, aluno=inscricao.aluno,
@@ -942,23 +955,99 @@ def editar_contrato(request, contrato_pk):
 @login_required
 def editar_registro_aula(request, pk):
     registro_aula = get_object_or_404(RegistroAula, pk=pk)
-    turma_pk = registro_aula.turma.pk # Guarda o ID da turma para o redirecionamento
+    turma = registro_aula.turma # Precisamos da turma para buscar os alunos
 
     if request.method == 'POST':
         form = RegistroAulaForm(request.POST, instance=registro_aula)
         if form.is_valid():
+            # 1. Salva os detalhes da lição (last_word, etc.)
             form.save()
-            messages.success(request, 'Registro de aula atualizado com sucesso!')
-            # Redireciona de volta para a página de detalhes da turma
-            return redirect('cadastros:detalhe_turma', pk=turma_pk)
+            
+            # =====================================================
+            # ▼▼▼ LÓGICA ADICIONADA (TAREFA 2) ▼▼▼
+            # =====================================================
+            
+            # 2. Recria os registros de presença
+            alunos_presentes_ids = request.POST.getlist('presenca')
+            todos_os_inscritos = Inscricao.objects.filter(
+                turma=turma, 
+                status__in=['matriculado', 'experimental', 'acompanhando']
+            )
+            
+            # 3. Apaga presenças antigas e recria
+            Presenca.objects.filter(registro_aula=registro_aula).delete() 
+            
+            for inscricao in todos_os_inscritos:
+                Presenca.objects.create(
+                    registro_aula=registro_aula, 
+                    aluno=inscricao.aluno,
+                    presente=(str(inscricao.aluno.pk) in alunos_presentes_ids)
+                )
+            # =====================================================
+            # ▲▲▲ FIM DA LÓGICA DE PRESENÇA ▲▲▲
+            # =====================================================
+
+            messages.success(request, 'Registro de aula e presenças atualizados com sucesso!')
+            return redirect('cadastros:detalhe_turma', pk=turma.pk)
     else:
+        # Lógica GET
         form = RegistroAulaForm(instance=registro_aula)
+        
+        # =====================================================
+        # ▼▼▼ LÓGICA ADICIONADA (TAREFA 2) ▼▼▼
+        # =====================================================
+        
+        # Busca todos os alunos que deveriam estar na lista de chamada
+        inscritos_turma = Inscricao.objects.filter(
+            turma=turma, 
+            status__in=['matriculado', 'experimental', 'acompanhando']
+        ).select_related('aluno')
+        
+        # Busca os IDs dos alunos que foram marcados como PRESENTES
+        presentes_ids = set(Presenca.objects.filter(
+            registro_aula=registro_aula, 
+            presente=True
+        ).values_list('aluno_id', flat=True))
+        # =====================================================
+        # ▲▲▲ FIM DA LÓGICA DE PRESENÇA ▲▲▲
+        # =====================================================
 
     context = {
         'form': form,
-        'registro_aula': registro_aula
+        'registro_aula': registro_aula,
+        # =====================================================
+        # ▼▼▼ CONTEXTO ADICIONADO (TAREFA 2) ▼▼▼
+        # =====================================================
+        'inscritos_turma': inscritos_turma,
+        'presentes_ids': presentes_ids,
+        # =====================================================
+        # ▲▲▲ FIM DO CONTEXTO ▲▲▲
+        # =====================================================
     }
     return render(request, 'cadastros/editar_registro_aula.html', context)
+
+
+# =====================================================
+# ▼▼▼ VIEW ADICIONADA (TAREFA 1) ▼▼▼
+# =====================================================
+@login_required
+@require_POST # Garante que esta view só aceite requisições POST
+def excluir_registro_aula(request, pk):
+    """
+    Exclui um registro de aula e todas as suas presenças associadas.
+    """
+    registro_aula = get_object_or_404(RegistroAula, pk=pk)
+    turma_pk = registro_aula.turma.pk # Guarda o ID da turma para o redirecionamento
+    
+    try:
+        data_aula_formatada = registro_aula.data_aula.strftime('%d/%m/%Y')
+        registro_aula.delete()
+        messages.success(request, f'O registro da aula do dia {data_aula_formatada} foi excluído com sucesso.')
+    except Exception as e:
+        messages.error(request, f'Ocorreu um erro ao excluir o registro: {e}')
+        
+    # Redireciona de volta para a página de detalhes da turma
+    return redirect('cadastros:detalhe_turma', pk=turma_pk)
 
 @login_required
 def lista_leads(request):

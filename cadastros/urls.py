@@ -67,6 +67,7 @@ urlpatterns = [
     # Rotas de Turmas
     path('turma/<int:pk>/', views.detalhe_turma, name='detalhe_turma'),
     path('registro-aula/editar/<int:pk>/', views.editar_registro_aula, name='editar_registro_aula'),
+    path('registro-aula/excluir/<int:pk>/', views.excluir_registro_aula, name='excluir_registro_aula'),
 
     # Rotas financeiras e administrativas
     path('acompanhamento/resolver/<int:pk>/', views.resolver_acompanhamento, name='resolver_acompanhamento'),
