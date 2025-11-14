@@ -19,21 +19,9 @@
         .touch-target input[type="checkbox"] { inline-size: 1.2rem; block-size: 1.2rem; }
         .list-scroll { max-height: 260px; overflow: auto; }
     </style>
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Work+Sans:wght@400;500&display=swap" rel="stylesheet">
-    <link href="{% static 'cadastros/mms_style.css' %}" rel="stylesheet">
-    {% if request.resolver_match.url_name == 'dashboard_admin' %}
-        <link href="{% static 'cadastros/dashboard.css' %}" rel="stylesheet">
-    {% endif %}
-    <style>
-        /* Estilos do detalhe_turma para a lista de presença */
-        .touch-target input[type="checkbox"] { inline-size: 1.2rem; block-size: 1.2rem; }
-        .list-scroll { max-height: 260px; overflow: auto; }
-    </style>
 </head>
 <body class="bg-light">
 
-    <div class="container my-4" style="max-width: 700px;">
     <div class="container my-4" style="max-width: 700px;">
         <a href="{% url 'cadastros:detalhe_turma' registro_aula.turma.pk %}" class="text-decoration-none"><i class="bi bi-arrow-left"></i> Voltar para a Turma</a>
         <hr>
@@ -46,7 +34,6 @@
                     <strong>Turma:</strong> {{ registro_aula.turma.nome }}<br>
                     <strong>Data da Aula:</strong> {{ registro_aula.data_aula|date:"d/m/Y" }}
                 </p>
-
 
                 <form method="post" novalidate>
                     {% csrf_token %}
@@ -149,44 +136,9 @@
                     </fieldset>
                     <button type="submit" class="btn btn-primary mt-3 w-100">Salvar Alterações de Conteúdo e Presença</button>
                 </form>
+                
                 <hr class="my-4">
-                <form method="post" action="{% url 'cadastros:excluir_registro_aula' registro_aula.pk %}" 
-                      onsubmit="return confirm('Tem a certeza que quer excluir permanentemente este registro de aula? Esta ação não pode ser desfeita.');">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-outline-danger w-100">
-                        <i class="bi bi-trash-fill me-1"></i> Excluir Registro da Aula
-                    </button>
-                    
-                    <h5 class="mt-4">Detalhes da Lição</h5>
-                    {{ form.as_p }}
-
-                    <hr class="my-4">
-
-                    <fieldset class="mb-3">
-                        <legend class="h5 mb-3">Editar Lista de Presença</legend>
-                        <ul class="list-unstyled list-scroll" id="lista-matriculados-atrasada">
-                            {% for inscricao in inscritos_turma %}
-                                <li class="mb-1">
-                                    <div class="form-check touch-target">
-                                        <input class="form-check-input" 
-                                               type="checkbox" 
-                                               name="presenca" 
-                                               value="{{ inscricao.aluno.pk }}" 
-                                               id="presenca-{{ inscricao.aluno.pk }}"
-                                               {% if inscricao.aluno.id in presentes_ids %}checked{% endif %}>
-                                        <label class="form-check-label" for="presenca-{{ inscricao.aluno.pk }}">
-                                            {{ inscricao.aluno.nome_completo }}
-                                        </label>
-                                    </div>
-                                </li>
-                            {% empty %}
-                                <li class="text-muted">Nenhum aluno ativo nesta turma.</li>
-                            {% endfor %}
-                        </ul>
-                    </fieldset>
-                    <button type="submit" class="btn btn-primary mt-3 w-100">Salvar Alterações de Conteúdo e Presença</button>
-                </form>
-                <hr class="my-4">
+                
                 <form method="post" action="{% url 'cadastros:excluir_registro_aula' registro_aula.pk %}" 
                       onsubmit="return confirm('Tem a certeza que quer excluir permanentemente este registro de aula? Esta ação não pode ser desfeita.');">
                     {% csrf_token %}
@@ -194,8 +146,7 @@
                         <i class="bi bi-trash-fill me-1"></i> Excluir Registro da Aula
                     </button>
                 </form>
-                </div>
-                </div>
+            </div>
         </div>
     </div>
 

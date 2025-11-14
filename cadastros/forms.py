@@ -98,10 +98,8 @@ class RegistroAulaForm(forms.ModelForm):
             self.initial['data_aula'] = self.instance.data_aula.strftime('%Y-%m-%d')        
     class Meta:
         model = RegistroAula
-        # 1. Adicionado 'data_aula' à lista de campos
         fields = ['data_aula', 'last_parag', 'last_word', 'new_dictation', 'old_dictation', 'new_reading', 'old_reading', 'lesson_check']
         
-        # --- ALTERAÇÕES AQUI (Removendo o "(No.)") ---
         labels = {
             'data_aula': 'Class Date',
             'last_parag': 'Last Page Number',
@@ -112,17 +110,17 @@ class RegistroAulaForm(forms.ModelForm):
             'old_reading': 'Old Reading',
             'lesson_check': 'Lesson Check',
         }
-        # --- FIM DAS ALTERAÇÕES ---
         
-        # 2. Adicionado o widget para o novo campo
+        # --- CORREÇÃO AQUI ---
+        # Trocamos NumberInput por TextInput para aceitar texto
         widgets = {
             'data_aula': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'last_parag': forms.NumberInput(attrs={'class': 'form-control'}), # Este continua sendo número
             'last_word': forms.TextInput(attrs={'class': 'form-control'}),
-            'new_dictation': forms.NumberInput(attrs={'class': 'form-control'}),
-            'old_dictation': forms.NumberInput(attrs={'class': 'form-control'}),
-            'new_reading': forms.NumberInput(attrs={'class': 'form-control'}),
-            'old_reading': forms.NumberInput(attrs={'class': 'form-control'}),
+            'new_dictation': forms.TextInput(attrs={'class': 'form-control'}), # MUDADO
+            'old_dictation': forms.TextInput(attrs={'class': 'form-control'}), # MUDADO
+            'new_reading': forms.TextInput(attrs={'class': 'form-control'}),   # MUDADO
+            'old_reading': forms.TextInput(attrs={'class': 'form-control'}),   # MUDADO
             'lesson_check': forms.TextInput(attrs={'class': 'form-control'}),
         }
 
