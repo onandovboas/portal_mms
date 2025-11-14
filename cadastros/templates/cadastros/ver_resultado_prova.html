@@ -46,7 +46,11 @@
                         </div>
                       {% else %}
                         <p class="card-text small"><strong>Sua resposta:</strong> 
-                          {% if item.resposta.resposta_texto %}{{ item.resposta.resposta_texto|linebreaksbr }}{% elif item.resposta.resposta_opcao %}{{ item.resposta.resposta_opcao|upper }}{% else %}<em class="text-muted">Não respondeu.</em>{% endif %}
+                          {% if item.resposta.resposta_texto %}{{ item.resposta.resposta_texto|linebreaksbr }}
+                          
+                          {% elif item.texto_da_opcao %}{{ item.texto_da_opcao }}
+                          {% elif item.resposta.resposta_opcao %}{{ item.resposta.resposta_opcao|upper }}
+                          {% else %}<em class="text-muted">Não respondeu.</em>{% endif %}
                         </p>
                       {% endif %}
                     </div>

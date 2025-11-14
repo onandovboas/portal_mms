@@ -19,9 +19,21 @@
         .touch-target input[type="checkbox"] { inline-size: 1.2rem; block-size: 1.2rem; }
         .list-scroll { max-height: 260px; overflow: auto; }
     </style>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Work+Sans:wght@400;500&display=swap" rel="stylesheet">
+    <link href="{% static 'cadastros/mms_style.css' %}" rel="stylesheet">
+    {% if request.resolver_match.url_name == 'dashboard_admin' %}
+        <link href="{% static 'cadastros/dashboard.css' %}" rel="stylesheet">
+    {% endif %}
+    <style>
+        /* Estilos do detalhe_turma para a lista de presença */
+        .touch-target input[type="checkbox"] { inline-size: 1.2rem; block-size: 1.2rem; }
+        .list-scroll { max-height: 260px; overflow: auto; }
+    </style>
 </head>
 <body class="bg-light">
 
+    <div class="container my-4" style="max-width: 700px;">
     <div class="container my-4" style="max-width: 700px;">
         <a href="{% url 'cadastros:detalhe_turma' registro_aula.turma.pk %}" class="text-decoration-none"><i class="bi bi-arrow-left"></i> Voltar para a Turma</a>
         <hr>
@@ -35,8 +47,115 @@
                     <strong>Data da Aula:</strong> {{ registro_aula.data_aula|date:"d/m/Y" }}
                 </p>
 
+
                 <form method="post" novalidate>
                     {% csrf_token %}
+                    
+                    <h5 class="mt-4">Detalhes da Lição</h5>
+                    
+                    <fieldset aria-labelledby="legend-licao" class="gy-3 row">
+                        <legend id="legend-licao" class="h6 visually-hidden">Detalhes da lição</legend>
+                        
+                        <div class="col-md-6">
+                            <label for="{{ form.data_aula.id_for_label }}" class="form-label">{{ form.data_aula.label }}</label>
+                            {{ form.data_aula }}
+                            {% if form.data_aula.errors %}<div class="invalid-feedback d-block">{{ form.data_aula.errors|join:", " }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label for="{{ form.last_parag.id_for_label }}" class="form-label">{{ form.last_parag.label }}</label>
+                            {{ form.last_parag }}
+                            {% if form.last_parag.errors %}<div class="invalid-feedback d-block">{{ form.last_parag.errors|join:", " }}</div>{% endif %}
+                        </div>
+                        <div class="col-12">
+                            <label for="{{ form.last_word.id_for_label }}" class="form-label">{{ form.last_word.label }}</label>
+                            {{ form.last_word }}
+                            {% if form.last_word.errors %}<div class="invalid-feedback d-block">{{ form.last_word.errors|join:", " }}</div>{% endif %}
+                        </div>
+
+                        <div class="col-12">
+                          <div class="p-3 rounded bg-primary-subtle border">
+                            <h6 class="border-bottom pb-2 mb-3">Dictation</h6>
+                            <div class="row g-3">
+                              <div class="col-md-6">
+                                <label class="form-label" for="{{ form.new_dictation.id_for_label }}">
+                                  {{ form.new_dictation.label }} <span class="badge bg-success text-white rounded-pill ms-1">New</span>
+                                </label>
+                                {{ form.new_dictation }}
+                                {% if form.new_dictation.errors %}<div class="invalid-feedback d-block">{{ form.new_dictation.errors|join:", " }}</div>{% endif %}
+                              </div>
+                              <div class="col-md-6">
+                                <label class="form-label" for="{{ form.old_dictation.id_for_label }}">
+                                  {{ form.old_dictation.label }} <span class="badge bg-secondary text-white rounded-pill ms-1">Old</span>
+                                </label>
+                                {{ form.old_dictation }}
+                                {% if form.old_dictation.errors %}<div class="invalid-feedback d-block">{{ form.old_dictation.errors|join:", " }}</div>{% endif %}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div class="col-12">
+                          <div class="p-3 rounded bg-warning-subtle border">
+                            <h6 class="border-bottom pb-2 mb-3">Reading</h6>
+                            <div class="row g-3">
+                              <div class="col-md-6">
+                                <label class="form-label" for="{{ form.new_reading.id_for_label }}">
+                                  {{ form.new_reading.label }} <span class="badge bg-success text-white rounded-pill ms-1">New</span>
+                                </label>
+                                {{ form.new_reading }}
+                                {% if form.new_reading.errors %}<div class="invalid-feedback d-block">{{ form.new_reading.errors|join:", " }}</div>{% endif %}
+                              </div>
+                              <div class="col-md-6">
+                                <label class="form-label" for="{{ form.old_reading.id_for_label }}">
+                                  {{ form.old_reading.label }} <span class="badge bg-secondary text-white rounded-pill ms-1">Old</span>
+                                </label>
+                                {{ form.old_reading }}
+                                {% if form.old_reading.errors %}<div class="invalid-feedback d-block">{{ form.old_reading.errors|join:", " }}</div>{% endif %}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div class="col-12">
+                            <label for="{{ form.lesson_check.id_for_label }}" class="form-label">{{ form.lesson_check.label }}</label>
+                            {{ form.lesson_check }}
+                            {% if form.lesson_check.errors %}<div class="invalid-feedback d-block">{{ form.lesson_check.errors|join:", " }}</div>{% endif %}
+                        </div>
+
+                    </fieldset>
+                    <hr class="my-4">
+
+                    <fieldset class="mb-3">
+                        <legend class="h5 mb-3">Editar Lista de Presença</legend>
+                        <ul class="list-unstyled list-scroll" id="lista-matriculados-atrasada">
+                            {% for inscricao in inscritos_turma %}
+                                <li class="mb-1">
+                                    <div class="form-check touch-target">
+                                        <input class="form-check-input" 
+                                               type="checkbox" 
+                                               name="presenca" 
+                                               value="{{ inscricao.aluno.pk }}" 
+                                               id="presenca-{{ inscricao.aluno.pk }}"
+                                               {% if inscricao.aluno.id in presentes_ids %}checked{% endif %}>
+                                        <label class="form-check-label" for="presenca-{{ inscricao.aluno.pk }}">
+                                            {{ inscricao.aluno.nome_completo }}
+                                        </label>
+                                    </div>
+                                </li>
+                            {% empty %}
+                                <li class="text-muted">Nenhum aluno ativo nesta turma.</li>
+                            {% endfor %}
+                        </ul>
+                    </fieldset>
+                    <button type="submit" class="btn btn-primary mt-3 w-100">Salvar Alterações de Conteúdo e Presença</button>
+                </form>
+                <hr class="my-4">
+                <form method="post" action="{% url 'cadastros:excluir_registro_aula' registro_aula.pk %}" 
+                      onsubmit="return confirm('Tem a certeza que quer excluir permanentemente este registro de aula? Esta ação não pode ser desfeita.');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-danger w-100">
+                        <i class="bi bi-trash-fill me-1"></i> Excluir Registro da Aula
+                    </button>
                     
                     <h5 class="mt-4">Detalhes da Lição</h5>
                     {{ form.as_p }}
@@ -75,6 +194,7 @@
                         <i class="bi bi-trash-fill me-1"></i> Excluir Registro da Aula
                     </button>
                 </form>
+                </div>
                 </div>
         </div>
     </div>

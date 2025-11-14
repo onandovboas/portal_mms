@@ -66,10 +66,15 @@ class RegistroAula(models.Model):
     professor = models.ForeignKey(Professor, on_delete=models.SET_NULL, null=True)
     last_parag = models.IntegerField("Último Parágrafo", null=True, blank=True)
     last_word = models.CharField("Última Palavra", max_length=100, null=True, blank=True)
-    new_dictation = models.CharField("Ditado Novo (Nº)", null=True, blank=True)
-    old_dictation = models.CharField("Ditado Antigo (Nº)", null=True, blank=True)
-    new_reading = models.CharField("Leitura Nova (Nº)", null=True, blank=True)
-    old_reading = models.CharField("Leitura Antiga (Nº)", null=True, blank=True)
+    
+    # --- ALTERAÇÕES AQUI ---
+    # Mudamos de IntegerField para CharField para aceitar texto.
+    new_dictation = models.CharField("Ditado Novo", max_length=100, null=True, blank=True)
+    old_dictation = models.CharField("Ditado Antigo", max_length=100, null=True, blank=True)
+    new_reading = models.CharField("Leitura Nova", max_length=100, null=True, blank=True)
+    old_reading = models.CharField("Leitura Antiga", max_length=100, null=True, blank=True)
+    # --- FIM DAS ALTERAÇÕES ---
+    
     lesson_check = models.CharField("Lesson Check", max_length=100, null=True, blank=True)
 
     def __str__(self):
