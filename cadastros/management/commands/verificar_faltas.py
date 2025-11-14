@@ -15,7 +15,7 @@ class Command(BaseCommand):
         data_limite = timezone.now().date() - timedelta(days=30)
         
         inscricoes_ativas = Inscricao.objects.filter(
-            Q(status='matriculado') | Q(status='acompanhando') | Q(status='experimental')
+            status='matriculado' 
         ).select_related('aluno', 'turma')
 
         self.stdout.write(self.style.SUCCESS(f'Iniciando verificação de faltas para {inscricoes_ativas.count()} inscrições ativas...'))
