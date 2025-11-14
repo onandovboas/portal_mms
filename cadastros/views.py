@@ -119,12 +119,12 @@ def detalhe_turma(request, pk):
 
         # --- Lógica para 'salvar_aula_atrasada' ---
         elif 'salvar_aula_atrasada' in request.POST:
+            professor_id = request.POST.get('professor_aula_atrasada')
+
             try:
-                # Aqui usamos o 'professor_selecionado' do formulário
-                professor_id = request.POST.get('professor_aula_atrasada')
                 professor_selecionado = Professor.objects.get(pk=professor_id)
-            except Professor.DoesNotExist:
-                messages.error(request, 'Professor selecionado inválido.')
+            except (Professor.DoesNotExist, ValueError): # <--- CORREÇÃO AQUI
+                messages.error(request, 'Você deve selecionar um professor válido.')
                 return redirect('cadastros:detalhe_turma', pk=turma.pk)
 
             data_aula_str = request.POST.get('data_aula_atrasada')
@@ -1032,21 +1032,74 @@ def editar_contrato(request, contrato_pk):
 @professor_required
 def editar_registro_aula(request, pk):
     registro_aula = get_object_or_404(RegistroAula, pk=pk)
-    turma_pk = registro_aula.turma.pk # Guarda o ID da turma para o redirecionamento
+    turma = registro_aula.turma # Precisamos da turma para buscar os alunos
 
     if request.method == 'POST':
         form = RegistroAulaForm(request.POST, instance=registro_aula)
         if form.is_valid():
+            # 1. Salva os detalhes da lição (last_word, etc.)
             form.save()
-            messages.success(request, 'Registro de aula atualizado com sucesso!')
-            # Redireciona de volta para a página de detalhes da turma
-            return redirect('cadastros:detalhe_turma', pk=turma_pk)
+            
+            # =====================================================
+            # ▼▼▼ LÓGICA ADICIONADA (TAREFA 2) ▼▼▼
+            # =====================================================
+            
+            # 2. Recria os registros de presença
+            alunos_presentes_ids = request.POST.getlist('presenca')
+            todos_os_inscritos = Inscricao.objects.filter(
+                turma=turma, 
+                status__in=['matriculado', 'experimental', 'acompanhando']
+            )
+            
+            # 3. Apaga presenças antigas e recria
+            Presenca.objects.filter(registro_aula=registro_aula).delete() 
+            
+            for inscricao in todos_os_inscritos:
+                Presenca.objects.create(
+                    registro_aula=registro_aula, 
+                    aluno=inscricao.aluno,
+                    presente=(str(inscricao.aluno.pk) in alunos_presentes_ids)
+                )
+            # =====================================================
+            # ▲▲▲ FIM DA LÓGICA DE PRESENÇA ▲▲▲
+            # =====================================================
+
+            messages.success(request, 'Registro de aula e presenças atualizados com sucesso!')
+            return redirect('cadastros:detalhe_turma', pk=turma.pk)
     else:
+        # Lógica GET
         form = RegistroAulaForm(instance=registro_aula)
+        
+        # =====================================================
+        # ▼▼▼ LÓGICA ADICIONADA (TAREFA 2) ▼▼▼
+        # =====================================================
+        
+        # Busca todos os alunos que deveriam estar na lista de chamada
+        inscritos_turma = Inscricao.objects.filter(
+            turma=turma, 
+            status__in=['matriculado', 'experimental', 'acompanhando']
+        ).select_related('aluno')
+        
+        # Busca os IDs dos alunos que foram marcados como PRESENTES
+        presentes_ids = set(Presenca.objects.filter(
+            registro_aula=registro_aula, 
+            presente=True
+        ).values_list('aluno_id', flat=True))
+        # =====================================================
+        # ▲▲▲ FIM DA LÓGICA DE PRESENÇA ▲▲▲
+        # =====================================================
 
     context = {
         'form': form,
-        'registro_aula': registro_aula
+        'registro_aula': registro_aula,
+        # =====================================================
+        # ▼▼▼ CONTEXTO ADICIONADO (TAREFA 2) ▼▼▼
+        # =====================================================
+        'inscritos_turma': inscritos_turma,
+        'presentes_ids': presentes_ids,
+        # =====================================================
+        # ▲▲▲ FIM DO CONTEXTO ▲▲▲
+        # =====================================================
     }
     return render(request, 'cadastros/editar_registro_aula.html', context)
 
@@ -2199,3 +2252,23 @@ def exportar_acompanhamentos_csv(request):
     
     response['charset'] = 'utf-8'
     return response
+
+@login_required
+@professor_required
+@require_POST # Garante que esta view só aceite requisições POST
+def excluir_registro_aula(request, pk):
+    """
+    Exclui um registro de aula e todas as suas presenças associadas.
+    """
+    registro_aula = get_object_or_404(RegistroAula, pk=pk)
+    turma_pk = registro_aula.turma.pk # Guarda o ID da turma para o redirecionamento
+    
+    try:
+        data_aula_formatada = registro_aula.data_aula.strftime('%d/%m/%Y')
+        registro_aula.delete()
+        messages.success(request, f'O registro da aula do dia {data_aula_formatada} foi excluído com sucesso.')
+    except Exception as e:
+        messages.error(request, f'Ocorreu um erro ao excluir o registro: {e}')
+        
+    # Redireciona de volta para a página de detalhes da turma
+    return redirect('cadastros:detalhe_turma', pk=turma_pk)

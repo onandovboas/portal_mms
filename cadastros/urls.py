@@ -67,6 +67,7 @@ urlpatterns = [
     # Rotas de Turmas
     path('turma/<int:pk>/', views.detalhe_turma, name='detalhe_turma'),
     path('registro-aula/editar/<int:pk>/', views.editar_registro_aula, name='editar_registro_aula'),
+    path('registro-aula/excluir/<int:pk>/', views.excluir_registro_aula, name='excluir_registro_aula'),
 
     # Rotas financeiras e administrativas
     path('acompanhamento/resolver/<int:pk>/', views.resolver_acompanhamento, name='resolver_acompanhamento'),
@@ -85,7 +86,6 @@ urlpatterns = [
     path('exportar/contratos/', views.exportar_contratos_csv, name='exportar_contratos_csv'),
     path('exportar/pagamentos/', views.exportar_pagamentos_csv, name='exportar_pagamentos_csv'),
     path('exportar/registros-aula-por-turma/', views.exportar_registros_aula_por_turma_zip, name='exportar_registros_aula_por_turma_zip'),
-    path('exportar/acompanhamentos/', views.exportar_acompanhamentos_csv, name='exportar_acompanhamentos_csv'),
     
     # Relatórios
     path('relatorios/professores/', views.relatorio_pagamento_professores, name='relatorio_professores'),
