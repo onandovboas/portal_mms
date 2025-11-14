@@ -101,26 +101,28 @@ class RegistroAulaForm(forms.ModelForm):
         # 1. Adicionado 'data_aula' à lista de campos
         fields = ['data_aula', 'last_parag', 'last_word', 'new_dictation', 'old_dictation', 'new_reading', 'old_reading', 'lesson_check']
         
+        # --- ALTERAÇÕES AQUI (Removendo o "(No.)") ---
         labels = {
             'data_aula': 'Class Date',
             'last_parag': 'Last Page Number',
             'last_word': 'Last Word',
-            'new_dictation': 'New Dictation (No.)',
-            'old_dictation': 'Old Dictation (No.)',
-            'new_reading': 'New Reading (No.)',
-            'old_reading': 'Old Reading (No.)',
+            'new_dictation': 'New Dictation',
+            'old_dictation': 'Old Dictation',
+            'new_reading': 'New Reading',
+            'old_reading': 'Old Reading',
             'lesson_check': 'Lesson Check',
         }
+        # --- FIM DAS ALTERAÇÕES ---
         
         # 2. Adicionado o widget para o novo campo
         widgets = {
             'data_aula': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-            'last_parag': forms.NumberInput(attrs={'class': 'form-control'}),
+            'last_parag': forms.NumberInput(attrs={'class': 'form-control'}), # Este continua sendo número
             'last_word': forms.TextInput(attrs={'class': 'form-control'}),
-            'new_dictation': forms.TextInput(attrs={'class': 'form-control'}),
-            'old_dictation': forms.TextInput(attrs={'class': 'form-control'}),
-            'new_reading': forms.TextInput(attrs={'class': 'form-control'}),
-            'old_reading': forms.TextInput(attrs={'class': 'form-control'}),
+            'new_dictation': forms.TextInput(attrs={'class': 'form-control'}), # Já estava correto
+            'old_dictation': forms.TextInput(attrs={'class': 'form-control'}), # Já estava correto
+            'new_reading': forms.TextInput(attrs={'class': 'form-control'}),  # Já estava correto
+            'old_reading': forms.TextInput(attrs={'class': 'form-control'}),  # Já estava correto
             'lesson_check': forms.TextInput(attrs={'class': 'form-control'}),
         }
 
@@ -196,25 +198,27 @@ class PlanoAulaForm(forms.ModelForm):
             'old_dictation', 'new_reading', 'old_reading', 'lesson_check'
         ]
         
+        # --- ALTERAÇÕES AQUI (Removendo o "(No.)") ---
         labels = {
             'data_aula': 'Data da Aula Planejada',
             'last_parag': 'Last Page Number',
             'last_word': 'Last Word',
-            'new_dictation': 'New Dictation (No.)',
-            'old_dictation': 'Old Dictation (No.)',
-            'new_reading': 'New Reading (No.)',
-            'old_reading': 'Old Reading (No.)',
+            'new_dictation': 'New Dictation',
+            'old_dictation': 'Old Dictation',
+            'new_reading': 'New Reading',
+            'old_reading': 'Old Reading',
             'lesson_check': 'Lesson Check',
         }
         
+        # --- ALTERAÇÕES AQUI (Mudando de NumberInput para TextInput) ---
         widgets = {
             'data_aula': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'last_parag': forms.NumberInput(attrs={'class': 'form-control'}),
             'last_word': forms.TextInput(attrs={'class': 'form-control'}),
-            'new_dictation': forms.NumberInput(attrs={'class': 'form-control'}),
-            'old_dictation': forms.NumberInput(attrs={'class': 'form-control'}),
-            'new_reading': forms.NumberInput(attrs={'class': 'form-control'}),
-            'old_reading': forms.NumberInput(attrs={'class': 'form-control'}),
+            'new_dictation': forms.TextInput(attrs={'class': 'form-control'}), # MUDADO
+            'old_dictation': forms.TextInput(attrs={'class': 'form-control'}), # MUDADO
+            'new_reading': forms.TextInput(attrs={'class': 'form-control'}),   # MUDADO
+            'old_reading': forms.TextInput(attrs={'class': 'form-control'}),   # MUDADO
             'lesson_check': forms.TextInput(attrs={'class': 'form-control'}),
         }
 # --- FIM DO FORMULÁRIO ADICIONADO ---

@@ -29,7 +29,7 @@
     }
   </style>
 </head>
-<body class="bg-light">
+<body class="bg-secondary-subtle">
   <header class="sticky-top-blur">
     <nav class="navbar container content-wrap py-2" aria-label="Navegação da turma">
       <div class="d-flex align-items-center gap-2">
@@ -163,6 +163,115 @@
       </div>
     </section>
 
+    <div class="row g-3 mb-3">
+      <div class="col-12 col-lg-7">
+        <section class="card" aria-labelledby="sec-registrar">
+          <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h2 id="sec-registrar" class="h5 mb-0">
+              Registrar Aula de Hoje
+            </h2>
+            {% if plano_de_hoje %}
+              <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i> Pré-preenchido com o plano do dia</span>
+            {% endif %}
+          </div>
+          <div class="card-body">
+            <form method="post" novalidate id="form-aula-hoje">
+              {% csrf_token %}
+              
+              <fieldset class="mb-3" aria-describedby="hint-presenca">
+                <legend class="h6 mb-2">Lista de presença</legend>
+                <p id="hint-presenca" class="text-muted small mb-2">Use a busca para filtrar alunos. "Marcar todos" afeta apenas a lista visível.</p>
+                <div class="input-group mb-3" role="search"><span class="input-group-text" id="addon-search" aria-hidden="true"><i class="bi bi-search"></i></span><input type="search" class="form-control" id="filtro-alunos" placeholder="Buscar aluno pelo nome" aria-label="Buscar aluno pelo nome" aria-describedby="addon-search" /><button type="button" class="btn btn-outline-secondary" id="btn-limpar-filtro" aria-label="Limpar busca">Limpar</button></div>
+                <div class="accordion" id="accordionPresenca">
+                  <div class="accordion-item"><h3 class="accordion-header" id="head-matriculados"><button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-matriculados" aria-expanded="true" aria-controls="collapse-matriculados">Matriculados <span class="badge bg-secondary ms-2" id="count-matriculados">{{ matriculados.count }}</span></button></h3><div id="collapse-matriculados" class="accordion-collapse collapse show" aria-labelledby="head-matriculados" data-bs-parent="#accordionPresenca"><div class="accordion-body"><div class="d-flex justify-content-between align-items-center mb-2"><div class="form-check touch-target"><input class="form-check-input" type="checkbox" id="toggle-all-matriculados" /><label class="form-check-label" for="toggle-all-matriculados">Marcar todos visíveis</label></div><small class="text-muted" id="sel-matriculados" aria-live="polite"></small></div><ul class="list-unstyled list-scroll" id="lista-matriculados">{% for inscricao in matriculados %}<li class="mb-1 aluno-item" data-nome="{{ inscricao.aluno.nome_completo|lower }}"><div class="form-check touch-target"><input class="form-check-input presenca-checkbox" type="checkbox" name="presenca" value="{{ inscricao.aluno.pk }}" id="m-{{ inscricao.aluno.pk }}" /><label class="form-check-label" for="m-{{ inscricao.aluno.pk }}">{{ inscricao.aluno.nome_completo }}</label></div></li>{% empty %}<li class="text-muted">Nenhum aluno matriculado nesta turma.</li>{% endfor %}</ul></div></div></div>
+                  <div class="accordion-item"><h3 class="accordion-header" id="head-experimentais"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-experimentais" aria-expanded="false" aria-controls="collapse-experimentais">Aula Experimental <span class="badge bg-info text-dark ms-2">{{ experimentais.count }}</span></button></h3><div id="collapse-experimentais" class="accordion-collapse collapse" aria-labelledby="head-experimentais" data-bs-parent="#accordionPresenca"><div class="accordion-body"><div class="d-flex justify-content-between align-items-center mb-2"><div class="form-check touch-target"><input class="form-check-input" type="checkbox" id="toggle-all-experimentais" /><label class="form-check-label" for="toggle-all-experimentais">Marcar todos visíveis</label></div><small class="text-muted" id="sel-experimentais" aria-live="polite"></small></div><ul class="list-unstyled list-scroll" id="lista-experimentais">{% for inscricao in experimentais %}<li class="mb-1 aluno-item" data-nome="{{ inscricao.aluno.nome_completo|lower }}"><div class="form-check touch-target"><input class="form-check-input presenca-checkbox" type="checkbox" name="presenca" value="{{ inscricao.aluno.pk }}" id="e-{{ inscricao.aluno.pk }}" /><label class="form-check-label" for="e-{{ inscricao.aluno.pk }}">{{ inscricao.aluno.nome_completo }}</label></div></li>{% empty %}<li class="text-muted">Nenhum aluno em aula experimental nesta turma.</li>{% endfor %}</ul></div></div></div>
+                  <div class="accordion-item"><h3 class="accordion-header" id="head-acompanhando"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-acompanhando" aria-expanded="false" aria-controls="collapse-acompanhando">Acompanhando <span class="badge muted-badge ms-2">{{ acompanhando.count }}</span></button></h3><div id="collapse-acompanhando" class="accordion-collapse collapse" aria-labelledby="head-acompanhando" data-bs-parent="#accordionPresenca"><div class="accordion-body"><div class="d-flex justify-content-between align-items-center mb-2"><div class="form-check touch-target"><input class="form-check-input" type="checkbox" id="toggle-all-acompanhando" /><label class="form-check-label" for="toggle-all-acompanhando">Marcar todos visíveis</label></div><small class="text-muted" id="sel-acompanhando" aria-live="polite"></small></div><ul class="list-unstyled list-scroll" id="lista-acompanhando">{% for inscricao in acompanhando %}<li class="mb-1 aluno-item" data-nome="{{ inscricao.aluno.nome_completo|lower }}"><div class="form-check touch-target"><input class="form-check-input presenca-checkbox" type="checkbox" name="presenca" value="{{ inscricao.aluno.pk }}" id="a-{{ inscricao.aluno.pk }}" /><label class="form-check-label" for="a-{{ inscricao.aluno.pk }}">{{ inscricao.aluno.nome_completo }}</label></div></li>{% empty %}<li class="text-muted">Nenhum aluno acompanhando esta turma.</li>{% endfor %}</ul></div></div></div>
+                  <div class="accordion-item"><h3 class="accordion-header" id="head-trancados"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-trancados" aria-expanded="false" aria-controls="collapse-trancados">Trancados <span class="badge bg-danger ms-2">{{ trancados.count }}</span></button></h3><div id="collapse-trancados" class="accordion-collapse collapse" aria-labelledby="head-trancados" data-bs-parent="#accordionPresenca"><div class="accordion-body"><ul class="list-unstyled mb-0">{% for inscricao in trancados %}<li class="text-muted">{{ inscricao.aluno.nome_completo }}</li>{% empty %}<li class="text-muted">Nenhum aluno com matrícula trancada nesta turma.</li>{% endfor %}</ul></div></div></div>
+                </div>
+              </fieldset>
+              
+              <hr class="my-4" />
+              
+              <fieldset aria-labelledby="legend-licao" class="gy-3 row">
+                <legend id="legend-licao" class="h6">Detalhes da lição</legend>
+                <div class="col-md-6"><label class="form-label" for="last_word">Last Word</label><input type="text" name="last_word" id="last_word" class="form-control" autocomplete="off" value="{{ plano_de_hoje.last_word|default:'' }}" data-unsaved-check /></div>
+                <div class="col-md-6"><label class="form-label" for="last_parag">Last Page Number</label><input type="number" name="last_parag" id="last_parag" class="form-control" inputmode="numeric" value="{{ plano_de_hoje.last_parag|default:'' }}" data-unsaved-check /></div>
+
+                <div class="col-12">
+                  <div class="p-3 rounded bg-primary-subtle border">
+                    <h6 class="border-bottom pb-2 mb-3">Dictation</h6>
+                    <div class="row g-3">
+                      <div class="col-md-6">
+                        <label class="form-label" for="new_dictation">
+                          Dictation <span class="badge bg-success text-white rounded-pill ms-1">New</span>
+                        </label>
+                        <input type="text" name="new_dictation" id="new_dictation" class="form-control" value="{{ plano_de_hoje.new_dictation|default:'' }}" data-unsaved-check />
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label" for="old_dictation">
+                          Dictation <span class="badge bg-secondary text-white rounded-pill ms-1">Old</span>
+                        </label>
+                        <input type="text" name="old_dictation" id="old_dictation" class="form-control" value="{{ plano_de_hoje.old_dictation|default:'' }}" data-unsaved-check />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="col-12">
+                  <div class="p-3 rounded bg-warning-subtle border">
+                    <h6 class="border-bottom pb-2 mb-3">Reading</h6>
+                    <div class="row g-3">
+                      <div class="col-md-6">
+                        <label class="form-label" for="new_reading">
+                          Reading <span class="badge bg-success text-white rounded-pill ms-1">New</span>
+                        </label>
+                        <input type="text" name="new_reading" id="new_reading" class="form-control" value="{{ plano_de_hoje.new_reading|default:'' }}" data-unsaved-check />
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label" for="old_reading">
+                          Reading <span class="badge bg-secondary text-white rounded-pill ms-1">Old</span>
+                        </label>
+                        <input type="text" name="old_reading" id="old_reading" class="form-control" value="{{ plano_de_hoje.old_reading|default:'' }}" data-unsaved-check />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-12"><label class="form-label" for="lesson_check">Lesson Check</label><input type="text" name="lesson_check" id="lesson_check" class="form-control" autocomplete="off" value="{{ plano_de_hoje.lesson_check|default:'' }}" data-unsaved-check /></div>
+              </fieldset>
+              
+              <div class="fab-bar bg-white p-2 mt-3 rounded-3 d-grid"><button type="submit" name="salvar_aula" class="btn btn-primary btn-lg">Salvar registro da aula</button></div>
+            </form>
+          </div>
+        </section>
+      </div>
+
+      <div class="col-12 col-lg-5">
+        <section class="card mb-3" aria-labelledby="sec-faltas">
+          <div class="card-header"><h2 id="sec-faltas" class="h5 mb-0">Faltas no Mês</h2></div>
+          <div class="card-body">
+            {% if faltas_do_mes %}
+              <ul class="list-group list-group-flush">
+                {% for falta in faltas_do_mes %}
+                  <li class="list-group-item d-flex justify-content-between align-items-center">
+                    {{ falta.aluno__nome_completo }}
+                    <span class="badge bg-danger rounded-pill">{{ falta.total_faltas }}</span>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <p class="text-muted text-center mb-0">Nenhuma falta registrada neste mês. Ótimo trabalho!</p>
+            {% endif %}
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="sec-anotacoes">
+          <div class="card-header"><h2 id="sec-anotacoes" class="h5 mb-0">Anotações importantes</h2></div>
+          <div class="card-body">
+            <form method="post" novalidate>{% csrf_token %}<div class="mb-2"><label for="anotacoes_gerais" class="form-label visually-hidden">Anotações da turma</label><textarea id="anotacoes_gerais" name="anotacoes_gerais" class="form-control" rows="4" placeholder="Ex.: conteúdos-chave, dificuldades coletivas, combinados de sala">{{ turma.anotacoes_gerais|default:"" }}</textarea></div><button type="submit" name="salvar_anotacoes" class="btn btn-secondary btn-sm">Salvar anotações</button></form>
+          </div>
+        </section>
+      </div>
+    </div>
     <section class="card mb-3" aria-labelledby="sec-historico">
       <div class="card-header d-flex justify-content-between align-items-center gap-2 flex-wrap">
         <div>
@@ -186,8 +295,8 @@
               <tr>
                 <th scope="col" class="text-start">Data</th>
                 <th scope="col" class="text-start">Professor</th>
-                <th scope="col">Last Word</th>
                 <th scope="col">Last Page Number</th>
+                <th scope="col">Last Word</th>
                 <th scope="col">Dictation (New/Old)</th>
                 <th scope="col">Reading (New/Old)</th>
                 <th scope="col">Lesson Check</th>
@@ -203,10 +312,10 @@
                     </a>
                   </td>
                   <td class="text-nowrap text-start">{{ aula.professor.nome_completo|default:"-" }}</td>
-                  <td>{{ aula.last_word|default:"-" }}</td>
                   <td>{{ aula.last_parag|default:"-" }}</td>
+                  <td>{{ aula.last_word|default:"-" }}</td>
                   <td>{{ aula.new_dictation|default:"-" }}/{{ aula.old_dictation|default:"-" }}</td>
-                  <td>{{ aula.new_reading|default:"-" }}/{{ aula.old_reading|default:"-" }}</td>
+                  <td>{{ aula.new_reading|default:"-" }}/{{ plano.old_reading|default:"-" }}</td>
                   <td>{{ aula.lesson_check|default:"-" }}</td>
                   <td>
                     {% if aula.alunos_ausentes %}
@@ -244,79 +353,6 @@
       </div>
     </section>
 
-    <div class="row g-3">
-      <div class="col-12 col-lg-7">
-        <section class="card" aria-labelledby="sec-registrar">
-          <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <h2 id="sec-registrar" class="h5 mb-0">
-              Registrar Aula de Hoje
-            </h2>
-            {% if plano_de_hoje %}
-              <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i> Pré-preenchido com o plano do dia</span>
-            {% endif %}
-          </div>
-          <div class="card-body">
-            <form method="post" novalidate id="form-aula-hoje">
-              {% csrf_token %}
-              
-              <fieldset class="mb-3" aria-describedby="hint-presenca">
-                <legend class="h6 mb-2">Lista de presença</legend>
-                <p id="hint-presenca" class="text-muted small mb-2">Use a busca para filtrar alunos. "Marcar todos" afeta apenas a lista visível.</p>
-                <div class="input-group mb-3" role="search"><span class="input-group-text" id="addon-search" aria-hidden="true"><i class="bi bi-search"></i></span><input type="search" class="form-control" id="filtro-alunos" placeholder="Buscar aluno pelo nome" aria-label="Buscar aluno pelo nome" aria-describedby="addon-search" /><button type="button" class="btn btn-outline-secondary" id="btn-limpar-filtro" aria-label="Limpar busca">Limpar</button></div>
-                <div class="accordion" id="accordionPresenca">
-                  <div class="accordion-item"><h3 class="accordion-header" id="head-matriculados"><button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-matriculados" aria-expanded="true" aria-controls="collapse-matriculados">Matriculados <span class="badge bg-secondary ms-2" id="count-matriculados">{{ matriculados.count }}</span></button></h3><div id="collapse-matriculados" class="accordion-collapse collapse show" aria-labelledby="head-matriculados" data-bs-parent="#accordionPresenca"><div class="accordion-body"><div class="d-flex justify-content-between align-items-center mb-2"><div class="form-check touch-target"><input class="form-check-input" type="checkbox" id="toggle-all-matriculados" /><label class="form-check-label" for="toggle-all-matriculados">Marcar todos visíveis</label></div><small class="text-muted" id="sel-matriculados" aria-live="polite"></small></div><ul class="list-unstyled list-scroll" id="lista-matriculados">{% for inscricao in matriculados %}<li class="mb-1 aluno-item" data-nome="{{ inscricao.aluno.nome_completo|lower }}"><div class="form-check touch-target"><input class="form-check-input presenca-checkbox" type="checkbox" name="presenca" value="{{ inscricao.aluno.pk }}" id="m-{{ inscricao.aluno.pk }}" /><label class="form-check-label" for="m-{{ inscricao.aluno.pk }}">{{ inscricao.aluno.nome_completo }}</label></div></li>{% empty %}<li class="text-muted">Nenhum aluno matriculado nesta turma.</li>{% endfor %}</ul></div></div></div>
-                  <div class="accordion-item"><h3 class="accordion-header" id="head-experimentais"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-experimentais" aria-expanded="false" aria-controls="collapse-experimentais">Aula Experimental <span class="badge bg-info text-dark ms-2">{{ experimentais.count }}</span></button></h3><div id="collapse-experimentais" class="accordion-collapse collapse" aria-labelledby="head-experimentais" data-bs-parent="#accordionPresenca"><div class="accordion-body"><div class="d-flex justify-content-between align-items-center mb-2"><div class="form-check touch-target"><input class="form-check-input" type="checkbox" id="toggle-all-experimentais" /><label class="form-check-label" for="toggle-all-experimentais">Marcar todos visíveis</label></div><small class="text-muted" id="sel-experimentais" aria-live="polite"></small></div><ul class="list-unstyled list-scroll" id="lista-experimentais">{% for inscricao in experimentais %}<li class="mb-1 aluno-item" data-nome="{{ inscricao.aluno.nome_completo|lower }}"><div class="form-check touch-target"><input class="form-check-input presenca-checkbox" type="checkbox" name="presenca" value="{{ inscricao.aluno.pk }}" id="e-{{ inscricao.aluno.pk }}" /><label class="form-check-label" for="e-{{ inscricao.aluno.pk }}">{{ inscricao.aluno.nome_completo }}</label></div></li>{% empty %}<li class="text-muted">Nenhum aluno em aula experimental nesta turma.</li>{% endfor %}</ul></div></div></div>
-                  <div class="accordion-item"><h3 class="accordion-header" id="head-acompanhando"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-acompanhando" aria-expanded="false" aria-controls="collapse-acompanhando">Acompanhando <span class="badge muted-badge ms-2">{{ acompanhando.count }}</span></button></h3><div id="collapse-acompanhando" class="accordion-collapse collapse" aria-labelledby="head-acompanhando" data-bs-parent="#accordionPresenca"><div class="accordion-body"><div class="d-flex justify-content-between align-items-center mb-2"><div class="form-check touch-target"><input class="form-check-input" type="checkbox" id="toggle-all-acompanhando" /><label class="form-check-label" for="toggle-all-acompanhando">Marcar todos visíveis</label></div><small class="text-muted" id="sel-acompanhando" aria-live="polite"></small></div><ul class="list-unstyled list-scroll" id="lista-acompanhando">{% for inscricao in acompanhando %}<li class="mb-1 aluno-item" data-nome="{{ inscricao.aluno.nome_completo|lower }}"><div class="form-check touch-target"><input class="form-check-input presenca-checkbox" type="checkbox" name="presenca" value="{{ inscricao.aluno.pk }}" id="a-{{ inscricao.aluno.pk }}" /><label class="form-check-label" for="a-{{ inscricao.aluno.pk }}">{{ inscricao.aluno.nome_completo }}</label></div></li>{% empty %}<li class="text-muted">Nenhum aluno acompanhando esta turma.</li>{% endfor %}</ul></div></div></div>
-                  <div class="accordion-item"><h3 class="accordion-header" id="head-trancados"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-trancados" aria-expanded="false" aria-controls="collapse-trancados">Trancados <span class="badge bg-danger ms-2">{{ trancados.count }}</span></button></h3><div id="collapse-trancados" class="accordion-collapse collapse" aria-labelledby="head-trancados" data-bs-parent="#accordionPresenca"><div class="accordion-body"><ul class="list-unstyled mb-0">{% for inscricao in trancados %}<li class="text-muted">{{ inscricao.aluno.nome_completo }}</li>{% empty %}<li class="text-muted">Nenhum aluno com matrícula trancada nesta turma.</li>{% endfor %}</ul></div></div></div>
-                </div>
-              </fieldset>
-              
-              <hr class="my-4" />
-              
-              <fieldset aria-labelledby="legend-licao" class="gy-3 row">
-                <legend id="legend-licao" class="h6">Detalhes da lição</legend>
-                <div class="col-md-6"><label class="form-label" for="last_word">Last Word</label><input type="text" name="last_word" id="last_word" class="form-control" autocomplete="off" value="{{ plano_de_hoje.last_word|default:'' }}" data-unsaved-check /></div>
-                <div class="col-md-6"><label class="form-label" for="last_parag">Last Page Number</label><input type="number" name="last_parag" id="last_parag" class="form-control" inputmode="numeric" value="{{ plano_de_hoje.last_parag|default:'' }}" data-unsaved-check /></div>
-                <div class="col-md-6"><label class="form-label" for="new_dictation">New Dictation (nº)</label><input type="number" name="new_dictation" id="new_dictation" class="form-control" inputmode="numeric" value="{{ plano_de_hoje.new_dictation|default:'' }}" data-unsaved-check /></div>
-                <div class="col-md-6"><label class="form-label" for="old_dictation">Old Dictation (nº)</label><input type="number" name="old_dictation" id="old_dictation" class="form-control" inputmode="numeric" value="{{ plano_de_hoje.old_dictation|default:'' }}" data-unsaved-check /></div>
-                <div class="col-md-6"><label class="form-label" for="new_reading">New Reading (nº)</label><input type="number" name="new_reading" id="new_reading" class="form-control" inputmode="numeric" value="{{ plano_de_hoje.new_reading|default:'' }}" data-unsaved-check /></div>
-                <div class="col-md-6"><label class="form-label" for="old_reading">Old Reading (nº)</label><input type="number" name="old_reading" id="old_reading" class="form-control" inputmode="numeric" value="{{ plano_de_hoje.old_reading|default:'' }}" data-unsaved-check /></div>
-                <div class="col-12"><label class="form-label" for="lesson_check">Lesson Check</label><input type="text" name="lesson_check" id="lesson_check" class="form-control" autocomplete="off" value="{{ plano_de_hoje.lesson_check|default:'' }}" data-unsaved-check /></div>
-              </fieldset>
-              
-              <div class="fab-bar bg-white p-2 mt-3 rounded-3 d-grid"><button type="submit" name="salvar_aula" class="btn btn-primary btn-lg">Salvar registro da aula</button></div>
-            </form>
-          </div>
-        </section>
-      </div>
-
-      <div class="col-12 col-lg-5">
-        <section class="card mb-3" aria-labelledby="sec-faltas">
-          <div class="card-header"><h2 id="sec-faltas" class="h5 mb-0">Faltas no Mês</h2></div>
-          <div class="card-body">
-            {% if faltas_do_mes %}
-              <ul class="list-group list-group-flush">
-                {% for falta in faltas_do_mes %}
-                  <li class="list-group-item d-flex justify-content-between align-items-center">
-                    {{ falta.aluno__nome_completo }}
-                    <span class="badge bg-danger rounded-pill">{{ falta.total_faltas }}</span>
-                  </li>
-                {% endfor %}
-              </ul>
-            {% else %}
-              <p class="text-muted text-center mb-0">Nenhuma falta registrada neste mês. Ótimo trabalho!</p>
-            {% endif %}
-          </div>
-        </section>
-
-        <section class="card" aria-labelledby="sec-anotacoes">
-          <div class="card-header"><h2 id="sec-anotacoes" class="h5 mb-0">Anotações importantes</h2></div>
-          <div class="card-body">
-            <form method="post" novalidate>{% csrf_token %}<div class="mb-2"><label for="anotacoes_gerais" class="form-label visually-hidden">Anotações da turma</label><textarea id="anotacoes_gerais" name="anotacoes_gerais" class="form-control" rows="4" placeholder="Ex.: conteúdos-chave, dificuldades coletivas, combinados de sala">{{ turma.anotacoes_gerais|default:"" }}</textarea></div><button type="submit" name="salvar_anotacoes" class="btn btn-secondary btn-sm">Salvar anotações</button></form>
-          </div>
-        </section>
-      </div>
-    </div>
   </main>
 
   <div class="modal fade" id="modalAulaAtrasada" tabindex="-1" aria-labelledby="modalAulaAtrasadaLabel" aria-hidden="true">
@@ -366,10 +402,46 @@
               <legend id="legend-licao-atrasada" class="h6">Detalhes da lição</legend>
               <div class="col-md-6"><label class="form-label" for="last_word_atrasada">Last Word</label><input type="text" name="last_word_atrasada" id="last_word_atrasada" class="form-control" autocomplete="off" /></div>
               <div class="col-md-6"><label class="form-label" for="last_parag_atrasada">Last Page Number</label><input type="number" name="last_parag_atrasada" id="last_parag_atrasada" class="form-control" inputmode="numeric" /></div>
-              <div class="col-md-6"><label class="form-label" for="new_dictation_atrasada">Dictation New (nº)</label><input type="number" name="new_dictation_atrasada" id="new_dictation_atrasada" class="form-control" inputmode="numeric" /></div>
-              <div class="col-md-6"><label class="form-label" for="old_dictation_atrasada">Dictation Old (nº)</label><input type="number" name="old_dictation_atrasada" id="old_dictation_atrasada" class="form-control" inputmode="numeric" /></div>
-              <div class="col-md-6"><label class="form-label" for="new_reading_atrasada">Reading New (nº)</label><input type="number" name="new_reading_atrasada" id="new_reading_atrasada" class="form-control" inputmode="numeric" /></div>
-              <div class="col-md-6"><label class="form-label" for="old_reading_atrasada">Reading Old (nº)</label><input type="number" name="old_reading_atrasada" id="old_reading_atrasada" class="form-control" inputmode="numeric" /></div>
+              
+              <div class="col-12">
+                <div class="p-3 rounded bg-primary-subtle border">
+                  <h6 class="border-bottom pb-2 mb-3">Dictation</h6>
+                  <div class="row g-3">
+                    <div class="col-md-6">
+                      <label class="form-label" for="new_dictation_atrasada">
+                        Dictation <span class="badge bg-success text-white rounded-pill ms-1">New</span>
+                      </label>
+                      <input type="text" name="new_dictation_atrasada" id="new_dictation_atrasada" class="form-control" />
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="old_dictation_atrasada">
+                        Dictation <span class="badge bg-secondary text-white rounded-pill ms-1">Old</span>
+                      </label>
+                      <input type="text" name="old_dictation_atrasada" id="old_dictation_atrasada" class="form-control" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-12">
+                <div class="p-3 rounded bg-warning-subtle border">
+                  <h6 class="border-bottom pb-2 mb-3">Reading</h6>
+                  <div class="row g-3">
+                    <div class="col-md-6">
+                      <label class="form-label" for="new_reading_atrasada">
+                        Reading <span class="badge bg-success text-white rounded-pill ms-1">New</span>
+                      </label>
+                      <input type="text" name="new_reading_atrasada" id="new_reading_atrasada" class="form-control" />
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="old_reading_atrasada">
+                        Reading <span class="badge bg-secondary text-white rounded-pill ms-1">Old</span>
+                      </label>
+                      <input type="text" name="old_reading_atrasada" id="old_reading_atrasada" class="form-control" />
+                    </div>
+                  </div>
+                </div>
+              </div>
               <div class="col-12"><label class="form-label" for="lesson_check_atrasada">Lesson Check</label><input type="text" name="lesson_check_atrasada" id="lesson_check_atrasada" class="form-control" autocomplete="off" /></div>
             </fieldset>
 
@@ -398,10 +470,29 @@
             <fieldset aria-labelledby="legend-licao-plano" class="gy-3 row">
               <legend id="legend-licao-plano" class="h6 visually-hidden">Detalhes do Planejamento</legend>
               {% for field in form_plano_aula %}
-                <div class="col-12 {% if field.name != 'data_aula' and field.name != 'lesson_check' %}col-md-6{% endif %}">
-                  <label for="{{ field.id_for_label }}" class="form-label">
-                    {{ field.label }} {% if field.name == 'data_aula' %}<span class="text-danger">*</span>{% endif %}
-                  </label>
+                <div class="col-12 {% if field.name != 'data_aula' and field.name != 'lesson_check' and field.name != 'last_word' and field.name != 'last_parag' %}col-md-6{% endif %}">
+                  
+                  {% if field.name == 'new_dictation' %}
+                    <label for="{{ field.id_for_label }}" class="form-label">
+                      {{ field.label }} <span class="badge bg-success text-white rounded-pill ms-1">New</span>
+                    </label>
+                  {% elif field.name == 'old_dictation' %}
+                    <label for="{{ field.id_for_label }}" class="form-label">
+                      {{ field.label }} <span class="badge bg-secondary text-white rounded-pill ms-1">Old</span>
+                    </label>
+                  {% elif field.name == 'new_reading' %}
+                    <label for="{{ field.id_for_label }}" class="form-label">
+                      {{ field.label }} <span class="badge bg-success text-white rounded-pill ms-1">New</span>
+                    </label>
+                  {% elif field.name == 'old_reading' %}
+                    <label for="{{ field.id_for_label }}" class="form-label">
+                      {{ field.label }} <span class="badge bg-secondary text-white rounded-pill ms-1">Old</span>
+                    </label>
+                  {% else %}
+                    <label for="{{ field.id_for_label }}" class="form-label">
+                      {{ field.label }} {% if field.name == 'data_aula' %}<span class="text-danger">*</span>{% endif %}
+                    </label>
+                  {% endif %}
                   {{ field }}
                   {% if field.errors %}
                     <div class="invalid-feedback d-block">

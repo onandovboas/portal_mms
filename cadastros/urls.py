@@ -87,6 +87,9 @@ urlpatterns = [
     path('exportar/pagamentos/', views.exportar_pagamentos_csv, name='exportar_pagamentos_csv'),
     path('exportar/registros-aula-por-turma/', views.exportar_registros_aula_por_turma_zip, name='exportar_registros_aula_por_turma_zip'),
     
+    # --- LINHA ADICIONADA ---
+    path('exportar/acompanhamentos/', views.exportar_acompanhamentos_csv, name='exportar_acompanhamentos_csv'),
+    
     # Relatórios
     path('relatorios/professores/', views.relatorio_pagamento_professores, name='relatorio_professores'),
     path('relatorios/alunos-pendentes/', views.relatorio_alunos_pendentes, name='relatorio_alunos_pendentes'),
