@@ -188,6 +188,12 @@ def detalhe_turma(request, pk):
             if novo_stage:
                 turma.stage = novo_stage
             turma.save()
+        
+        elif 'salvar_anotacoes' in request.POST:
+            anotacoes = request.POST.get('anotacoes_gerais')
+            turma.anotacoes_gerais = anotacoes
+            turma.save()
+            messages.success(request, 'Anotações da turma salvas com sucesso.')
 
         # Redireciona no final de qualquer ação POST
         return redirect('cadastros:detalhe_turma', pk=turma.pk)
