@@ -1,0 +1,43 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Obrigado! - MMS Institute</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Work+Sans:wght@400;500&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Work Sans', sans-serif; background-color: #f0f2f5; height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .card-success { border: none; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); max-width: 500px; width: 100%; }
+        h1, h2 { font-family: 'Poppins', sans-serif; }
+    </style>
+</head>
+<body>
+    <div class="container p-3">
+        <div class="card card-success p-5 text-center mx-auto">
+            <div class="mb-4 text-success display-1">
+                <i class="bi bi-check-circle-fill"></i>
+            </div>
+            <h2 class="fw-bold text-dark mb-3">Obrigado pelo Feedback!</h2>
+            <p class="text-muted mb-4">Suas respostas foram salvas e seu cadastro foi atualizado com sucesso.</p>
+            
+            <hr class="my-4">
+            
+            <p class="small fw-bold text-primary text-uppercase">O que você quer fazer agora?</p>
+            
+            <div class="d-grid gap-3">
+                <a href="{% url 'cadastros:portal_login' %}" class="btn btn-outline-primary btn-lg rounded-pill">
+                    Acessar o Portal do Aluno
+                </a>
+
+                <a href="{% url 'cadastros:esqueci_minha_senha' %}" class="btn btn-primary btn-lg rounded-pill shadow-sm">
+                    Definir ou Recuperar minha Senha <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,133 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard Marketing - MMS</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="{% static 'cadastros/mms_style.css' %}" rel="stylesheet">
+</head>
+<body class="bg-light">
+<div class="container my-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 fw-bold mb-0">Marketing & Persona</h1>
+            <p class="text-muted">Análise de aquisição e perfil dos alunos</p>
+        </div>
+        <a href="{% url 'cadastros:dashboard_admin' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Voltar</a>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <h6 class="text-muted text-uppercase small fw-bold">Total de Leads</h6>
+                    <h2 class="display-6 fw-bold text-primary">{{ leads_total }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <h6 class="text-muted text-uppercase small fw-bold">Taxa de Conversão</h6>
+                    <h2 class="display-6 fw-bold {% if taxa_conversao > 20 %}text-success{% else %}text-warning{% endif %}">
+                        {{ taxa_conversao }}%
+                    </h2>
+                    <small class="text-muted">Leads que viraram Alunos</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <h6 class="text-muted text-uppercase small fw-bold">Alunos Convertidos</h6>
+                    <h2 class="display-6 fw-bold text-dark">{{ leads_convertidos }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white fw-bold">Origem dos Leads (CRM)</div>
+                <div class="card-body">
+                    <canvas id="chartFontes"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white fw-bold">Como Conheceu a MMS (Pesquisa)</div>
+                <div class="card-body">
+                    <canvas id="chartConheceu"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-md-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white fw-bold">Perfil Demográfico (Faixa Etária)</div>
+                <div class="card-body">
+                    <div style="height: 300px;">
+                        <canvas id="chartIdade"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // 1. Chart Fontes (Leads)
+    const dadosFontes = JSON.parse('{{ dados_fontes|escapejs }}');
+    new Chart(document.getElementById('chartFontes'), {
+        type: 'doughnut',
+        data: {
+            labels: dadosFontes.labels,
+            datasets: [{
+                data: dadosFontes.data,
+                backgroundColor: ['#0d6efd', '#6610f2', '#0dcaf0', '#198754', '#ffc107']
+            }]
+        }
+    });
+
+    // 2. Chart Como Conheceu (Pesquisa)
+    const dadosConheceu = JSON.parse('{{ dados_conheceu|escapejs }}');
+    new Chart(document.getElementById('chartConheceu'), {
+        type: 'pie',
+        data: {
+            labels: dadosConheceu.labels,
+            datasets: [{
+                data: dadosConheceu.data,
+                backgroundColor: ['#fd7e14', '#20c997', '#d63384', '#6f42c1']
+            }]
+        }
+    });
+
+    // 3. Chart Faixa Etária (Barra Horizontal)
+    const dadosFaixa = JSON.parse('{{ dados_faixa|escapejs }}');
+    new Chart(document.getElementById('chartIdade'), {
+        type: 'bar',
+        data: {
+            labels: dadosFaixa.labels,
+            datasets: [{
+                label: 'Quantidade de Alunos',
+                data: dadosFaixa.data,
+                backgroundColor: '#0d6efd',
+                borderRadius: 5
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+</script>
+</body>
+</html>

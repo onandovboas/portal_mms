@@ -1,6 +1,6 @@
 import re
 from django import forms
-from .models import Aluno, Pagamento, Turma, Contrato, RegistroAula, Inscricao, Lead, AcompanhamentoPedagogico, ProvaTemplate
+from .models import Aluno, Pagamento, Turma, Contrato, RegistroAula, Inscricao, Lead, AcompanhamentoPedagogico, ProvaTemplate, PesquisaSatisfacao
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -220,3 +220,39 @@ class PlanoAulaForm(forms.ModelForm):
             'lesson_check': forms.TextInput(attrs={'class': 'form-control'}),
         }
 # --- FIM DO FORMULÁRIO ADICIONADO ---
+
+class PesquisaSatisfacaoForm(forms.ModelForm):
+    class Meta:
+        model = PesquisaSatisfacao
+        fields = [
+            'email_confirmado', 'telefone_atualizado', 'stage_atual_informado', # <--- Stage aqui
+            'faixa_etaria', 'escolaridade', 
+            'area_atuacao', 'cargo_atual', 'objetivo_ingles', 'como_conheceu', # Persona
+            'segue_instagram', 'conteudo_desejado',
+            'nps_score', 'comentarios_gerais'
+        ]
+        widgets = {
+            'email_confirmado': forms.EmailInput(attrs={'class': 'form-control'}),
+            'telefone_atualizado': forms.TextInput(attrs={'class': 'form-control'}),
+            'stage_atual_informado': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Ex: 3'}),
+            
+            # Selects estilizados
+            'faixa_etaria': forms.Select(attrs={'class': 'form-select'}),
+            'escolaridade': forms.Select(attrs={'class': 'form-select'}),
+            'como_conheceu': forms.Select(attrs={'class': 'form-select'}),
+            
+            # Campos de Texto
+            'area_atuacao': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Saúde, Tecnologia, Direito...'}),
+            'cargo_atual': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Estudante, Gerente, Autônomo...'}),
+            'objetivo_ingles': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Intercâmbio, Trabalho, Viagem...'}),
+            
+            'conteudo_desejado': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+            'comentarios_gerais': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
+        }
+
+# Formulário para recuperação de senha (usado na próxima Sprint, mas já deixamos pronto)
+class EsqueciSenhaForm(forms.Form):
+    email = forms.EmailField(
+        label="E-mail",
+        widget=forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Digite seu e-mail cadastrado'})
+    )
