@@ -56,9 +56,19 @@
 <body>
 
     <div class="container main-container pt-4">
+        
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
         <div class="card-feedback border-top-admin" style="border-top-width: 8px; border-top-color: #0d6efd;">
             <h1 class="display-6 fw-bold text-dark mb-2">Pesquisa de Satisfação MMS</h1>
-            <p class="text-muted">Sua opinião constrói a nossa escola. Todos os dados coletados no feedback semestral são anônimos e utilizados exclusivamente para melhorar nossos serviços.</p>
+            <p class="text-muted">Sua opinião constrói a nossa escola. Todos os dados são anônimos e utilizados exclusivamente para melhorar nossos serviços. <strong>Todas as respostas são opcionais.</strong></p>
         </div>
 
         <form method="post">
@@ -84,13 +94,13 @@
 
             <div class="card-feedback border-top-persona">
                 <h4 class="mb-4 text-primary"><i class="bi bi-people-fill me-2"></i> Perfil MMS</h4>
-                <p class="text-muted small mb-3">Conte um pouco mais sobre você. Queremos melhorar nossos conteúdos para você. Esses dados são anônimos!</p>
+                <p class="text-muted small mb-3">Conte um pouco mais sobre você. Esses dados são anônimos!</p>
 
                 <div class="row g-3">
                     <div class="col-md-6"><label class="form-label">Faixa Etária</label>{{ form_geral.faixa_etaria }}</div>
                     <div class="col-md-6"><label class="form-label">Escolaridade</label>{{ form_geral.escolaridade }}</div>
                     <div class="col-md-6"><label class="form-label">Área de Atuação</label>{{ form_geral.area_atuacao }}</div>
-                    <div class="col-md-6"><label class="form-label">Cargo Atual / Profissão</label>{{ form_geral.cargo_atual }}</div>
+                    <div class="col-md-6"><label class="form-label">Cargo Atual</label>{{ form_geral.cargo_atual }}</div>
                     <div class="col-12"><label class="form-label">Como conheceu a MMS?</label>{{ form_geral.como_conheceu }}</div>
                     <div class="col-12"><label class="form-label">Seu maior objetivo com o inglês:</label>{{ form_geral.objetivo_ingles }}</div>
                 </div>
@@ -98,46 +108,35 @@
 
             {% if teachers %}
             <div class="mt-5 mb-3"><h4 class="text-secondary ps-2">Avaliação dos Teachers</h4></div>
-            
             {% for teacher in teachers %}
             <div class="card-feedback border-top-teacher">
                 <div class="section-header">
                     <div class="avatar-box">
                         {% if teacher.foto %}<img src="{{ teacher.foto.url }}" class="avatar-img">{% else %}<div class="avatar-initials">{{ teacher.nome_completo|slice:":2"|upper }}</div>{% endif %}
                     </div>
-                    <div>
-                        <h4 class="m-0 fw-bold">{{ teacher.nome_completo }}</h4>
-                        <span class="badge bg-warning text-dark">Teacher</span>
-                    </div>
+                    <div><h4 class="m-0 fw-bold">{{ teacher.nome_completo }}</h4><span class="badge bg-warning text-dark">Teacher</span></div>
                 </div>
 
                 <p class="question-title">1. Satisfação geral com as aulas deste teacher:</p>
                 <div class="scale-wrapper">{% for i in "12345" %}<div class="scale-option"><label class="small mb-1">{{ i }}</label><input type="radio" name="teacher_{{ teacher.id }}_satisfacao" value="{{ i }}"></div>{% endfor %}</div>
                 <div class="scale-labels"><span>Insatisfeito</span><span>Muito Satisfeito</span></div>
 
-                <p class="question-title">2. O quão incentivado o teacher te mantém durante as aulas?</p>
+                <p class="question-title">2. O quão incentivado o teacher te mantém?</p>
                 <div class="scale-wrapper">{% for i in "12345" %}<div class="scale-option"><label class="small mb-1">{{ i }}</label><input type="radio" name="teacher_{{ teacher.id }}_incentivo" value="{{ i }}"></div>{% endfor %}</div>
                 <div class="scale-labels"><span>Pouco</span><span>Muito</span></div>
 
-                <p class="question-title">3. O quão seguro/confortável se sente durante as aulas?</p>
+                <p class="question-title">3. O quão seguro/confortável se sente?</p>
                 <div class="scale-wrapper">{% for i in "12345" %}<div class="scale-option"><label class="small mb-1">{{ i }}</label><input type="radio" name="teacher_{{ teacher.id }}_conforto" value="{{ i }}"></div>{% endfor %}</div>
                 <div class="scale-labels"><span>Inseguro</span><span>Confortável</span></div>
                 
-                <p class="question-title">4. O quanto você observa que o teacher {{ teacher.nome_completo }} se esforça para apresentar o conteúdo durante as aulas?</p>
+                <p class="question-title">4. O teacher se esforça para explicar?</p>
                 <div class="scale-wrapper">{% for i in "12345" %}<div class="scale-option"><label class="small mb-1">{{ i }}</label><input type="radio" name="teacher_{{ teacher.id }}_esforco" value="{{ i }}"></div>{% endfor %}</div>
                 <div class="scale-labels"><span>Pouco</span><span>Muito</span></div>
                 
                 <hr class="text-muted my-4">
-                
                 <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label text-success small">Que bom 👍 (Deixe seu elogio)</label>
-                        <textarea name="teacher_{{ teacher.id }}_elogio" class="form-control" rows="2"></textarea>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label text-danger small">Que pena 💡 (Deixe sua sugestão de melhoria)</label>
-                        <textarea name="teacher_{{ teacher.id }}_sugestao" class="form-control" rows="2"></textarea>
-                    </div>
+                    <div class="col-md-6 mb-3"><label class="form-label text-success small">Que bom 👍 (Elogio)</label><textarea name="teacher_{{ teacher.id }}_elogio" class="form-control" rows="2"></textarea></div>
+                    <div class="col-md-6 mb-3"><label class="form-label text-danger small">Que pena 💡 (Sugestão)</label><textarea name="teacher_{{ teacher.id }}_sugestao" class="form-control" rows="2"></textarea></div>
                 </div>
             </div>
             {% endfor %}
@@ -154,39 +153,32 @@
                     <div><h4 class="m-0 fw-bold">{{ adm.nome_completo }}</h4><span class="badge bg-info text-white">Equipe Adm</span></div>
                 </div>
 
-                <p class="question-title">Quão educado e prestativo foi o atendimento quando você precisou?</p>
+                <p class="question-title">Quão educado e prestativo foi o atendimento?</p>
                 <div class="scale-wrapper">{% for i in "12345" %}<div class="scale-option"><label class="small mb-1">{{ i }}</label><input type="radio" name="adm_{{ adm.id }}_educacao" value="{{ i }}"></div>{% endfor %}</div>
                 <div class="scale-labels"><span>Ruim</span><span>Excelente</span></div>
 
-                <p class="question-title">Com base em suas últimas experiências, como você avalia o atendimento?</p>
+                <p class="question-title">Como avalia o atendimento geral?</p>
                 <div class="scale-wrapper">{% for i in "12345" %}<div class="scale-option"><label class="small mb-1">{{ i }}</label><input type="radio" name="adm_{{ adm.id }}_geral" value="{{ i }}"></div>{% endfor %}</div>
                 <div class="scale-labels"><span>Ruim</span><span>Excelente</span></div>
 
-                <p class="question-title">Qual seu nível de satisfação com o atendimento?</p>
+                <p class="question-title">Nível de satisfação?</p>
                 <div class="scale-wrapper">{% for i in "12345" %}<div class="scale-option"><label class="small mb-1">{{ i }}</label><input type="radio" name="adm_{{ adm.id }}_satisfacao" value="{{ i }}"></div>{% endfor %}</div>
                 <div class="scale-labels"><span>Insatisfeito</span><span>Satisfeito</span></div>
 
                 <div class="mt-4 p-3 bg-light rounded">
-                    <label class="form-label mb-2 text-muted">Selecione os itens que se destacam:</label>
+                    <label class="form-label mb-2 text-muted">Destaques:</label>
                     <div class="d-flex flex-wrap gap-2">
-                        <input type="checkbox" class="btn-check" id="rk_{{adm.id}}_1" name="adm_{{adm.id}}_destaques" value="Rapidez"><label class="btn btn-outline-secondary btn-sm rounded-pill" for="rk_{{adm.id}}_1">Rapidez no atendimento</label>
+                        <input type="checkbox" class="btn-check" id="rk_{{adm.id}}_1" name="adm_{{adm.id}}_destaques" value="Rapidez"><label class="btn btn-outline-secondary btn-sm rounded-pill" for="rk_{{adm.id}}_1">Rapidez</label>
                         <input type="checkbox" class="btn-check" id="rk_{{adm.id}}_2" name="adm_{{adm.id}}_destaques" value="Paciência"><label class="btn btn-outline-secondary btn-sm rounded-pill" for="rk_{{adm.id}}_2">Paciência</label>
                         <input type="checkbox" class="btn-check" id="rk_{{adm.id}}_3" name="adm_{{adm.id}}_destaques" value="Humor"><label class="btn btn-outline-secondary btn-sm rounded-pill" for="rk_{{adm.id}}_3">Bom Humor</label>
-                        <input type="checkbox" class="btn-check" id="rk_{{adm.id}}_4" name="adm_{{adm.id}}_destaques" value="Clareza"><label class="btn btn-outline-secondary btn-sm rounded-pill" for="rk_{{adm.id}}_4">Clareza da informação</label>
+                        <input type="checkbox" class="btn-check" id="rk_{{adm.id}}_4" name="adm_{{adm.id}}_destaques" value="Clareza"><label class="btn btn-outline-secondary btn-sm rounded-pill" for="rk_{{adm.id}}_4">Clareza</label>
                         <input type="checkbox" class="btn-check" id="rk_{{adm.id}}_5" name="adm_{{adm.id}}_destaques" value="Tom de Voz"><label class="btn btn-outline-secondary btn-sm rounded-pill" for="rk_{{adm.id}}_5">Tom de voz</label>
                     </div>
                 </div>
-
                 <hr class="text-muted my-4">
                 <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label text-success small">Deixe seu elogio 👍</label>
-                        <textarea name="adm_{{ adm.id }}_elogio" class="form-control" rows="2"></textarea>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label text-danger small">Deixe sua sugestão de melhoria 💡</label>
-                        <textarea name="adm_{{ adm.id }}_sugestao" class="form-control" rows="2"></textarea>
-                    </div>
+                    <div class="col-md-6 mb-3"><label class="form-label text-success small">Elogio 👍</label><textarea name="adm_{{ adm.id }}_elogio" class="form-control" rows="2"></textarea></div>
+                    <div class="col-md-6 mb-3"><label class="form-label text-danger small">Sugestão 💡</label><textarea name="adm_{{ adm.id }}_sugestao" class="form-control" rows="2"></textarea></div>
                 </div>
             </div>
             {% endfor %}
@@ -204,30 +196,20 @@
                 </div>
 
                 <div class="form-check form-switch p-3 bg-light rounded mb-3">
-                    <input class="form-check-input" type="checkbox" id="ped_{{ped.id}}_participou" name="ped_{{ped.id}}_participou" value="sim" onchange="document.getElementById('bloco_ped_{{ped.id}}').style.display = this.checked ? 'block' : 'none'">
-                    <label class="form-check-label fw-bold ms-2" for="ped_{{ped.id}}_participou">Sim, participei de um Acompanhamento Pedagógico com ela</label>
+                    <input class="form-check-input" type="checkbox" id="ped_{{ped.id}}_participou" name="ped_{{ped.id}}_participou" value="sim" onchange="togglePed(this, 'bloco_ped_{{ped.id}}')">
+                    <label class="form-check-label fw-bold ms-2" for="ped_{{ped.id}}_participou">Sim, participei de um Acompanhamento Pedagógico</label>
                 </div>
 
                 <div id="bloco_ped_{{ped.id}}" style="display:none;">
-                    <p class="question-title">Quão satisfeito você se sentiu com o atendimento?</p>
-                    <div class="scale-wrapper">{% for i in "12345" %}<div class="scale-option"><label class="small mb-1">{{ i }}</label><input type="radio" name="ped_{{ ped.id }}_satisfacao" value="{{ i }}"></div>{% endfor %}</div>
+                    <p class="question-title">Quão satisfeito você ficou?</p>
+                    <div class="scale-wrapper">{% for i in "12345" %}<div class="scale-option"><label class="small mb-1">{{ i }}</label><input type="radio" class="radio_ped_{{ped.id}}" name="ped_{{ ped.id }}_satisfacao" value="{{ i }}"></div>{% endfor %}</div>
                     <div class="scale-labels"><span>Insatisfeito</span><span>Satisfeito</span></div>
                     
-                    <div class="mt-3">
-                        <label class="form-label small">Quais atividades você acha que seriam interessantes para acontecer no acompanhamento pedagógico?</label>
-                        <textarea name="ped_{{ ped.id }}_atividades" class="form-control" rows="2"></textarea>
-                    </div>
-
+                    <div class="mt-3"><label class="form-label small">Atividades interessantes?</label><textarea name="ped_{{ ped.id }}_atividades" class="form-control" rows="2"></textarea></div>
                     <hr class="text-muted my-4">
                     <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label text-success small">Deixe seu elogio 👍</label>
-                            <textarea name="ped_{{ ped.id }}_elogio" class="form-control" rows="2"></textarea>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label text-danger small">Deixe sua sugestão de melhoria 💡</label>
-                            <textarea name="ped_{{ ped.id }}_sugestao" class="form-control" rows="2"></textarea>
-                        </div>
+                        <div class="col-md-6 mb-3"><label class="form-label text-success small">Elogio 👍</label><textarea name="ped_{{ ped.id }}_elogio" class="form-control" rows="2"></textarea></div>
+                        <div class="col-md-6 mb-3"><label class="form-label text-danger small">Sugestão 💡</label><textarea name="ped_{{ ped.id }}_sugestao" class="form-control" rows="2"></textarea></div>
                     </div>
                 </div>
             </div>
@@ -235,12 +217,12 @@
             {% endif %}
 
             <div class="card-feedback bg-light border-0 mt-5">
-                <p class="question-title text-center" style="font-size: 1.2rem;">De 0 a 10, quanto você recomendaria nosso trabalho para um amigo ou familiar?</p>
+                <p class="question-title text-center" style="font-size: 1.2rem;">De 0 a 10, quanto você recomendaria a MMS?</p>
                 <div style="display: flex; justify-content: space-between; overflow-x: auto; margin-top: 20px;">
                     {% for i in "0123456789"|make_list %}
                     <div style="text-align: center; min-width: 30px;">
                         <label style="display:block; margin-bottom: 5px; font-weight: bold;">{{ i }}</label>
-                        <input type="radio" name="nps_score" value="{{ i }}" style="width: 20px; height: 20px;" required>
+                        <input type="radio" name="nps_score" value="{{ i }}" style="width: 20px; height: 20px;">
                     </div>
                     {% endfor %}
                      <div style="text-align: center; min-width: 30px;">
@@ -249,40 +231,43 @@
                     </div>
                 </div>
                 <div class="d-flex justify-content-between mt-2 small text-muted">
-                    <span>Insatisfeito(a)</span>
-                    <span>Muito satisfeito(a)</span>
+                    <span>Não recomendaria</span>
+                    <span>Recomendaria muito</span>
                 </div>
 
                 <hr class="my-4">
 
                 <div class="row align-items-start">
                     <div class="col-md-6 mb-3">
-                        <label class="form-label fw-bold">Você nos segue no Instagram? @mmsinstitute</label>
+                        <label class="form-label fw-bold">Segue no Instagram? @mmsinstitute</label>
                         <div class="form-check form-switch mb-2">
                             {{ form_geral.segue_instagram }}
                             <label class="form-check-label" for="{{ form_geral.segue_instagram.id_for_label }}">Sim, eu sigo!</label>
                         </div>
-                        <div class="mt-2">
-                            <label class="form-label small">Que tipo de conteúdo você gostaria de ver com mais frequência?</label>
-                            <textarea name="conteudo_desejado" class="form-control form-control-sm" rows="2"></textarea>
-                        </div>
+                        <div class="mt-2"><label class="form-label small">Conteúdo desejado:</label><textarea name="conteudo_desejado" class="form-control form-control-sm" rows="2"></textarea></div>
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="form-label fw-bold">Espaço Livre</label>
-                        <p class="small text-muted mb-1">Aqui você pode nos contar o que quiser a respeito da escola MMS Institute! Fique a vontade para escrever <3</p>
                         {{ form_geral.comentarios_gerais }}
                     </div>
                 </div>
 
                 <div class="text-center mt-4">
-                    <button type="submit" class="btn btn-primary btn-lg rounded-pill px-5 shadow">
-                        Enviar Pesquisa <i class="bi bi-send-fill ms-2"></i>
-                    </button>
+                    <button type="submit" class="btn btn-primary btn-lg rounded-pill px-5 shadow">Enviar Pesquisa <i class="bi bi-send-fill ms-2"></i></button>
                 </div>
             </div>
-
         </form>
     </div>
 
+    <script>
+        function togglePed(checkbox, blockId) {
+            const block = document.getElementById(blockId);
+            if (checkbox.checked) {
+                block.style.display = 'block';
+            } else {
+                block.style.display = 'none';
+            }
+        }
+    </script>
 </body>
 </html>

@@ -2298,10 +2298,7 @@ def excluir_registro_aula(request, pk):
     return redirect('cadastros:detalhe_turma', pk=turma_pk)
 
 def responder_pesquisa_satisfacao(request, token):
-    """
-    View pública (protegida por token) para o aluno responder a pesquisa semestral.
-    """
-    # 1. Validação do Token (Reutilizando a lógica segura existente)
+    # 1. Validação do Token
     try:
         token_obj = TokenAtualizacaoAluno.objects.get(token=token, usado=False)
         if token_obj.is_expired:
@@ -2311,93 +2308,93 @@ def responder_pesquisa_satisfacao(request, token):
 
     aluno = token_obj.aluno
 
-    # === CORREÇÃO AQUI: Usar os novos campos booleanos ===
-    
-    # Busca quem tem o check "É Teacher" marcado
     teachers = Professor.objects.filter(ativo=True, eh_teacher=True)
-    for t in teachers: t.id_str = str(t.id)
-        
-    # Busca quem tem o check "É Administrativo" marcado
     equipe_adm = Professor.objects.filter(ativo=True, eh_administrativo=True)
-    for a in equipe_adm: a.id_str = str(a.id)
-
-    # Busca quem tem o check "É Pedagógico" marcado
     equipe_pedagogica = Professor.objects.filter(ativo=True, eh_pedagogico=True)
-    for p in equipe_pedagogica: p.id_str = str(p.id)
 
     if request.method == 'POST':
+        # O formulário geral (Persona) também deve ser não-obrigatório nos campos que o model permitir
         form_geral = PesquisaSatisfacaoForm(request.POST)
         
+        # Ignoramos a validação estrita do form_geral se quisermos permitir salvar mesmo incompleto,
+        # mas mantemos o is_valid() para sanitização básica. Se falhar em campos obrigatórios do model, ele avisa.
         if form_geral.is_valid():
-            with transaction.atomic(): # Garante que salva tudo ou nada
+            
+            # --- REMOVIDA A VALIDAÇÃO MANUAL ---
+            # Agora aceitamos submissões parciais.
+
+            with transaction.atomic():
                 # A. Salva a pesquisa principal
                 pesquisa = form_geral.save(commit=False)
                 pesquisa.aluno = aluno
                 pesquisa.save()
                 
-                # B. Atualiza os dados cadastrais do aluno com o que ele confirmou
+                # B. Atualiza dados do aluno (se fornecidos)
                 if pesquisa.email_confirmado:
                     aluno.email = pesquisa.email_confirmado
-                    
-                    # === ADICIONE ISTO AQUI ===
-                    # Sincroniza com o Usuário de Login (para funcionar o reset de senha)
                     if aluno.usuario:
                         aluno.usuario.email = pesquisa.email_confirmado
                         aluno.usuario.save()
-                    # ==========================
 
                 if pesquisa.telefone_atualizado:
                     aluno.telefone = pesquisa.telefone_atualizado
                 aluno.save()
 
-                # C. Salva Avaliações dos Teachers
+                # Função auxiliar para tratar vazio -> None
+                def get_val(key):
+                    val = request.POST.get(key)
+                    return val if val else None
+
+                # C. Salva Teachers (Aceitando Nulos)
                 for teacher in teachers:
+                    # Só cria o registro se pelo menos UM campo foi preenchido
+                    # OU cria sempre vazio (optei por criar sempre para manter histórico de "não respondeu")
                     AvaliacaoProfessor.objects.create(
                         pesquisa=pesquisa,
                         professor=teacher,
-                        satisfacao_aulas=request.POST.get(f'teacher_{teacher.id}_satisfacao'),
-                        incentivo_teacher=request.POST.get(f'teacher_{teacher.id}_incentivo'),
-                        seguranca_conforto=request.POST.get(f'teacher_{teacher.id}_conforto'),
-                        esforco_conteudo=request.POST.get(f'teacher_{teacher.id}_esforco'),
+                        satisfacao_aulas=get_val(f'teacher_{teacher.id}_satisfacao'),
+                        incentivo_teacher=get_val(f'teacher_{teacher.id}_incentivo'),
+                        seguranca_conforto=get_val(f'teacher_{teacher.id}_conforto'),
+                        esforco_conteudo=get_val(f'teacher_{teacher.id}_esforco'),
                         elogio=request.POST.get(f'teacher_{teacher.id}_elogio', ''),
                         sugestao=request.POST.get(f'teacher_{teacher.id}_sugestao', '')
                     )
 
-                # D. Salva Avaliação Administrativa (Ex: Nando)
+                # D. Salva Admin (Aceitando Nulos)
                 for adm in equipe_adm:
-                    destaques = request.POST.getlist(f'adm_{adm.id}_destaques') # Checkboxes
+                    destaques = request.POST.getlist(f'adm_{adm.id}_destaques')
                     AvaliacaoAdministrativo.objects.create(
                         pesquisa=pesquisa,
                         membro_equipe=adm,
-                        educacao_prestatividade=request.POST.get(f'adm_{adm.id}_educacao'),
-                        avaliacao_geral=request.POST.get(f'adm_{adm.id}_geral'),
-                        nivel_satisfacao=request.POST.get(f'adm_{adm.id}_satisfacao'),
+                        educacao_prestatividade=get_val(f'adm_{adm.id}_educacao'),
+                        avaliacao_geral=get_val(f'adm_{adm.id}_geral'),
+                        nivel_satisfacao=get_val(f'adm_{adm.id}_satisfacao'),
                         destaques=destaques,
                         elogio=request.POST.get(f'adm_{adm.id}_elogio', ''),
                         sugestao=request.POST.get(f'adm_{adm.id}_sugestao', '')
                     )
                 
-                # E. Salva Avaliação Pedagógica (Ex: Gabi)
+                # E. Salva Pedagógico (Aceitando Nulos)
                 for ped in equipe_pedagogica:
                     participou = request.POST.get(f'ped_{ped.id}_participou') == 'sim'
                     AvaliacaoPedagogico.objects.create(
                         pesquisa=pesquisa,
                         coordenador=ped,
                         participou_acompanhamento=participou,
-                        satisfacao_atendimento=request.POST.get(f'ped_{ped.id}_satisfacao') if participou else None,
+                        satisfacao_atendimento=get_val(f'ped_{ped.id}_satisfacao') if participou else None,
                         atividades_interessantes=request.POST.get(f'ped_{ped.id}_atividades', ''),
                         elogio=request.POST.get(f'ped_{ped.id}_elogio', ''),
                         sugestao=request.POST.get(f'ped_{ped.id}_sugestao', '')
                     )
 
-                # F. Invalida o token para não usar de novo
                 token_obj.usado = True
                 token_obj.save()
 
             return render(request, 'cadastros/feedback_sucesso.html')
-
+        else:
+            # Se o form_geral falhar (ex: campo email inválido), mostra erro
+            messages.error(request, "Verifique os dados de contato.")
     else:
-        # Pre-popula o formulário com dados existentes do aluno
         initial_data = {
             'email_confirmado': aluno.email,
             'telefone_atualizado': aluno.telefone,
