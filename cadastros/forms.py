@@ -225,15 +225,15 @@ class PesquisaSatisfacaoForm(forms.ModelForm):
     class Meta:
         model = PesquisaSatisfacao
         fields = [
-            'email_confirmado', 'telefone_atualizado', 'stage_atual_informado', # <--- Stage aqui
+            'email_confirmado', 'telefone_atualizado', 'stage_atual_informado',
             'faixa_etaria', 'escolaridade', 
-            'area_atuacao', 'cargo_atual', 'objetivo_ingles', 'como_conheceu', # Persona
+            'area_atuacao', 'cargo_atual', 'objetivo_ingles', 'como_conheceu',
             'segue_instagram', 'conteudo_desejado',
             'nps_score', 'comentarios_gerais'
         ]
         widgets = {
-            'email_confirmado': forms.EmailInput(attrs={'class': 'form-control'}),
-            'telefone_atualizado': forms.TextInput(attrs={'class': 'form-control'}),
+            'email_confirmado': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Seu melhor e-mail'}),
+            'telefone_atualizado': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '(XX) XXXXX-XXXX'}),
             'stage_atual_informado': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Ex: 3'}),
             
             # Selects estilizados
@@ -248,7 +248,28 @@ class PesquisaSatisfacaoForm(forms.ModelForm):
             
             'conteudo_desejado': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
             'comentarios_gerais': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
+            
+            # NPS como Radio Select para o Django entender a validação, embora o HTML seja customizado
+            'nps_score': forms.RadioSelect(choices=[(i, str(i)) for i in range(11)]),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # 1. Definir os OBRIGATÓRIOS (Isso impede o envio vazio)
+        self.fields['email_confirmado'].required = True
+        self.fields['telefone_atualizado'].required = True
+        self.fields['stage_atual_informado'].required = True
+        self.fields['nps_score'].required = True
+
+        # 2. Definir os OPCIONAIS (Evita erro de validação se estiverem vazios)
+        campos_opcionais = [
+            'faixa_etaria', 'escolaridade', 'area_atuacao', 'cargo_atual', 
+            'objetivo_ingles', 'como_conheceu', 'conteudo_desejado', 
+            'comentarios_gerais', 'segue_instagram'
+        ]
+        for campo in campos_opcionais:
+            self.fields[campo].required = False
 
 # Formulário para recuperação de senha (usado na próxima Sprint, mas já deixamos pronto)
 class EsqueciSenhaForm(forms.Form):
