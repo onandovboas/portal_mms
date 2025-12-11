@@ -76,18 +76,48 @@
 
             <div class="card-feedback">
                 <h4 class="mb-4 text-primary"><i class="bi bi-person-lines-fill me-2"></i> Atualização Cadastral</h4>
+                
                 <div class="mb-3">
-                    <label class="form-label text-dark">E-mail (para login e recados):</label>
-                    {{ form_geral.email_confirmado }}
+                    <label class="form-label text-dark">E-mail (para login e recados) <span class="text-danger">*</span>:</label>
+                    <input type="email" name="{{ form_geral.email_confirmado.name }}" 
+                           value="{{ form_geral.email_confirmado.value|default_if_none:'' }}"
+                           class="form-control {% if form_geral.email_confirmado.errors %}is-invalid{% endif %}"
+                           placeholder="Seu melhor e-mail" required>
+                    
+                    {% if form_geral.email_confirmado.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form_geral.email_confirmado.errors.0 }}
+                        </div>
+                    {% endif %}
                 </div>
+
                 <div class="row">
                     <div class="col-md-6 mb-3">
-                        <label class="form-label text-dark">WhatsApp:</label>
-                        {{ form_geral.telefone_atualizado }}
+                        <label class="form-label text-dark">WhatsApp <span class="text-danger">*</span>:</label>
+                        <input type="text" name="{{ form_geral.telefone_atualizado.name }}" 
+                               value="{{ form_geral.telefone_atualizado.value|default_if_none:'' }}"
+                               class="form-control {% if form_geral.telefone_atualizado.errors %}is-invalid{% endif %}"
+                               placeholder="(XX) XXXXX-XXXX" required>
+                        
+                        {% if form_geral.telefone_atualizado.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form_geral.telefone_atualizado.errors.0 }}
+                            </div>
+                        {% endif %}
                     </div>
+
                     <div class="col-md-6 mb-3">
-                        <label class="form-label text-dark">Em qual Stage você está?</label>
-                        {{ form_geral.stage_atual_informado }}
+                        <label class="form-label text-dark">Em qual Stage você está? <span class="text-danger">*</span></label>
+                        <input type="number" name="{{ form_geral.stage_atual_informado.name }}" 
+                               value="{{ form_geral.stage_atual_informado.value|default_if_none:'' }}"
+                               class="form-control {% if form_geral.stage_atual_informado.errors %}is-invalid{% endif %}"
+                               placeholder="Ex: 3" required>
+
+                        {% if form_geral.stage_atual_informado.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form_geral.stage_atual_informado.errors.0 }}
+                            </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -217,17 +247,28 @@
             {% endif %}
 
             <div class="card-feedback bg-light border-0 mt-5">
-                <p class="question-title text-center" style="font-size: 1.2rem;">De 0 a 10, quanto você recomendaria a MMS?</p>
+                <p class="question-title text-center" style="font-size: 1.2rem;">
+                    De 0 a 10, quanto você recomendaria a MMS? <span class="text-danger">*</span>
+                </p>
+                
+                {% if form_geral.nps_score.errors %}
+                    <div class="alert alert-danger text-center py-2">
+                        <i class="bi bi-exclamation-circle me-1"></i> Por favor, selecione uma nota de 0 a 10.
+                    </div>
+                {% endif %}
+
                 <div style="display: flex; justify-content: space-between; overflow-x: auto; margin-top: 20px;">
                     {% for i in "0123456789"|make_list %}
                     <div style="text-align: center; min-width: 30px;">
                         <label style="display:block; margin-bottom: 5px; font-weight: bold;">{{ i }}</label>
-                        <input type="radio" name="nps_score" value="{{ i }}" style="width: 20px; height: 20px;">
+                        <input type="radio" name="nps_score" value="{{ i }}" style="width: 20px; height: 20px;" 
+                               {% if form_geral.nps_score.value == i|stringformat:"s" %}checked{% endif %} required>
                     </div>
                     {% endfor %}
                      <div style="text-align: center; min-width: 30px;">
                         <label style="display:block; margin-bottom: 5px; font-weight: bold;">10</label>
-                        <input type="radio" name="nps_score" value="10" style="width: 20px; height: 20px;">
+                        <input type="radio" name="nps_score" value="10" style="width: 20px; height: 20px;"
+                               {% if form_geral.nps_score.value == "10" %}checked{% endif %} required>
                     </div>
                 </div>
                 <div class="d-flex justify-content-between mt-2 small text-muted">
