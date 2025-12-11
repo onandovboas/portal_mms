@@ -146,3 +146,6 @@ EMAIL_USE_SSL = False  # Na porta 587, usamos TLS, não SSL direto
 EMAIL_HOST_USER = 'info@mmsinstitute.com.br'
 EMAIL_HOST_PASSWORD = 'N@ndo357951'  # Coloque a senha que você usa para entrar no webmail
 DEFAULT_FROM_EMAIL = 'MMS Institute <info@mmsinstitute.com.br>'
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')

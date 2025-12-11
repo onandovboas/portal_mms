@@ -471,7 +471,7 @@ class PesquisaSatisfacao(models.Model):
     
     # 1. Confirmação de Contato
     email_confirmado = models.EmailField("E-mail confirmado")
-    telefone_atualizado = models.CharField("Telefone atualizado", max_length=20)
+    telefone_atualizado = models.CharField("Telefone atualizado", null=True, max_length=20)
     
     # 2. Perfil Demográfico (Aprofundado)
     faixa_etaria = models.CharField("Faixa Etária", max_length=10, choices=FAIXA_ETARIA_CHOICES, null=True, blank=True)
@@ -506,11 +506,11 @@ class AvaliacaoProfessor(models.Model):
     professor = models.ForeignKey(Professor, on_delete=models.CASCADE)
     
     # Perguntas amigáveis (Escala 1 a 5)
-    satisfacao_aulas = models.IntegerField("De modo geral, o quão satisfeito você está com as aulas deste teacher?")
-    incentivo_teacher = models.IntegerField("O quanto você sente que este teacher te mantém motivado e incentivado?")
-    seguranca_conforto = models.IntegerField("Você se sente seguro e confortável para participar e tirar dúvidas nas aulas dele(a)?")
-    esforco_conteudo = models.IntegerField("O quanto você percebe que o teacher se esforça para explicar o conteúdo de forma clara?")
-    
+    satisfacao_aulas = models.IntegerField("De modo geral, o quão satisfeito você está com as aulas deste teacher?", null=True, blank=True)
+    incentivo_teacher = models.IntegerField("O quanto você sente que este teacher te mantém motivado e incentivado?", null=True, blank=True)
+    seguranca_conforto = models.IntegerField("Você se sente seguro e confortável para participar e tirar dúvidas nas aulas dele(a)?", null=True, blank=True)
+    esforco_conteudo = models.IntegerField("O quanto você percebe que o teacher se esforça para explicar o conteúdo de forma clara?", null=True, blank=True)
+
     elogio = models.TextField("Mande um 'Que Bom!' (Elogio)", blank=True)
     sugestao = models.TextField("Deixe um 'Que Pena' (Sugestão de melhoria)", blank=True)
 
@@ -518,10 +518,10 @@ class AvaliacaoAdministrativo(models.Model):
     pesquisa = models.ForeignKey(PesquisaSatisfacao, on_delete=models.CASCADE, related_name="avaliacoes_adm")
     membro_equipe = models.ForeignKey(Professor, on_delete=models.CASCADE)
     
-    educacao_prestatividade = models.IntegerField("O quão educado e prestativo foi o atendimento quando você precisou?")
-    avaliacao_geral = models.IntegerField("Considerando suas últimas experiências, como você avalia o atendimento?")
-    nivel_satisfacao = models.IntegerField("Qual seu nível geral de satisfação com a nossa recepção/administração?")
-    
+    educacao_prestatividade = models.IntegerField("O quão educado e prestativo foi o atendimento quando você precisou?", null=True, blank=True)
+    avaliacao_geral = models.IntegerField("Considerando suas últimas experiências, como você avalia o atendimento?", null=True, blank=True)
+    nivel_satisfacao = models.IntegerField("Qual seu nível geral de satisfação com a nossa recepção/administração?", null=True, blank=True)
+
     destaques = models.JSONField("O que se destaca no atendimento?", default=list) 
     
     elogio = models.TextField("Deixe seu elogio para o atendimento:", blank=True)
