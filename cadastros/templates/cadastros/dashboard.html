@@ -4,7 +4,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Dashboard do Administrador</title>
+  <title>MMS Admin Dashboard</title>
+  
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   
@@ -15,229 +16,422 @@
   {% if request.resolver_match.url_name == 'dashboard_admin' %}
       <link href="{% static 'cadastros/dashboard.css' %}" rel="stylesheet">
   {% endif %}
-</head>
-<body class="bg-light">
 
-  <!-- Header -->
-  <header class="sticky-top-blur">
-    <div class="container content-wrap d-flex justify-content-between align-items-center py-2 flex-wrap gap-2">
-      <div>
-        <h1 class="h4 mb-0">Dashboard</h1>
-        <small class="text-muted">Administração</small>
-      </div>
-      <div class="btn-wrap d-flex align-items-center">
-        <a href="{% url 'cadastros:relatorio_professores' %}" class="btn btn-secondary btn-sm"><i class="bi bi-people me-1"></i> Relatório de Professores</a>
-        <a href="{% url 'cadastros:venda_livro' %}" class="btn btn-info btn-sm"><i class="bi bi-bag-check me-1"></i> Vender Material</a>
-        <a href="{% url 'cadastros:lancamento_recebimento' %}" class="btn btn-primary btn-sm"><i class="bi bi-cash-coin me-1"></i> Lançar Recebimento</a>
-        <form action="{% url 'logout' %}" method="post" class="m-0">
-          {% csrf_token %}
-          <button type="submit" class="btn btn-outline-danger btn-sm w-100"><i class="bi bi-box-arrow-right me-1"></i> Sair</button>
-        </form>
-      </div>
+  <style>
+    /* --- Estilos do Layout Moderno --- */
+    :root {
+        --sidebar-width: 260px;
+        --topbar-height: 60px;
+        --primary-color: #0d6efd;
+        --bg-light: #f4f6f9;
+    }
+    
+    body { background-color: var(--bg-light); overflow-x: hidden; }
+
+    /* SIDEBAR (PC) */
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        width: var(--sidebar-width);
+        background: #1e293b; /* Azul Escuro Moderno */
+        color: #fff;
+        z-index: 1000;
+        transition: transform 0.3s ease-in-out;
+        padding-top: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .sidebar-header {
+        height: var(--topbar-height);
+        display: flex;
+        align-items: center;
+        padding: 0 1.5rem;
+        background: rgba(0,0,0,0.2);
+        font-weight: 700;
+        font-size: 1.2rem;
+        letter-spacing: 1px;
+    }
+
+    .sidebar-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1rem 0;
+    }
+
+    .nav-link {
+        color: #cbd5e1;
+        padding: 0.8rem 1.5rem;
+        display: flex;
+        align-items: center;
+        transition: 0.2s;
+        border-left: 3px solid transparent;
+    }
+
+    .nav-link:hover, .nav-link.active {
+        color: #fff;
+        background: rgba(255,255,255,0.05);
+        border-left-color: var(--primary-color);
+    }
+    
+    .nav-link i { width: 24px; font-size: 1.1rem; margin-right: 10px; }
+    
+    .nav-section-title {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        color: #64748b;
+        margin: 1.5rem 1.5rem 0.5rem;
+        font-weight: 600;
+    }
+
+    /* CONTEÚDO PRINCIPAL */
+    .main-content {
+        margin-left: var(--sidebar-width); /* Empurra conteúdo no PC */
+        padding-top: var(--topbar-height);
+        min-height: 100vh;
+        transition: margin-left 0.3s ease-in-out;
+    }
+
+    /* TOPBAR (Header Superior) */
+    .topbar {
+        position: fixed;
+        top: 0;
+        right: 0;
+        left: var(--sidebar-width); /* Alinhado com sidebar */
+        height: var(--topbar-height);
+        background: #fff;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        z-index: 999;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 1.5rem;
+        transition: left 0.3s ease-in-out;
+    }
+
+    /* MOBILE / TABLET (< 992px) */
+    @media (max-width: 991.98px) {
+        .sidebar { transform: translateX(-100%); } /* Esconde sidebar */
+        .sidebar.show { transform: translateX(0); } /* Mostra sidebar */
+        
+        .main-content { margin-left: 0; }
+        .topbar { left: 0; }
+        
+        /* Backdrop escuro quando menu abre no mobile */
+        .sidebar-backdrop {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.5); z-index: 999; display: none;
+        }
+        .sidebar-backdrop.show { display: block; }
+    }
+
+    /* Card Stats */
+    .stat-card { transition: transform 0.2s; border: none; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
+    .stat-card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.08); }
+    
+    /* Link hover effect for names */
+    .hover-link:hover { text-decoration: underline !important; color: var(--bs-primary) !important; }
+  </style>
+</head>
+<body>
+
+  <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>
+
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-header text-primary">
+      <i class="bi bi-grid-fill me-2"></i> MMS Portal
+    </div>
+    
+    <div class="sidebar-content">
+      <div class="nav-section-title">Principal</div>
+      <a href="{% url 'cadastros:dashboard_admin' %}" class="nav-link active">
+        <i class="bi bi-speedometer2"></i> Dashboard
+      </a>
+      <a href="{% url 'cadastros:lista_leads' %}" class="nav-link">
+        <i class="bi bi-funnel"></i> CRM / Leads
+      </a>
+
+      <div class="nav-section-title">Gestão Escolar</div>
+      <a href="{% url 'cadastros:lista_alunos' %}" class="nav-link">
+        <i class="bi bi-people"></i> Alunos
+      </a>
+      <a href="{% url 'cadastros:lista_acompanhamento_pedagogico' %}" class="nav-link">
+        <i class="bi bi-journal-check"></i> Pedagógico
+      </a>
+      <a href="{% url 'cadastros:relatorio_professores' %}" class="nav-link">
+        <i class="bi bi-person-video3"></i> Professores
+      </a>
+
+      <div class="nav-section-title">Estratégia</div>
+      <a href="{% url 'cadastros:dashboard_marketing' %}" class="nav-link">
+        <i class="bi bi-graph-up-arrow"></i> Marketing
+      </a>
+      <a href="{% url 'cadastros:dashboard_feedback' %}" class="nav-link">
+        <i class="bi bi-chat-heart"></i> NPS & Feedback
+      </a>
+      <a href="{% url 'cadastros:exportar_dados_page' %}" class="nav-link">
+        <i class="bi bi-cloud-download"></i> Exportar Dados
+      </a>
+    </div>
+
+    <div class="p-3 border-top border-secondary border-opacity-25 bg-dark bg-opacity-25">
+      <form action="{% url 'logout' %}" method="post" class="m-0">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-danger btn-sm w-100 d-flex align-items-center justify-content-center gap-2">
+          <i class="bi bi-box-arrow-left"></i> Sair
+        </button>
+      </form>
+    </div>
+  </nav>
+
+  <header class="topbar">
+    <div class="d-flex align-items-center">
+      <button class="btn btn-light d-lg-none me-3" onclick="toggleSidebar()">
+        <i class="bi bi-list fs-4"></i>
+      </button>
+      <h5 class="mb-0 fw-bold d-none d-sm-block">Visão Geral</h5>
+    </div>
+    
+    <div class="d-flex align-items-center gap-3">
+        <div class="d-flex align-items-center gap-2">
+            <div class="text-end d-none d-md-block line-height-1">
+                <small class="d-block fw-bold">{{ request.user.username }}</small>
+                <small class="d-block text-muted" style="font-size: 0.75rem;">Administrador</small>
+            </div>
+            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width: 35px; height: 35px;">
+                {{ request.user.username|slice:":1"|upper }}
+            </div>
+        </div>
     </div>
   </header>
 
-  <main class="container content-wrap mt-3">
-    <div class="accordion mb-3" id="dashboardAccordion">
+  <main class="main-content">
+    <div class="container-fluid p-4">
 
-      <!-- Renovações (fechada por padrão) -->
-      <div class="accordion-item card-section">
-        <h2 class="accordion-header" id="headRenovacoes">
-          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseRenovacoes" aria-expanded="false" aria-controls="collapseRenovacoes">
-            Alerta de Renovações (Próximos 30 dias)
-          </button>
-        </h2>
-        <div id="collapseRenovacoes" class="accordion-collapse collapse" aria-labelledby="headRenovacoes" data-bs-parent="#dashboardAccordion">
-          <div class="accordion-body">
-            <h5 class="text-info-emphasis">A Vencer (Próximos 30 dias)</h5>
-            {% include "cadastros/includes/table_card_stack.html" with table_id="tbl-renovacoes" headers=headers_renovacoes rows_template="cadastros/includes/rows_renovacoes.html" items=contratos_a_vencer empty_text="Nenhum contrato vencendo." %}
-            
-            {% if contratos_vencidos %}
-                <hr class="my-4">
-                <h5 class="text-danger">Vencidos sem Renovação</h5>
-                {% include "cadastros/includes/table_card_stack.html" with table_id="tbl-vencidos" headers=headers_renovacoes rows_template="cadastros/includes/rows_renovacoes.html" items=contratos_vencidos empty_text="Nenhum contrato vencido sem renovação." %}
-            {% endif %}
-          </div>
+      <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <a href="{% url 'cadastros:lancamento_recebimento' %}" class="card stat-card text-decoration-none h-100">
+                <div class="card-body d-flex align-items-center gap-3">
+                    <div class="rounded bg-success bg-opacity-10 p-3 text-success"><i class="bi bi-cash-coin fs-4"></i></div>
+                    <div><h6 class="mb-0 text-dark fw-bold">Receber</h6><small class="text-muted">Mensalidade</small></div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-3">
+            <a href="{% url 'cadastros:venda_livro' %}" class="card stat-card text-decoration-none h-100">
+                <div class="card-body d-flex align-items-center gap-3">
+                    <div class="rounded bg-info bg-opacity-10 p-3 text-info"><i class="bi bi-bag-check fs-4"></i></div>
+                    <div><h6 class="mb-0 text-dark fw-bold">Vender</h6><small class="text-muted">Material</small></div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-3">
+            <a href="{% url 'cadastros:novo_aluno_experimental' %}" class="card stat-card text-decoration-none h-100">
+                <div class="card-body d-flex align-items-center gap-3">
+                    <div class="rounded bg-warning bg-opacity-10 p-3 text-warning"><i class="bi bi-person-plus-fill fs-4"></i></div>
+                    <div><h6 class="mb-0 text-dark fw-bold">Novo Aluno</h6><small class="text-muted">Experimental</small></div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-3">
+            <a href="{% url 'cadastros:lista_leads' %}" class="card stat-card text-decoration-none h-100">
+                <div class="card-body d-flex align-items-center gap-3">
+                    <div class="rounded bg-primary bg-opacity-10 p-3 text-primary"><i class="bi bi-funnel-fill fs-4"></i></div>
+                    <div><h6 class="mb-0 text-dark fw-bold">CRM</h6><small class="text-muted">Ver Leads</small></div>
+                </div>
+            </a>
         </div>
       </div>
 
-      <!-- Faltas Pendentes -->
-      <div class="accordion-item card-section">
-        <h2 class="accordion-header" id="headFaltas">
-          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFaltas" aria-expanded="false" aria-controls="collapseFaltas">
-            Acompanhamentos de Faltas Pendentes
-          </button>
-        </h2>
-        <div id="collapseFaltas" class="accordion-collapse collapse" aria-labelledby="headFaltas" data-bs-parent="#dashboardAccordion">
-          <div class="accordion-body">
-            {% for acompanhamento in acompanhamentos_pendentes %}
-            <form action="{% url 'cadastros:resolver_acompanhamento' pk=acompanhamento.pk %}" method="post" class="mb-3 p-3 border rounded bg-white">
-              {% csrf_token %}
-              <p class="mb-1"><strong>Aluno:</strong> {{ acompanhamento.aluno.nome_completo }}</p>
-              <p class="mb-1"><strong>Telefone:</strong> {{ acompanhamento.aluno.telefone|default:'não cadastrado' }}</p>
-              <p class="mb-2 text-muted"><strong>Alerta:</strong> <time datetime="{{ acompanhamento.criado_em|date:'Y-m-d' }}">{{ acompanhamento.criado_em|date:"d/m/Y" }}</time> – {{ acompanhamento.numero_de_faltas }} faltas consecutivas</p>
-              <div class="mb-2">
-                <label for="motivo-{{ acompanhamento.pk }}" class="form-label">Motivo das Faltas e Ações Tomadas</label>
-                <textarea name="motivo" id="motivo-{{ acompanhamento.pk }}" class="form-control" rows="2" placeholder="Ex.: contato realizado em 01/09, retorno combinado, justificativa de saúde"></textarea>
-              </div>
-              <div class="d-grid d-sm-flex gap-2">
-                <button type="submit" class="btn btn-info btn-sm">Marcar como Resolvido</button>
-              </div>
-            </form>
-            {% empty %}
-            <p class="text-center text-muted">Nenhum acompanhamento de faltas pendente. Ótimo trabalho!</p>
-            {% endfor %}
-          </div>
-        </div>
-      </div>
-
-      <!-- Experimentais -->
-      <div class="accordion-item card-section">
-        <h2 class="accordion-header" id="headExperimental">
-          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseExperimental" aria-expanded="false" aria-controls="collapseExperimental">
-            Alunos em Aula Experimental
-            <span class="badge bg-info text-dark ms-2">{% if inscricoes_experimentais %}{{ inscricoes_experimentais.count }}{% else %}0{% endif %}</span>
-          </button>
-        </h2>
-        <div id="collapseExperimental" class="accordion-collapse collapse" aria-labelledby="headExperimental" data-bs-parent="#dashboardAccordion">
-          <div class="accordion-body">
-            {% include "cadastros/includes/table_card_stack.html" with table_id="tbl-experimentais" headers=headers_experimentais rows_template="cadastros/includes/rows_experimentais.html" items=inscricoes_experimentais empty_text="Nenhum aluno em aula experimental no momento." %}
-          </div>
-        </div>
-      </div>
-
-    </div>
-
-    <!-- Card de Relatórios -->
-    <div class="card mb-4">
-      <div class="card-header">
-        Relatórios e Módulos
-      </div>
-      <div class="list-group list-group-flush">
+      <div class="accordion shadow-sm border-0 rounded-3 mb-4" id="dashboardAccordion">
         
-        <a href="{% url 'cadastros:lista_acompanhamento_pedagogico' %}" class="list-group-item list-group-item-action">
-          <i class="bi bi-journal-check me-2"></i>Acompanhamento Pedagógico
-        </a>
-        
-        <a href="{% url 'cadastros:lista_alunos' %}" class="list-group-item list-group-item-action">Listagem Geral de Alunos</a>
-        <a href="{% url 'cadastros:relatorio_professores' %}" class="list-group-item list-group-item-action">Aulas por Professor</a>
-        <a href="{% url 'cadastros:relatorio_alunos_pendentes' %}" class="list-group-item list-group-item-action text-danger fw-bold">
-          <i class="bi bi-exclamation-triangle-fill"></i> Alunos com Pendências
-        </a>
-        <a href="{% url 'cadastros:exportar_dados_page' %}" class="list-group-item list-group-item-action">
-          <i class="bi bi-cloud-download me-2"></i>Exportar Dados (CSV)
-        </a>
-        <a href="{% url 'cadastros:lista_leads' %}" class="btn btn-dark btn-sm"><i class="bi bi-star me-1"></i> CRM de Leads</a>
-        <a href="{% url 'cadastros:novo_aluno_experimental' %}" class="btn btn-success btn-sm"><i class="bi bi-person-plus me-1"></i> Novo Experimental</a>
-      </div>
-    </div>
-
-    <!-- Status Financeiro -->
-    <div id="financeiro-top" class="d-flex justify-content-between align-items-center my-3 flex-wrap gap-2">
-      <h3 class="h5 mb-0">Status Financeiro – {{ data_selecionada|date:"F \d\e Y" }}</h3>
-      <div class="d-flex align-items-center gap-2 flex-wrap">
-        <div class="input-group input-group-sm" style="max-width: 320px;">
-          <span class="input-group-text" id="search-all" aria-hidden="true"><i class="bi bi-search"></i></span>
-          <input type="search" id="globalSearch" class="form-control" placeholder="Buscar aluno ou descrição..." aria-label="Buscar por aluno ou descrição">
-        </div>
-        <div class="btn-group btn-group-sm" role="group" aria-label="Navegar por mês">
-          <a href="{% url 'cadastros:dashboard_admin' %}?ano={{ nav.ano_anterior }}&mes={{ nav.mes_anterior }}#financeiro-top" class="btn btn-outline-secondary" aria-label="Mês anterior" data-preserve-scroll>&larr;</a>
-          <a href="{% url 'cadastros:dashboard_admin' %}?ano={{ nav.ano_seguinte }}&mes={{ nav.mes_seguinte }}#financeiro-top" class="btn btn-outline-secondary" aria-label="Próximo mês" data-preserve-scroll>&rarr;</a>
-        </div>
-      </div>
-    </div>
-
-    {% include 'cadastros/includes/filters_financeiro.html' %}
-
-    <!-- Pagamentos Pendentes -->
-    <form id="form-lote" action="{% url 'cadastros:pagamentos_acoes_em_lote' %}" method="post">
-      {% csrf_token %}
-        <section class="card mb-3 card-section" aria-labelledby="sec-pendentes">
-          <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <h4 id="sec-pendentes" class="mb-0">Pagamentos Pendentes <span class="badge bg-dark-subtle text-dark ms-1">{{ pagamentos_pendentes|length }}</span></h4>
-            <div class="d-flex flex-wrap align-items-center gap-2">
-              <label for="sort-pendentes" class="form-label m-0 small">Ordenar:</label>
-              <select id="sort-pendentes" class="form-select form-select-sm">
-                <option value="az" selected>Aluno A→Z</option>
-                <option value="za">Aluno Z→A</option>
-              </select>
+        <div class="accordion-item border-0">
+          <h2 class="accordion-header" id="headRenovacoes">
+            <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseRenovacoes">
+              <i class="bi bi-calendar-event me-2 text-primary"></i> Alerta de Renovações (30 dias)
+              {% if contratos_a_vencer or contratos_vencidos %}
+                <span class="badge bg-danger ms-2 rounded-pill">!</span>
+              {% endif %}
+            </button>
+          </h2>
+          <div id="collapseRenovacoes" class="accordion-collapse collapse" data-bs-parent="#dashboardAccordion">
+            <div class="accordion-body bg-white">
+              <h6 class="text-muted text-uppercase small fw-bold mb-3">A Vencer</h6>
+              {% include "cadastros/includes/table_card_stack.html" with table_id="tbl-renovacoes" headers=headers_renovacoes rows_template="cadastros/includes/rows_renovacoes.html" items=contratos_a_vencer empty_text="Nenhum contrato vencendo." %}
+              
+              {% if contratos_vencidos %}
+                  <hr class="my-4">
+                  <h6 class="text-danger text-uppercase small fw-bold mb-3">Vencidos sem Renovação</h6>
+                  {% include "cadastros/includes/table_card_stack.html" with table_id="tbl-vencidos" headers=headers_renovacoes rows_template="cadastros/includes/rows_renovacoes.html" items=contratos_vencidos empty_text="Nenhum contrato vencido." %}
+              {% endif %}
             </div>
           </div>
-          <div class="card-body">
-            {% include "cadastros/includes/table_card_stack.html" with table_id="tabela-pendentes" headers=headers_pendentes rows_template="cadastros/includes/rows_pendentes.html" items=pagamentos_pendentes empty_text="Nenhum pagamento pendente para este mês." %}
-          </div>
+        </div>
 
-          <div class="card-footer bg-light d-flex align-items-center gap-2">
-              <label for="acao-lote" class="form-label mb-0 me-2">Ações em lote:</label>
-              <select name="acao" id="acao-lote" class="form-select form-select-sm w-auto">
-                  <option value="">Selecione uma ação</option>
-                  <option value="quitar">Quitar Selecionados</option>
-              </select>
-              <button type="submit" class="btn btn-primary btn-sm">Aplicar</button>
+        <div class="accordion-item border-0 border-top">
+          <h2 class="accordion-header" id="headFaltas">
+            <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFaltas">
+              <i class="bi bi-exclamation-octagon me-2 text-warning"></i> Faltas Pendentes
+              {% if acompanhamentos_pendentes %}
+                <span class="badge bg-warning text-dark ms-2 rounded-pill">{{ acompanhamentos_pendentes.count }}</span>
+              {% endif %}
+            </button>
+          </h2>
+          <div id="collapseFaltas" class="accordion-collapse collapse" data-bs-parent="#dashboardAccordion">
+            <div class="accordion-body bg-white">
+              {% for acompanhamento in acompanhamentos_pendentes %}
+              <div class="alert alert-light border d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                <div>
+                    <strong>
+                        <a href="{% url 'cadastros:perfil_aluno' pk=acompanhamento.aluno.pk %}" class="text-decoration-none text-dark hover-link" title="Ir para o Perfil">
+                            {{ acompanhamento.aluno.nome_completo }} <i class="bi bi-box-arrow-up-right small text-primary ms-1" style="font-size: 0.8rem;"></i>
+                        </a>
+                    </strong>
+                    <span class="text-muted">({{ acompanhamento.numero_de_faltas }} faltas)</span>
+                    <div class="small text-muted">Desde: {{ acompanhamento.criado_em|date:"d/m/Y" }}</div>
+                </div>
+                <form action="{% url 'cadastros:resolver_acompanhamento' pk=acompanhamento.pk %}" method="post" class="d-flex flex-grow-1 gap-2">
+                    {% csrf_token %}
+                    <input type="text" name="motivo" class="form-control form-control-sm" placeholder="Ação tomada..." required>
+                    <button type="submit" class="btn btn-success btn-sm text-nowrap">Resolver</button>
+                </form>
+              </div>
+              {% empty %}
+              <div class="text-muted text-center py-2"><i class="bi bi-check-circle me-1"></i> Tudo em dia!</div>
+              {% endfor %}
+            </div>
           </div>
-        </section>
-    </form>
+        </div>
 
-    <!-- Pagamentos Recebidos -->
-    <section class="card mb-4 card-section" aria-labelledby="sec-recebidos">
-      <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-        <h4 id="sec-recebidos" class="mb-0">Pagamentos Recebidos <span class="badge bg-light text-dark ms-1">{{ pagamentos_pagos|length }}</span></h4>
-        <div class="d-flex align-items-center gap-2">
-          <label for="sort-recebidos" class="form-label m-0 small text-white-50">Ordenar:</label>
-          <select id="sort-recebidos" class="form-select form-select-sm">
-            <option value="az" selected>Aluno A→Z</option>
-            <option value="za">Aluno Z→A</option>
-          </select>
+        <div class="accordion-item border-0 border-top">
+            <h2 class="accordion-header" id="headExperimental">
+              <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseExperimental">
+                <i class="bi bi-stars me-2 text-info"></i> Alunos Experimentais
+                <span class="badge bg-info text-dark ms-2 rounded-pill">{% if inscricoes_experimentais %}{{ inscricoes_experimentais.count }}{% else %}0{% endif %}</span>
+              </button>
+            </h2>
+            <div id="collapseExperimental" class="accordion-collapse collapse" data-bs-parent="#dashboardAccordion">
+              <div class="accordion-body bg-white">
+                {% include "cadastros/includes/table_card_stack.html" with table_id="tbl-experimentais" headers=headers_experimentais rows_template="cadastros/includes/rows_experimentais.html" items=inscricoes_experimentais empty_text="Nenhum aluno experimental." %}
+              </div>
+            </div>
         </div>
       </div>
-      <div class="card-body">
-        {% include "cadastros/includes/table_card_stack.html" with table_id="tabela-recebidos" headers=headers_recebidos rows_template="cadastros/includes/rows_recebidos.html" items=pagamentos_pagos empty_text="Nenhum pagamento recebido para este mês." %}
-      </div>
-    </section>
-  </main>
 
-  <!-- Toast container (mantido para feedback de ações futuras) -->
-  <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1080">
-    <div id="liveToast" class="toast align-items-center text-bg-success border-0" role="status" aria-live="polite" aria-atomic="true">
-      <div class="d-flex">
-        <div class="toast-body" id="toastMsg">Operação concluída.</div>
-        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Fechar"></button>
+      <div id="financeiro-top" class="d-flex justify-content-between align-items-center mb-3 mt-5 flex-wrap gap-2">
+        <h4 class="h5 fw-bold mb-0">Visão Financeira</h4>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-light text-dark border">{{ data_selecionada|date:"F Y"|upper }}</span>
+            <div class="btn-group btn-group-sm">
+                <a href="?ano={{ nav.ano_anterior }}&mes={{ nav.mes_anterior }}#financeiro-top" class="btn btn-white border"><i class="bi bi-chevron-left"></i></a>
+                <a href="?ano={{ nav.ano_seguinte }}&mes={{ nav.mes_seguinte }}#financeiro-top" class="btn btn-white border"><i class="bi bi-chevron-right"></i></a>
+            </div>
+        </div>
       </div>
+
+      <div class="row mb-3">
+          <div class="col-12">
+            <input type="search" id="globalSearch" class="form-control" placeholder="🔍 Filtrar pagamentos nesta tela...">
+          </div>
+      </div>
+
+      {% include 'cadastros/includes/filters_financeiro.html' %}
+
+      <form id="form-lote" action="{% url 'cadastros:pagamentos_acoes_em_lote' %}" method="post">
+        {% csrf_token %}
+        <div class="card shadow-sm border-0 mb-4" id="sec-pendentes">
+            <div class="card-header bg-warning bg-opacity-10 border-warning border-opacity-25 d-flex justify-content-between align-items-center">
+                <h6 class="mb-0 text-warning-emphasis fw-bold">
+                    <i class="bi bi-hourglass-split me-1"></i> A Receber ({{ pagamentos_pendentes|length }})
+                </h6>
+                <select id="sort-pendentes" class="form-select form-select-sm w-auto bg-white border-warning border-opacity-25">
+                    <option value="az">A-Z</option>
+                    <option value="za">Z-A</option>
+                </select>
+            </div>
+            <div class="card-body p-0">
+                {% include "cadastros/includes/table_card_stack.html" with table_id="tabela-pendentes" headers=headers_pendentes rows_template="cadastros/includes/rows_pendentes.html" items=pagamentos_pendentes empty_text="Nenhum pendência este mês." %}
+            </div>
+            {% if pagamentos_pendentes %}
+            <div class="card-footer bg-light border-top d-flex gap-2 align-items-center p-2">
+                <select name="acao" class="form-select form-select-sm w-auto">
+                    <option value="quitar">Quitar Marcados</option>
+                </select>
+                <button type="submit" class="btn btn-primary btn-sm">OK</button>
+            </div>
+            {% endif %}
+        </div>
+      </form>
+
+      <div class="card shadow-sm border-0" id="sec-recebidos">
+        <div class="card-header bg-success bg-opacity-10 border-success border-opacity-25 d-flex justify-content-between align-items-center">
+            <h6 class="mb-0 text-success-emphasis fw-bold">
+                <i class="bi bi-check-circle-fill me-1"></i> Recebidos ({{ pagamentos_pagos|length }})
+            </h6>
+        </div>
+        <div class="card-body p-0">
+            {% include "cadastros/includes/table_card_stack.html" with table_id="tabela-recebidos" headers=headers_recebidos rows_template="cadastros/includes/rows_recebidos.html" items=pagamentos_pagos empty_text="Nenhum pagamento recebido." %}
+        </div>
+      </div>
+
     </div>
-  </div>
+  </main>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-    // Preserva rolagem
-    (function(){
-      const KEY = 'dash-scroll';
-      document.querySelectorAll('a[data-preserve-scroll]').forEach(a => a.addEventListener('click', () => sessionStorage.setItem(KEY, String(window.scrollY))));
-      const y = sessionStorage.getItem(KEY); if (y !== null) { window.scrollTo(0, parseInt(y, 10) || 0); sessionStorage.removeItem(KEY); }
-    })();
+    // Lógica do Menu Mobile
+    function toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const backdrop = document.getElementById('sidebarBackdrop');
+        sidebar.classList.toggle('show');
+        backdrop.classList.toggle('show');
+    }
 
-    // Ordenação robusta por cabeçalho "Aluno"
+    // Scripts de Ordenação e Busca
     (function(){
-      function sortByHeader(sectionTitleId, selectId, headerText){
-        const title = document.getElementById(sectionTitleId); const select = document.getElementById(selectId);
-        if (!title || !select) return; const section = title.closest('section'); const table = section?.querySelector('table'); if (!table) return;
-        const ths = Array.from(table.tHead?.rows?.[0]?.cells || []);
-        const idx = ths.findIndex(th => (th.innerText || '').trim().toLowerCase() === headerText.toLowerCase()); if (idx < 0) return;
-        function apply(){ const tbody = table.tBodies[0]; if (!tbody) return; const rows = Array.from(tbody.rows);
-          rows.sort((a,b)=>{ const ta = (a.cells[idx]?.innerText || '').trim().toLowerCase(); const tb = (b.cells[idx]?.innerText || '').trim().toLowerCase(); return select.value === 'az' ? ta.localeCompare(tb) : tb.localeCompare(ta); });
-          rows.forEach(r => tbody.appendChild(r)); }
-        select.addEventListener('change', apply); apply();
+      // Busca Global
+      const q = document.getElementById('globalSearch');
+      if (q) {
+        q.addEventListener('input', function(){
+            const term = this.value.trim().toLowerCase();
+            const tables = document.querySelectorAll('table');
+            tables.forEach(table => {
+                const rows = table.querySelectorAll('tbody tr');
+                rows.forEach(row => {
+                    const text = row.innerText.toLowerCase();
+                    row.style.display = text.includes(term) ? '' : 'none';
+                });
+            });
+        });
       }
-      sortByHeader('sec-pendentes','sort-pendentes','Aluno');
-      sortByHeader('sec-recebidos','sort-recebidos','Aluno');
-    })();
 
-    // Busca global
-    (function(){
-      const q = document.getElementById('globalSearch'); if (!q) return;
-      function filterTable(table, term){ const rows = table?.querySelectorAll('tbody tr') || []; rows.forEach(tr => { const text = (tr.innerText || '').toLowerCase(); tr.style.display = !term || text.includes(term) ? '' : 'none'; }); }
-      const pendSection = document.getElementById('sec-pendentes')?.closest('section'); const recSection  = document.getElementById('sec-recebidos')?.closest('section');
-      function apply(){ const term = q.value.trim().toLowerCase(); filterTable(pendSection?.querySelector('table'), term); filterTable(recSection?.querySelector('table'), term); }
-      q.addEventListener('input', apply);
+      // Ordenação Simples
+      function setupSort(selectId, tableId) {
+        const select = document.getElementById(selectId);
+        const wrapper = document.getElementById(tableId); 
+        if(!select || !wrapper) return;
+        
+        const table = wrapper.querySelector('table');
+        if(!table) return;
+
+        select.addEventListener('change', function(){
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const isDesc = this.value === 'za';
+            
+            rows.sort((a, b) => {
+                const tA = a.innerText.trim();
+                const tB = b.innerText.trim();
+                return isDesc ? tB.localeCompare(tA) : tA.localeCompare(tB);
+            });
+            
+            rows.forEach(row => tbody.appendChild(row));
+        });
+      }
+
+      setupSort('sort-pendentes', 'tabela-pendentes');
     })();
   </script>
 </body>

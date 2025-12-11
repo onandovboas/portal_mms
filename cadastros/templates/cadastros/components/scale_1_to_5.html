@@ -1,0 +1,12 @@
+<div class="scale-container">
+    {% for i in "12345"|make_list %}
+    <div class="scale-item">
+        <label class="scale-label" for="{{ name }}_{{ i }}">{{ i }}</label>
+        <input type="radio" name="{{ name }}" id="{{ name }}_{{ i }}" value="{{ i }}" required>
+    </div>
+    {% endfor %}
+</div>
+<div class="scale-limits">
+    <span>Insatisfeito</span>
+    <span>Muito Satisfeito</span>
+</div>

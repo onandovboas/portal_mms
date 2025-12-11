@@ -136,3 +136,13 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = 'cadastros:portal_login'
 LOGIN_REDIRECT_URL = 'cadastros:portal_aluno' # Redirecionamento padrão para o portal do aluno
 LOGOUT_REDIRECT_URL = 'cadastros:portal_login' # Para onde vai após o logout
+
+# Configurações de E-mail (Hostgator)
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'mail.mmsinstitute.com.br'  # Geralmente é mail.seudominio
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_USE_SSL = False  # Na porta 587, usamos TLS, não SSL direto
+EMAIL_HOST_USER = 'info@mmsinstitute.com.br'
+EMAIL_HOST_PASSWORD = 'N@ndo357951'  # Coloque a senha que você usa para entrar no webmail
+DEFAULT_FROM_EMAIL = 'MMS Institute <info@mmsinstitute.com.br>'

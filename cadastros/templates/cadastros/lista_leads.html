@@ -4,175 +4,259 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CRM - Quadro de Leads</title>
+    <title>CRM - Gestão de Leads</title>
+    
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    
     <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Work+Sans:wght@400;500&display=swap" rel="stylesheet">
-  <link href="{% static 'cadastros/mms_style.css' %}" rel="stylesheet">
-  {% if request.resolver_match.url_name == 'dashboard_admin' %}
-      <link href="{% static 'cadastros/dashboard.css' %}" rel="stylesheet">
-  {% endif %}
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Work+Sans:wght@400;500&display=swap" rel="stylesheet">
+    
+    <link href="{% static 'cadastros/mms_style.css' %}" rel="stylesheet">
+    {% if request.resolver_match.url_name == 'dashboard_admin' %}
+        <link href="{% static 'cadastros/dashboard.css' %}" rel="stylesheet">
+    {% endif %}
+
     <style>
-        .kanban-board {
+        :root { --radius: 1rem; }
+        body { background: #f6f7fb; }
+
+        /* Estilos específicos para o Kanban */
+        .kanban-container {
             display: flex;
-            overflow-x: auto; /* Permite rolagem horizontal em telas pequenas */
-            gap: 1rem;
+            overflow-x: auto;
             padding-bottom: 1rem;
+            gap: 1rem;
+            height: calc(100vh - 140px); /* Ajuste altura conforme header */
         }
+        
         .kanban-column {
-            min-width: 300px;
-            background-color: #f8f9fa;
-            border-radius: 0.5rem;
-            padding: 0.75rem;
+            min-width: 280px;
+            max-width: 280px;
+            background-color: #eef2f5;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(0,0,0,0.03);
         }
-        .kanban-column .card {
+        
+        .kanban-header {
+            padding: 1rem;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: #495057;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .kanban-body {
+            padding: 0.8rem;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+        
+        .lead-card {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            border: 1px solid rgba(0,0,0,0.04);
+            margin-bottom: 0.8rem;
             cursor: grab;
+            border-left: 4px solid transparent;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
         }
-        .kanban-column .card:active {
-            cursor: grabbing;
+        
+        .lead-card:hover { 
+            transform: translateY(-3px); 
+            box-shadow: 0 6px 12px rgba(0,0,0,0.08); 
+            z-index: 10;
         }
-        .kanban-column.status-convertido, .kanban-column.status-perdido {
-            opacity: 0.7;
-        }
+        
+        /* Cores das Bordas por Status */
+        .status-novo { border-left-color: #0d6efd; }          /* Azul */
+        .status-tentativa_1 { border-left-color: #6610f2; }   /* Roxo */
+        .status-tentativa_2 { border-left-color: #6f42c1; }   /* Roxo Claro */
+        .status-teste_nivel { border-left-color: #0dcaf0; }   /* Ciano */
+        .status-interessado { border-left-color: #198754; }   /* Verde */
+        .status-negociacao { border-left-color: #fd7e14; }    /* Laranja */
+        .status-agendado { border-left-color: #ffc107; }      /* Amarelo */
+        .status-congelado { border-left-color: #adb5bd; }     /* Cinza */
+        
+        .lead-actions { opacity: 0; transition: opacity 0.2s; }
+        .lead-card:hover .lead-actions { opacity: 1; }
+
+        .kanban-container::-webkit-scrollbar { height: 10px; }
+        .kanban-container::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 5px; }
+        .kanban-container::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 5px; }
+        .kanban-container::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
     </style>
 </head>
-<body class="bg-light">
+<body>
 
-    <div class="container-fluid my-4">
-        <div class="px-2">
-            <a href="{% url 'cadastros:dashboard_admin' %}" class="text-decoration-none"><i class="bi bi-arrow-left"></i> Voltar para o Dashboard</a>
-            <hr>
-
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h1 class="h3 mb-0">Quadro de Leads (CRM)</h1>
+    <div class="container-fluid px-4 my-4">
+        
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div class="d-flex align-items-center gap-3">
+                <a href="{% url 'cadastros:dashboard_admin' %}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-left"></i> Voltar
+                </a>
+                <h1 class="h4 mb-0 fw-bold">CRM <span class="text-muted fw-normal">/ Pipeline de Vendas</span></h1>
+            </div>
+            
+            <div class="d-flex gap-2">
+                <button onclick="window.location.reload()" class="btn btn-light btn-sm border" title="Atualizar quadro">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
                 <a href="{% url 'cadastros:adicionar_lead' %}" class="btn btn-primary">
-                    <i class="bi bi-plus-circle me-1"></i> Adicionar Novo Lead
+                    <i class="bi bi-plus-lg"></i> Novo Lead
                 </a>
             </div>
         </div>
 
-        <div class="kanban-board">
-            {% for coluna in colunas %}
-                <div class="kanban-column status-{{ coluna.id }}">
-                    <h5 class="mb-3 ps-2">{{ coluna.titulo }} <span class="badge bg-secondary">{{ coluna.leads|length }}</span></h5>
-                    
-                    <div class="d-flex flex-column gap-3">
-                        {% for lead in coluna.leads %}
-                            <div class="card shadow-sm">
-                                <div class="card-body">
-                                    <h6 class="card-title">{{ lead.nome_completo }}</h6>
-                                    <p class="card-text small text-muted mb-2">
-                                        {% if lead.telefone %}<i class="bi bi-telephone-fill me-1"></i> {{ lead.telefone }} <br>{% endif %}
-                                        {% if lead.email %}<i class="bi bi-envelope-fill me-1"></i> {{ lead.email }}{% endif %}
-                                    </p>
-
-                                    {% if lead.disponibilidade_horarios %}
-                                        <div class="alert alert-info small p-2">
-                                            <strong>Disponibilidade:</strong><br>
-                                            {{ lead.disponibilidade_horarios|linebreaksbr }}
-                                        </div>
-                                    {% endif %}
-
-                                    <div class="d-flex justify-content-between align-items-center mt-2">
-                                        <small class="text-muted">{{ lead.get_fonte_contato_display }}</small>
-                                        <div>
-                                            {% if lead.observacoes %}
-                                                <button class="btn btn-outline-info btn-sm" type="button" 
-                                                  data-bs-toggle="collapse" 
-                                                   data-bs-target="#collapseObs{{ lead.pk }}" 
-                                                   aria-expanded="false" 
-                                                   aria-controls="collapseObs{{ lead.pk }}"
-                                                   title="Ver Observações">
-                                               <i class="bi bi-chat-left-text"></i>
-                                           </button>
-                                           {% endif %}
-                                            <a href="{% url 'cadastros:editar_lead' lead.pk %}" class="btn btn-outline-secondary btn-sm" title="Editar"><i class="bi bi-pencil"></i></a>
-                                            {% if lead.status != 'convertido' and lead.status != 'perdido' %}
-                                                <a href="{% url 'cadastros:converter_lead' lead.pk %}" class="btn btn-success btn-sm" title="Converter em aluno"><i class="bi bi-check2-circle"></i></a>
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                    {% if lead.observacoes %}
-                                        <div class="collapse mt-2" id="collapseObs{{ lead.pk }}">
-                                            <div class="card card-body small">
-                                                {{ lead.observacoes|linebreaksbr }}
-                                            </div>
-                                        </div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        {% empty %}
-                            <div class="text-center text-muted p-3 small">
-                                <em>Nenhum lead nesta etapa.</em>
-                            </div>
-                        {% endfor %}
-                    </div>
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert {% if message.tags %}alert-{{ message.tags }}{% else %}alert-info{% endif %} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
             {% endfor %}
-        </div>
-    </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+        {% endif %}
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Pega o token CSRF que colocamos no HTML
-            const csrfToken = document.querySelector('.kanban-board').dataset.csrfToken;
-            
-            // Encontra todos os contêineres de cards
-            const containers = document.querySelectorAll('.kanban-card-container');
-
-            containers.forEach(container => {
-                new Sortable(container, {
-                    group: 'kanban-leads', // Permite arrastar entre colunas com o mesmo grupo
-                    animation: 150,
-                    handle: '.card-body', // Onde o usuário pode "agarrar" o card
-                    
-                    // Evento chamado ao soltar o card
-                    onEnd: function (evt) {
-                        const card = evt.item; // O card que foi movido
-                        const novaColuna = evt.to; // A coluna de destino
+        <div class="kanban-container">
+            {% for coluna in colunas %}
+            <div class="kanban-column" data-status="{{ coluna.id }}">
+                <div class="kanban-header">
+                    <span>{{ coluna.titulo }}</span>
+                    <span class="badge bg-white text-dark border shadow-sm rounded-pill">{{ coluna.leads|length }}</span>
+                </div>
+                <div class="kanban-body" ondrop="drop(event)" ondragover="allowDrop(event)">
+                    {% for lead in coluna.leads %}
+                    <div class="lead-card status-{{ lead.status }}" id="lead-{{ lead.pk }}" draggable="true" ondragstart="drag(event)">
                         
-                        const leadPk = card.dataset.leadPk;
-                        const novoStatus = novaColuna.dataset.statusId;
+                        <div class="d-flex justify-content-between align-items-start">
+                            <h6 class="mb-1 fw-bold text-dark">{{ lead.nome_completo }}</h6>
+                            <div class="lead-actions dropdown">
+                                <button class="btn btn-link btn-sm p-0 text-muted" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></button>
+                                <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                                    <li><h6 class="dropdown-header">Ações</h6></li>
+                                    <li><a class="dropdown-item small" href="{% url 'cadastros:editar_lead' lead.pk %}"><i class="bi bi-pencil me-2"></i>Editar</a></li>
+                                    
+                                    {% if lead.status == 'agendado' or lead.status == 'negociacao' or lead.status == 'interessado' %}
+                                    <li><a class="dropdown-item small text-success fw-bold" href="{% url 'cadastros:converter_lead' lead.pk %}"><i class="bi bi-check-circle me-2"></i>Converter em Aluno</a></li>
+                                    {% endif %}
+                                    
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <form action="{% url 'cadastros:excluir_lead' lead.pk %}" method="post" onsubmit="return confirm('Tem certeza? Isso apaga o lead permanentemente.');">
+                                            {% csrf_token %}
+                                            <button type="submit" class="dropdown-item small text-danger"><i class="bi bi-trash me-2"></i>Excluir</button>
+                                        </form>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex align-items-center gap-2 mt-1 mb-2">
+                            {% if lead.telefone %}
+                                <a href="https://wa.me/{{ lead.telefone|slugify }}" target="_blank" class="text-decoration-none badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">
+                                    <i class="bi bi-whatsapp"></i> WhatsApp
+                                </a>
+                            {% endif %}
+                            {% if lead.email %}
+                                <span class="text-muted small" title="{{ lead.email }}"><i class="bi bi-envelope"></i></span>
+                            {% endif %}
+                        </div>
 
-                        // Se não houver ID do lead ou status, não faz nada
-                        if (!leadPk || !novoStatus) {
-                            console.error('Erro: Card ou coluna sem data-attribute.');
-                            return;
-                        }
+                        {% if lead.disponibilidade_horarios %}
+                        <div class="d-flex gap-2 align-items-start mb-2 p-1 rounded bg-info bg-opacity-10 border border-info border-opacity-25">
+                            <i class="bi bi-clock text-info ps-1 mt-1" style="font-size: 0.8rem;"></i>
+                            <div class="small text-dark" style="font-size: 0.75rem; line-height: 1.3;">
+                                {{ lead.disponibilidade_horarios|truncatechars:50 }}
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if lead.observacoes %}
+                            <div class="small bg-light p-2 rounded text-secondary fst-italic text-truncate mb-2" style="font-size: 0.8rem;" title="{{ lead.observacoes }}">
+                                {{ lead.observacoes }}
+                            </div>
+                        {% endif %}
+                        
+                        <div class="d-flex justify-content-between align-items-center mt-2 border-top pt-2">
+                            <small class="text-muted" style="font-size: 0.7rem;">
+                                <i class="bi bi-clock"></i> {{ lead.data_criacao|timesince }}
+                            </small>
+                            <span class="badge bg-secondary bg-opacity-10 text-secondary" style="font-size: 0.65rem;">{{ lead.get_fonte_contato_display|default:"Orgânico" }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
 
-                        // Envia a mudança para o servidor Django
-                        fetch("{% url 'cadastros:atualizar_status_lead' %}", {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRFToken': csrfToken
-                            },
-                            body: JSON.stringify({
-                                'lead_pk': leadPk,
-                                'novo_status': novoStatus
-                            })
-                        })
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.status === 'sucesso') {
-                                console.log(`Lead ${data.lead} atualizado para ${data.novo_status}`);
-                            } else {
-                                console.error('Erro ao salvar status:', data.mensagem);
-                                // Opcional: reverter o movimento se falhar
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Erro de rede:', error);
-                            // Opcional: reverter o movimento se falhar
-                        });
-                    }
-                });
-            });
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function allowDrop(ev) { ev.preventDefault(); }
+
+        function drag(ev) {
+            ev.dataTransfer.setData("text", ev.target.id);
+            ev.target.style.opacity = '0.5'; 
+        }
+
+        document.addEventListener("dragend", function(event) {
+            event.target.style.opacity = '1';
         });
+
+        function drop(ev) {
+            ev.preventDefault();
+            var data = ev.dataTransfer.getData("text");
+            var leadCard = document.getElementById(data);
+            var novaColuna = ev.target.closest('.kanban-column');
+            
+            if (novaColuna && leadCard) {
+                var kanbanBody = novaColuna.querySelector('.kanban-body');
+                kanbanBody.appendChild(leadCard);
+                
+                leadCard.style.opacity = '1';
+                var novoStatus = novaColuna.getAttribute('data-status');
+                leadCard.className = leadCard.className.replace(/status-\w+/g, "status-" + novoStatus);
+                
+                var leadId = data.replace('lead-', '');
+                atualizarStatusNoBanco(leadId, novoStatus);
+            }
+        }
+
+        function atualizarStatusNoBanco(leadId, novoStatus) {
+            fetch("{% url 'cadastros:atualizar_status_lead' %}", {
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": "{{ csrf_token }}",
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ lead_pk: leadId, novo_status: novoStatus })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.status !== 'sucesso') {
+                    alert('Erro ao salvar: ' + data.mensagem);
+                    location.reload(); 
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                alert('Erro de conexão com o servidor.');
+            });
+        }
     </script>
-    </body>
+</body>
 </html>

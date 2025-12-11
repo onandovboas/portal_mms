@@ -1,8 +1,12 @@
 # cadastros/views.py
 from django.core.paginator import Paginator
 from django.contrib.auth.decorators import login_required
-from .models import Turma, Inscricao, RegistroAula, Professor, Presenca, Pagamento, Contrato, AcompanhamentoFalta, Aluno, Inscricao, RegistroAula, Presenca, Lead, TokenAtualizacaoAluno, AcompanhamentoPedagogico, AlunoProva, Questao, ProvaTemplate, RespostaAluno
-from .forms import AlunoForm, PagamentoForm, AlunoExperimentalForm, ContratoForm, RegistroAulaForm, LeadForm, AcompanhamentoPedagogicoForm, LiberarProvaForm, PlanoAulaForm
+from .models import Turma, Inscricao, RegistroAula, Professor, Presenca, Pagamento, Contrato, AcompanhamentoFalta, Aluno, Inscricao, RegistroAula, Presenca, Lead, TokenAtualizacaoAluno, AcompanhamentoPedagogico, AlunoProva, Questao, ProvaTemplate, RespostaAluno, PesquisaSatisfacao, AvaliacaoProfessor, AvaliacaoAdministrativo, AvaliacaoPedagogico
+from .forms import (
+    AlunoForm, PagamentoForm, AlunoExperimentalForm, ContratoForm, 
+    RegistroAulaForm, LeadForm, AcompanhamentoPedagogicoForm, 
+    LiberarProvaForm, PlanoAulaForm, PesquisaSatisfacaoForm, EsqueciSenhaForm
+)
 from django.utils import timezone
 from datetime import date, timedelta
 from django.db.models import F, Sum, Count, Min, Q, Subquery, OuterRef, Max, DecimalField, Exists
@@ -23,6 +27,7 @@ import re
 from django.utils.crypto import get_random_string
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth import login, authenticate
+from django.contrib.auth import views as auth_views
 from django import forms
 from django.db import transaction
 from django.utils.html import format_html
@@ -30,6 +35,9 @@ import json
 import io
 import zipfile
 from .decorators import admin_required, professor_required, aluno_required
+from django.db.models import Avg, FloatField, Case, When
+from django.db.models.functions import Cast
+from collections import Counter
 
 
 
@@ -616,7 +624,6 @@ def quitar_pagamento_especifico(request, pk):
 @login_required
 @admin_required
 def perfil_aluno(request, pk):
-    # CONSULTA OTIMIZADA - Evita problemas N+1
     aluno = get_object_or_404(
         Aluno.objects.prefetch_related(
             'contratos',
@@ -628,58 +635,46 @@ def perfil_aluno(request, pk):
         pk=pk
     )
 
-    # Contrato ativo
     contrato_ativo = (Contrato.objects
                       .filter(aluno=aluno, ativo=True)
                       .filter(Q(data_fim__gte=timezone.now()) | Q(data_fim__isnull=True))
                       .order_by('-data_inicio')
                       .first())
 
-    # HISTÓRICO DE TURMAS - Nova funcionalidade
     historico_turmas = (Inscricao.objects
                         .filter(aluno=aluno)
                         .select_related('turma')
                         .order_by('-id'))
 
-    # ACOMPANHAMENTOS
     acompanhamentos = (AcompanhamentoFalta.objects
                        .filter(aluno=aluno)
                        .order_by('-criado_em'))
 
-    # ESTATÍSTICAS DE FREQUÊNCIA
+    # Estatísticas simples de KPI
     presencas_stats = Presenca.objects.filter(aluno=aluno).aggregate(
         total_aulas=Count('id'),
-        total_presencas=Count('id', filter=Q(presente=True)),
-        total_faltas=Count('id', filter=Q(presente=False))
+        total_presencas=Count('id', filter=Q(presente=True))
     )
-    
-    # Calcular percentual de frequência
-    total_aulas = presencas_stats['total_aulas'] or 1  # Evita divisão por zero
+    total_aulas = presencas_stats['total_aulas'] or 1
     percentual_frequencia = (presencas_stats['total_presencas'] / total_aulas) * 100
 
-    # Pagamentos
-    pagamentos = (Pagamento.objects
-                  .filter(aluno=aluno)
-                  .order_by('-data_vencimento'))
-
+    pagamentos = (Pagamento.objects.filter(aluno=aluno).order_by('-data_vencimento'))
     kpis = pagamentos.aggregate(
         pendentes=Count('id', filter=Q(status='pendente')),
         atrasados=Count('id', filter=Q(status='atrasado')),
     )
 
-    # DADOS PARA GRÁFICO DE FREQUÊNCIA (ÚLTIMOS 6 MESES)
-    meses_frequencia = []
+    # --- LÓGICA DO GRÁFICO HÍBRIDO (BARRAS + LINHA) ---
+    dados_grafico = []
     hoje = timezone.now().date()
     
-    for i in range(5, -1, -1):  # Últimos 6 meses
+    for i in range(5, -1, -1):
         mes_data = hoje - relativedelta(months=i)
         mes_inicio = mes_data.replace(day=1)
-        if i == 0:
-            mes_fim = hoje
-        else:
-            mes_fim = mes_inicio + relativedelta(months=1) - timedelta(days=1)
+        # Último dia do mês
+        mes_fim = mes_inicio + relativedelta(months=1) - timedelta(days=1)
         
-        # Calcular frequência do mês
+        # 1. Frequência (Barras)
         presencas_mes = Presenca.objects.filter(
             aluno=aluno,
             registro_aula__data_aula__range=[mes_inicio, mes_fim]
@@ -687,20 +682,31 @@ def perfil_aluno(request, pk):
             total=Count('id'),
             presentes=Count('id', filter=Q(presente=True))
         )
+        total_m = presencas_mes['total'] or 0
+        pres_m = presencas_mes['presentes'] or 0
+        freq_pct = (pres_m / total_m * 100) if total_m > 0 else 0
         
-        total_mes = presencas_mes['total'] or 0
-        presentes_mes = presencas_mes['presentes'] or 0
-        percentual_mes = (presentes_mes / total_mes * 100) if total_mes > 0 else 0
+        # 2. Notas (Linha) - Média percentual das provas do mês
+        # Calculamos (nota_final / pontuacao_total * 100) para cada prova e tiramos a média
+        provas_mes = AlunoProva.objects.filter(
+            aluno=aluno,
+            data_realizacao__range=[mes_inicio, mes_fim],
+            status='finalizada'
+        ).aggregate(media=Avg('nota_final'))
         
-        meses_frequencia.append({
-            'mes': mes_inicio.strftime('%b/%Y'),
-            'percentual': round(percentual_mes, 1),
-            'aulas': total_mes,
-            'presencas': presentes_mes
+        # Se não houver provas, a média vem None, então tratamos para 0 ou None
+        nota_media = provas_mes['media'] if provas_mes['media'] is not None else 0
+
+        dados_grafico.append({
+            'mes': mes_inicio.strftime('%b'),
+            'freq': round(freq_pct, 1),
+            'nota': round(float(nota_media), 1) # Convertemos Decimal para float para o JSON
         })
 
+    # Todas as turmas para o modal de adicionar
+    todas_turmas = Turma.objects.all().order_by('nome')
+
     context = {
-        'meses_frequencia': meses_frequencia,
         'aluno': aluno,
         'contrato_ativo': contrato_ativo,
         'historico_turmas': historico_turmas,
@@ -709,6 +715,9 @@ def perfil_aluno(request, pk):
         'percentual_frequencia': percentual_frequencia,
         'pagamentos': pagamentos,
         'kpis': kpis,
+        # Convertemos para JSON string para o JS ler sem erro
+        'dados_grafico': json.dumps(dados_grafico), 
+        'todas_turmas': todas_turmas,
     }
 
     return render(request, 'cadastros/perfil_aluno.html', context)
@@ -1112,7 +1121,17 @@ def editar_registro_aula(request, pk):
 @admin_required
 def lista_leads(request):
     # A ordem das colunas no Kanban será definida por esta lista
-    ordem_status = ['novo', 'contatado', 'agendado', 'congelado', 'convertido', 'perdido']
+    ordem_status = [
+        'novo',
+        'contatado', 
+        'interessado',
+        'teste_nivel',
+        'negociacao',
+        'agendado', 
+        'congelado', 
+        'convertido', 
+        'perdido'
+        ]
 
     # Busca todos os leads e transforma-os num dicionário agrupado por status
     leads_todos = Lead.objects.all().order_by('-data_criacao')
@@ -1198,14 +1217,14 @@ def gerar_link_atualizacao(request, aluno_pk):
     
     # Constrói a URL completa que será enviada ao aluno
     link_atualizacao = request.build_absolute_uri(
-        reverse('cadastros:atualizar_dados_aluno', args=[token_obj.token])
+        reverse('cadastros:responder_pesquisa_satisfacao', args=[token_obj.token])
     )
     
     # Adiciona uma mensagem de sucesso com o link para o admin copiar
     messages.success(
         request, 
-        f"Link de atualização gerado para {aluno.nome_completo}. "
-        f"Envie este link para o aluno: {link_atualizacao}"
+        f"Link da PESQUISA gerado para {aluno.nome_completo}. "
+        f"Envie: {link_atualizacao}"
     )
     
     # Redireciona de volta para o perfil do aluno
@@ -2277,3 +2296,589 @@ def excluir_registro_aula(request, pk):
         
     # Redireciona de volta para a página de detalhes da turma
     return redirect('cadastros:detalhe_turma', pk=turma_pk)
+
+def responder_pesquisa_satisfacao(request, token):
+    """
+    View pública (protegida por token) para o aluno responder a pesquisa semestral.
+    """
+    # 1. Validação do Token (Reutilizando a lógica segura existente)
+    try:
+        token_obj = TokenAtualizacaoAluno.objects.get(token=token, usado=False)
+        if token_obj.is_expired:
+            return render(request, 'cadastros/token_invalido.html', {'motivo': 'O link expirou (24h). Peça um novo na secretaria.'})
+    except TokenAtualizacaoAluno.DoesNotExist:
+        return render(request, 'cadastros/token_invalido.html', {'motivo': 'Link inválido ou já utilizado.'})
+
+    aluno = token_obj.aluno
+
+    # === CORREÇÃO AQUI: Usar os novos campos booleanos ===
+    
+    # Busca quem tem o check "É Teacher" marcado
+    teachers = Professor.objects.filter(ativo=True, eh_teacher=True)
+    for t in teachers: t.id_str = str(t.id)
+        
+    # Busca quem tem o check "É Administrativo" marcado
+    equipe_adm = Professor.objects.filter(ativo=True, eh_administrativo=True)
+    for a in equipe_adm: a.id_str = str(a.id)
+
+    # Busca quem tem o check "É Pedagógico" marcado
+    equipe_pedagogica = Professor.objects.filter(ativo=True, eh_pedagogico=True)
+    for p in equipe_pedagogica: p.id_str = str(p.id)
+
+    if request.method == 'POST':
+        form_geral = PesquisaSatisfacaoForm(request.POST)
+        
+        if form_geral.is_valid():
+            with transaction.atomic(): # Garante que salva tudo ou nada
+                # A. Salva a pesquisa principal
+                pesquisa = form_geral.save(commit=False)
+                pesquisa.aluno = aluno
+                pesquisa.save()
+                
+                # B. Atualiza os dados cadastrais do aluno com o que ele confirmou
+                if pesquisa.email_confirmado:
+                    aluno.email = pesquisa.email_confirmado
+                    
+                    # === ADICIONE ISTO AQUI ===
+                    # Sincroniza com o Usuário de Login (para funcionar o reset de senha)
+                    if aluno.usuario:
+                        aluno.usuario.email = pesquisa.email_confirmado
+                        aluno.usuario.save()
+                    # ==========================
+
+                if pesquisa.telefone_atualizado:
+                    aluno.telefone = pesquisa.telefone_atualizado
+                aluno.save()
+
+                # C. Salva Avaliações dos Teachers
+                for teacher in teachers:
+                    AvaliacaoProfessor.objects.create(
+                        pesquisa=pesquisa,
+                        professor=teacher,
+                        satisfacao_aulas=request.POST.get(f'teacher_{teacher.id}_satisfacao'),
+                        incentivo_teacher=request.POST.get(f'teacher_{teacher.id}_incentivo'),
+                        seguranca_conforto=request.POST.get(f'teacher_{teacher.id}_conforto'),
+                        esforco_conteudo=request.POST.get(f'teacher_{teacher.id}_esforco'),
+                        elogio=request.POST.get(f'teacher_{teacher.id}_elogio', ''),
+                        sugestao=request.POST.get(f'teacher_{teacher.id}_sugestao', '')
+                    )
+
+                # D. Salva Avaliação Administrativa (Ex: Nando)
+                for adm in equipe_adm:
+                    destaques = request.POST.getlist(f'adm_{adm.id}_destaques') # Checkboxes
+                    AvaliacaoAdministrativo.objects.create(
+                        pesquisa=pesquisa,
+                        membro_equipe=adm,
+                        educacao_prestatividade=request.POST.get(f'adm_{adm.id}_educacao'),
+                        avaliacao_geral=request.POST.get(f'adm_{adm.id}_geral'),
+                        nivel_satisfacao=request.POST.get(f'adm_{adm.id}_satisfacao'),
+                        destaques=destaques,
+                        elogio=request.POST.get(f'adm_{adm.id}_elogio', ''),
+                        sugestao=request.POST.get(f'adm_{adm.id}_sugestao', '')
+                    )
+                
+                # E. Salva Avaliação Pedagógica (Ex: Gabi)
+                for ped in equipe_pedagogica:
+                    participou = request.POST.get(f'ped_{ped.id}_participou') == 'sim'
+                    AvaliacaoPedagogico.objects.create(
+                        pesquisa=pesquisa,
+                        coordenador=ped,
+                        participou_acompanhamento=participou,
+                        satisfacao_atendimento=request.POST.get(f'ped_{ped.id}_satisfacao') if participou else None,
+                        atividades_interessantes=request.POST.get(f'ped_{ped.id}_atividades', ''),
+                        elogio=request.POST.get(f'ped_{ped.id}_elogio', ''),
+                        sugestao=request.POST.get(f'ped_{ped.id}_sugestao', '')
+                    )
+
+                # F. Invalida o token para não usar de novo
+                token_obj.usado = True
+                token_obj.save()
+
+            return render(request, 'cadastros/feedback_sucesso.html')
+
+    else:
+        # Pre-popula o formulário com dados existentes do aluno
+        initial_data = {
+            'email_confirmado': aluno.email,
+            'telefone_atualizado': aluno.telefone,
+            'stage_atual_informado': aluno.inscricao_set.first().turma.stage if aluno.inscricao_set.exists() else 1
+        }
+        form_geral = PesquisaSatisfacaoForm(initial=initial_data)
+
+    context = {
+        'aluno': aluno,
+        'form_geral': form_geral,
+        'teachers': teachers,
+        'equipe_adm': equipe_adm,
+        'equipe_pedagogica': equipe_pedagogica,
+    }
+    return render(request, 'cadastros/responder_feedback.html', context)
+
+# --- VIEWS PARA "ESQUECI MINHA SENHA" (Preparação Sprint 2) ---
+
+def esqueci_minha_senha(request):
+    """
+    Solicita o e-mail para envio de recuperação.
+    Funciona tanto para Alunos quanto para Professores (pois ambos têm User).
+    """
+    if request.method == 'POST':
+        form = EsqueciSenhaForm(request.POST)
+        if form.is_valid():
+            email = form.cleaned_data['email']
+            try:
+                # Procura usuários com esse e-mail
+                users = User.objects.filter(email=email)
+                if users.exists():
+                    for user in users:
+                        # Aqui usaremos a função nativa do Django de reset password
+                        # Mas personalizaremos o template de email depois
+                        form_reset = auth_views.PasswordResetForm({'email': email})
+                        if form_reset.is_valid():
+                            # --- BLOCO CORRIGIDO ---
+                            form_reset.save(
+                                request=request,
+                                use_https=request.is_secure(),
+                                # 1. Versão Texto Puro (Anti-Spam)
+                                email_template_name='cadastros/emails/password_reset_email.txt',
+                                # 2. Versão HTML (Visual) - É AQUI QUE A MÁGICA ACONTECE
+                                html_email_template_name='cadastros/emails/password_reset_email.html',
+                                subject_template_name='cadastros/emails/password_reset_subject.txt'
+                            )
+                            # -----------------------
+                    messages.success(request, 'Se o e-mail estiver cadastrado, você receberá um link de redefinição. Olhe os SPAM também!')
+                    return redirect('cadastros:portal_login')
+                else:
+                    # Por segurança, não dizemos que o email não existe, apenas dizemos que enviamos
+                    messages.success(request, 'Se o e-mail estiver cadastrado, você receberá um link de redefinição.')
+            except Exception as e:
+                messages.error(request, 'Erro ao processar solicitação.')
+    else:
+        form = EsqueciSenhaForm()
+    
+    return render(request, 'cadastros/esqueci_senha.html', {'form': form})
+
+@login_required
+@admin_required
+def cancelar_contrato(request, pk):
+    contrato = get_object_or_404(Contrato, pk=pk)
+    
+    if request.method == 'POST':
+        hoje = timezone.now().date()
+        
+        # 1. Calcula meses restantes baseados na DATA FIM do contrato
+        # (Ex: Hoje é Jan, Fim é Dez -> 11 meses restantes)
+        r = relativedelta(contrato.data_fim, hoje)
+        meses_restantes = r.years * 12 + r.months
+        
+        if meses_restantes < 0: meses_restantes = 0
+        
+        # 2. Multa: 50% do valor das mensalidades restantes
+        valor_total_restante = meses_restantes * contrato.valor_mensalidade
+        multa = valor_total_restante * Decimal('0.5')
+        
+        # 3. Gera a cobrança da multa (Vencimento Hoje)
+        if multa > 0:
+            Pagamento.objects.create(
+                aluno=contrato.aluno,
+                contrato=contrato,
+                tipo='outro',
+                descricao=f"Multa Rescisória - Cancelamento ({meses_restantes} meses restantes)",
+                valor=multa,
+                mes_referencia=hoje,
+                data_vencimento=hoje,
+                status='pendente'
+            )
+        
+        # 4. Encerra o contrato e cancela cobranças futuras
+        contrato.status = 'cancelado'
+        contrato.ativo = False
+        contrato.save()
+        
+        # Cancela boletos futuros que ainda não foram pagos
+        Pagamento.objects.filter(
+            contrato=contrato,
+            status='pendente',
+            data_vencimento__gt=hoje
+        ).update(status='cancelado')
+
+        messages.warning(request, f'Contrato CANCELADO. Multa de R$ {multa:.2f} gerada.')
+        return redirect('cadastros:perfil_aluno', pk=contrato.aluno.pk)
+
+    return render(request, 'cadastros/confirmar_cancelamento.html', {'contrato': contrato, 'hoje': timezone.now().date()})
+
+# --- LÓGICA DE TRANCAMENTO ---
+@login_required
+@admin_required
+def trancar_contrato(request, pk):
+    contrato = get_object_or_404(Contrato, pk=pk)
+    
+    # 1. Tranca o contrato
+    contrato.status = 'trancado'
+    contrato.save()
+    
+    # 2. Tranca o Aluno (Atualiza status global)
+    aluno = contrato.aluno
+    aluno.status = 'trancado'
+    aluno.save()
+    
+    # 3. Atualiza inscrições ativas para 'trancado'
+    Inscricao.objects.filter(aluno=aluno, status__in=['matriculado', 'acompanhando']).update(status='trancado')
+    
+    messages.warning(request, f'Contrato e Matrícula de {aluno.nome_completo} foram TRANCADOS. Cobranças futuras gerarão créditos.')
+    return redirect('cadastros:perfil_aluno', pk=aluno.pk)
+
+# --- LÓGICA DE QUITAR (Gerar Crédito se Trancado) ---
+# ATENÇÃO: Substitua a sua view 'quitar_pagamento_especifico' atual por esta
+@login_required
+@admin_required
+def quitar_pagamento_especifico(request, pk):
+    pagamento = get_object_or_404(Pagamento, pk=pk)
+    contrato = pagamento.contrato
+    aluno = pagamento.aluno
+
+    # 1. Marca como Pago
+    pagamento.status = 'pago'
+    pagamento.valor_pago = pagamento.valor
+    pagamento.data_pagamento = timezone.now().date()
+    pagamento.save()
+
+    # 2. Regra do Trancamento (Acúmulo de Crédito)
+    # Se o contrato está trancado e é uma mensalidade, o aluno ganha +1 crédito
+    if contrato and contrato.status == 'trancado' and pagamento.tipo == 'mensalidade':
+        aluno.creditos_aulas += 1
+        aluno.save()
+        messages.success(request, f"Pagamento confirmado! O aluno ganhou +1 CRÉDITO DE AULA (Total: {aluno.creditos_aulas}).")
+    else:
+        messages.success(request, "Pagamento quitado com sucesso.")
+
+    # Retorna para a página anterior (Dashboard ou Perfil)
+    return redirect(request.META.get('HTTP_REFERER', 'cadastros:dashboard_admin'))
+
+# --- LÓGICA DE USO DE CRÉDITO (Para o Cenário A e B) ---
+@login_required
+@admin_required
+def usar_credito_pagamento(request, pk):
+    """
+    Usa 1 crédito do aluno para quitar uma mensalidade pendente.
+    """
+    pagamento = get_object_or_404(Pagamento, pk=pk)
+    aluno = pagamento.aluno
+    
+    if aluno.creditos_aulas > 0:
+        # Abate 1 crédito
+        aluno.creditos_aulas -= 1
+        aluno.save()
+        
+        # Quita a cobrança
+        pagamento.status = 'pago'
+        pagamento.valor_pago = 0 # Valor financeiro pago é 0, pois foi crédito
+        pagamento.data_pagamento = timezone.now().date()
+        pagamento.descricao += " (PAGO COM CRÉDITO)"
+        pagamento.save()
+        
+        messages.success(request, f"Mensalidade quitada usando 1 Crédito! Restam: {aluno.creditos_aulas}")
+    else:
+        messages.error(request, "O aluno não possui créditos disponíveis.")
+        
+    return redirect('cadastros:perfil_aluno', pk=aluno.pk)
+
+# 2. NOVAS VIEWS DE GESTÃO DE TURMA (Adicione ao final do arquivo)
+# ==============================================================================
+
+@login_required
+@admin_required
+@require_POST
+def adicionar_turma_aluno(request, aluno_pk):
+    """
+    Matricula o aluno numa turma diretamente pelo perfil.
+    """
+    aluno = get_object_or_404(Aluno, pk=aluno_pk)
+    turma_id = request.POST.get('turma')
+    
+    if turma_id:
+        turma = get_object_or_404(Turma, pk=turma_id)
+        # Verifica se já não está matriculado para não duplicar
+        if not Inscricao.objects.filter(aluno=aluno, turma=turma).exists():
+            Inscricao.objects.create(
+                aluno=aluno,
+                turma=turma,
+                status='matriculado' # Default
+            )
+            messages.success(request, f'{aluno.nome_completo} matriculado em {turma.nome}.')
+        else:
+            messages.warning(request, 'O aluno já pertence a esta turma.')
+    
+    return redirect('cadastros:perfil_aluno', pk=aluno_pk)
+
+@login_required
+@admin_required
+def gerenciar_inscricao(request, inscricao_pk):
+    """
+    Permite Excluir ou Editar o status de uma inscrição.
+    """
+    inscricao = get_object_or_404(Inscricao, pk=inscricao_pk)
+    aluno_pk = inscricao.aluno.pk
+
+    if request.method == 'POST':
+        acao = request.POST.get('acao')
+        
+        if acao == 'excluir':
+            turma_nome = inscricao.turma.nome
+            inscricao.delete()
+            messages.success(request, f'Matrícula na turma {turma_nome} removida.')
+        
+        elif acao == 'editar_status':
+            novo_status = request.POST.get('novo_status')
+            if novo_status:
+                inscricao.status = novo_status
+                inscricao.save()
+                messages.success(request, f'Status na turma {inscricao.turma.nome} atualizado.')
+
+    return redirect('cadastros:perfil_aluno', pk=aluno_pk)
+
+
+# ==============================================================================
+# 3. LÓGICA DE VERIFICAÇÃO DE FALTAS (Helper Function)
+# ==============================================================================
+
+def _verificar_e_gerar_alerta_faltas(aluno):
+    """
+    Função utilitária para verificar se o aluno tem 3 faltas consecutivas 
+    e gerar um alerta, EVITANDO DUPLICIDADE.
+    Deve ser chamada sempre que uma falta é registrada.
+    """
+    # 1. Verifica se JÁ EXISTE um acompanhamento pendente. Se sim, não faz nada.
+    if AcompanhamentoFalta.objects.filter(aluno=aluno, status='pendente').exists():
+        return # Já tem alerta aberto, não precisa spammar.
+
+    # 2. Busca as últimas 3 presenças do aluno (ordenadas da mais recente para antiga)
+    ultimas_presencas = Presenca.objects.filter(aluno=aluno).order_by('-registro_aula__data_aula')[:3]
+    
+    # Se tiver menos de 3 aulas registradas, não tem como ter 3 faltas seguidas
+    if len(ultimas_presencas) < 3:
+        return
+
+    # 3. Verifica se as 3 são faltas (presente=False)
+    # A lista vem [Recente, Anterior, Antepenúltima]
+    faltas_consecutivas = all(p.presente is False for p in ultimas_presencas)
+    
+    if faltas_consecutivas:
+        data_inicio = ultimas_presencas[2].registro_aula.data_aula # A data da 1ª falta da sequência
+        
+        AcompanhamentoFalta.objects.create(
+            aluno=aluno,
+            data_inicio_sequencia=data_inicio,
+            numero_de_faltas=3,
+            status='pendente',
+            motivo="Alerta Automático: 3 faltas consecutivas detectadas."
+        )
+
+# --- ONDE CHAMAR ESSA FUNÇÃO? ---
+# Você deve adicionar a chamada `_verificar_e_gerar_alerta_faltas(inscricao.aluno)`
+# dentro das views 'detalhe_turma' e 'editar_registro_aula', logo após criar a Presenca=False.
+# Exemplo (pseudocódigo para você inserir nas views existentes):
+# if not presente:
+#    _verificar_e_gerar_alerta_faltas(inscricao.aluno)
+
+@login_required
+@admin_required
+@require_POST
+def excluir_lead(request, pk):
+    lead = get_object_or_404(Lead, pk=pk)
+    nome = lead.nome_completo
+    lead.delete()
+    messages.success(request, f'Lead "{nome}" removido com sucesso.')
+    return redirect('cadastros:lista_leads')
+
+@login_required
+@admin_required
+def destrancar_contrato(request, pk):
+    contrato = get_object_or_404(Contrato, pk=pk)
+    
+    if contrato.status == 'trancado':
+        # 1. Reativa contrato
+        contrato.status = 'ativo'
+        contrato.save()
+        
+        # 2. Reativa aluno
+        aluno = contrato.aluno
+        aluno.status = 'ativo'
+        aluno.save()
+        
+        # 3. Reativa inscrições
+        Inscricao.objects.filter(aluno=aluno, status='trancado').update(status='matriculado')
+        
+        messages.success(request, f'Contrato de {aluno.nome_completo} DESTRANCADO com sucesso! Status voltou para Ativo.')
+    
+    return redirect('cadastros:perfil_aluno', pk=contrato.aluno.pk)
+
+@login_required
+@admin_required
+def dashboard_marketing(request):
+    # --- 1. DADOS DE LEADS (Funil de Vendas) ---
+    leads_total = Lead.objects.count()
+    leads_convertidos = Lead.objects.filter(status='convertido').count()
+    taxa_conversao = (leads_convertidos / leads_total * 100) if leads_total > 0 else 0
+    
+    # Origem dos Leads (Gráfico de Pizza)
+    fontes_qs = Lead.objects.values('fonte_contato').annotate(total=Count('id')).order_by('-total')
+    # Traduzindo as chaves do choice para labels legíveis
+    dict_fontes = dict(Lead.FONTE_CHOICES)
+    dados_fontes = {
+        'labels': [dict_fontes.get(item['fonte_contato'], item['fonte_contato']) for item in fontes_qs],
+        'data': [item['total'] for item in fontes_qs]
+    }
+
+    # --- 2. DADOS DE PERSONA (Vindos da Pesquisa de Satisfação) ---
+    # Faixa Etária
+    faixa_etaria_qs = PesquisaSatisfacao.objects.values('faixa_etaria').annotate(total=Count('id'))
+    dict_faixa = dict(PesquisaSatisfacao.FAIXA_ETARIA_CHOICES)
+    dados_faixa = {
+        'labels': [dict_faixa.get(item['faixa_etaria'], item['faixa_etaria']) for item in faixa_etaria_qs],
+        'data': [item['total'] for item in faixa_etaria_qs]
+    }
+
+    # Como Conheceu (Validar eficácia do marketing)
+    conheceu_qs = PesquisaSatisfacao.objects.values('como_conheceu').annotate(total=Count('id'))
+    dict_conheceu = dict(PesquisaSatisfacao.COMO_CONHECEU_CHOICES)
+    dados_conheceu = {
+        'labels': [dict_conheceu.get(item['como_conheceu'], item['como_conheceu']) for item in conheceu_qs],
+        'data': [item['total'] for item in conheceu_qs]
+    }
+
+    context = {
+        'leads_total': leads_total,
+        'leads_convertidos': leads_convertidos,
+        'taxa_conversao': round(taxa_conversao, 1),
+        'dados_fontes': json.dumps(dados_fontes),
+        'dados_faixa': json.dumps(dados_faixa),
+        'dados_conheceu': json.dumps(dados_conheceu),
+    }
+    return render(request, 'cadastros/dashboard_marketing.html', context)
+
+@login_required
+@admin_required
+def dashboard_feedback(request):
+    # ==========================================
+    # 1. VISÃO GERAL & MARKETING (ESCOLA)
+    # ==========================================
+    
+    # --- NPS ---
+    nps_stats = PesquisaSatisfacao.objects.aggregate(
+        total=Count('id'),
+        promotores=Count('id', filter=Q(nps_score__gte=9)),
+        detratores=Count('id', filter=Q(nps_score__lte=6)),
+        neutros=Count('id', filter=Q(nps_score__range=(7, 8)))
+    )
+    total_respostas = nps_stats['total'] or 0
+    promotores = nps_stats['promotores'] or 0
+    detratores = nps_stats['detratores'] or 0
+    neutros = nps_stats['neutros'] or 0
+    
+    nps_score = 0
+    if total_respostas > 0:
+        pct_promotores = promotores / total_respostas
+        pct_detratores = detratores / total_respostas
+        nps_score = (pct_promotores - pct_detratores) * 100
+
+    # --- INSTAGRAM (Quem segue vs Quem não segue) ---
+    insta_stats = PesquisaSatisfacao.objects.aggregate(
+        seguem=Count('id', filter=Q(segue_instagram=True)),
+        nao_seguem=Count('id', filter=Q(segue_instagram=False))
+    )
+    
+    # --- CONTEÚDO DESEJADO ---
+    # Filtra respostas vazias e traz as mais recentes
+    sugestoes_conteudo = PesquisaSatisfacao.objects.exclude(
+        conteudo_desejado__exact=''
+    ).exclude(
+        conteudo_desejado__isnull=True
+    ).values('conteudo_desejado', 'data_resposta').order_by('-data_resposta')
+
+    # --- ESPAÇO LIVRE (Comentários Gerais) ---
+    comentarios_gerais = PesquisaSatisfacao.objects.exclude(
+        comentarios_gerais__exact=''
+    ).exclude(
+        comentarios_gerais__isnull=True
+    ).order_by('-data_resposta')
+
+    # ==========================================
+    # 2. ADMINISTRATIVO (DETALHADO)
+    # ==========================================
+    admins = Professor.objects.filter(eh_administrativo=True, ativo=True)
+    admins_data = []
+    
+    for a in admins:
+        avals = a.avaliacaoadministrativo_set.select_related('pesquisa').all().order_by('-id')
+        
+        # Médias específicas solicitadas
+        stats = avals.aggregate(
+            media_atendimento=Avg('avaliacao_geral'),       # Avaliação do Atendimento
+            media_satisfacao=Avg('nivel_satisfacao'),       # Satisfação com Atendimento
+            media_educacao=Avg('educacao_prestatividade')   # Extra (Educação)
+        )
+        
+        # Processamento dos DESTAQUES (Contagem de Tags)
+        # O campo 'destaques' é uma lista JSON (ex: ['Agilidade', 'Simpatia'])
+        todos_destaques = []
+        for av in avals:
+            if av.destaques and isinstance(av.destaques, list):
+                todos_destaques.extend(av.destaques)
+        
+        # Conta a frequência de cada destaque (Ex: 'Simpatia': 10, 'Agilidade': 5)
+        contagem_destaques = Counter(todos_destaques).most_common()
+        
+        feedbacks_texto = [av for av in avals if av.elogio or av.sugestao]
+        
+        admins_data.append({
+            'membro': a,
+            'stats': stats,
+            'destaques': contagem_destaques, # Lista de tuplas [('Simpatia', 10), ...]
+            'feedbacks': feedbacks_texto,
+            'qtd': avals.count()
+        })
+
+    # ==========================================
+    # 3. PROFESSORES E PEDAGÓGICO (MANTIDO)
+    # ==========================================
+    
+    # Teachers
+    teachers = Professor.objects.filter(eh_teacher=True, ativo=True)
+    teachers_data = []
+    for t in teachers:
+        avals = t.avaliacaoprofessor_set.select_related('pesquisa').all().order_by('-id')
+        stats = avals.aggregate(
+            media_sat=Avg('satisfacao_aulas'),
+            media_inc=Avg('incentivo_teacher'),
+            media_seg=Avg('seguranca_conforto'),
+            media_esf=Avg('esforco_conteudo')
+        )
+        feedbacks_texto = [a for a in avals if a.elogio or a.sugestao]
+        teachers_data.append({'professor': t, 'stats': stats, 'feedbacks': feedbacks_texto, 'qtd': avals.count()})
+
+    # Pedagógico
+    pedagogicos = Professor.objects.filter(eh_pedagogico=True, ativo=True)
+    peds_data = []
+    for p in pedagogicos:
+        avals = p.avaliacaopedagogico_set.select_related('pesquisa').all().order_by('-id')
+        stats = avals.aggregate(media_sat=Avg('satisfacao_atendimento'))
+        feedbacks_texto = [av for av in avals if av.elogio or av.sugestao or av.atividades_interessantes]
+        peds_data.append({'coordenador': p, 'stats': stats, 'feedbacks': feedbacks_texto, 'qtd': avals.count()})
+
+    context = {
+        # Geral
+        'nps_score': round(nps_score),
+        'total_respostas': total_respostas,
+        'distribuicao_nps': json.dumps([promotores, neutros, detratores]),
+        'comentarios_gerais': comentarios_gerais,
+        
+        # Marketing
+        'insta_data': json.dumps([insta_stats['seguem'], insta_stats['nao_seguem']]),
+        'sugestoes_conteudo': sugestoes_conteudo,
+
+        # Setores
+        'teachers_data': teachers_data,
+        'admins_data': admins_data,
+        'peds_data': peds_data,
+    }
+    return render(request, 'cadastros/dashboard_feedback.html', context)

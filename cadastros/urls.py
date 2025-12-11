@@ -22,6 +22,8 @@ urlpatterns = [
     path('aluno/<int:aluno_pk>/criar-contrato/', views.criar_contrato, name='criar_contrato'),
     path('aluno/atualizar/<uuid:token>/', views.atualizar_dados_aluno, name='atualizar_dados_aluno'),
     path('contrato/<int:contrato_pk>/editar/', views.editar_contrato, name='editar_contrato'),
+    path('aluno/<int:aluno_pk>/adicionar-turma/', views.adicionar_turma_aluno, name='adicionar_turma_aluno'),
+    path('inscricao/<int:inscricao_pk>/gerenciar/', views.gerenciar_inscricao, name='gerenciar_inscricao'),
 
     # Rotas Acompanhamentos Pedagogicos
     path('acompanhamento-pedagogico/', views.lista_acompanhamento_pedagogico, name='lista_acompanhamento_pedagogico'),
@@ -63,6 +65,7 @@ urlpatterns = [
     path('leads/<int:pk>/converter/', views.converter_lead, name='converter_lead'),
     path('inscricao/<int:inscricao_pk>/desistiu/', views.marcar_experimental_desistiu, name='marcar_experimental_desistiu'),
     path('leads/atualizar-status/', views.atualizar_status_lead, name='atualizar_status_lead'),
+    path('leads/excluir/<int:pk>/', views.excluir_lead, name='excluir_lead'), # Nova
 
     # Rotas de Turmas
     path('turma/<int:pk>/', views.detalhe_turma, name='detalhe_turma'),
@@ -94,4 +97,28 @@ urlpatterns = [
     path('relatorios/professores/', views.relatorio_pagamento_professores, name='relatorio_professores'),
     path('relatorios/alunos-pendentes/', views.relatorio_alunos_pendentes, name='relatorio_alunos_pendentes'),
 
+    # Rotas de Feedback
+    path('feedback/<uuid:token>/', views.responder_pesquisa_satisfacao, name='responder_pesquisa_satisfacao'),
+    
+    # Rota Esqueci Minha Senha (Pública)
+    path('esqueci-senha/', views.esqueci_minha_senha, name='esqueci_minha_senha'),
+    
+    # Rotas de Reset de Senha do Django (necessárias para o fluxo funcionar)
+    path('reset-senha/<uidb64>/<token>/', auth_views.PasswordResetConfirmView.as_view(
+        template_name='cadastros/password_reset_confirm.html',
+        success_url='/reset-senha/concluido/'
+    ), name='password_reset_confirm'),
+    
+    path('reset-senha/concluido/', auth_views.PasswordResetCompleteView.as_view(
+        template_name='cadastros/password_reset_complete.html'
+    ), name='password_reset_complete'),
+
+    # Rotas de Gerenciamento de Contrato
+    path('contrato/<int:pk>/trancar/', views.trancar_contrato, name='trancar_contrato'),
+    path('contrato/<int:pk>/destrancar/', views.destrancar_contrato, name='destrancar_contrato'),
+    path('contrato/<int:pk>/cancelar/', views.cancelar_contrato, name='cancelar_contrato'),
+
+    # Dashboards de Dados
+    path('dashboard/marketing/', views.dashboard_marketing, name='dashboard_marketing'),
+    path('dashboard/feedback/', views.dashboard_feedback, name='dashboard_feedback'),
 ]

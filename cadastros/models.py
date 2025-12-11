@@ -20,7 +20,7 @@ class Aluno(models.Model):
     data_nascimento = models.DateField(null=True, blank=True)
     data_matricula = models.DateField(auto_now_add=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="ativo")
-    
+    creditos_aulas = models.IntegerField("Créditos (Mensalidades)", default=0)
 
     def __str__(self):
         return self.nome_completo
@@ -30,8 +30,19 @@ class Professor(models.Model):
     usuario = models.OneToOneField(User, on_delete=models.CASCADE)
     nome_completo = models.CharField(max_length=200)
     telefone = models.CharField(max_length=20, null=True, blank=True)
+    # Novo campo para a foto do perfil (necessário instalar Pillow: pip install Pillow)
+    foto = models.ImageField(upload_to='professores_fotos/', null=True, blank=True)
+    eh_teacher = models.BooleanField("É Teacher?", default=False)
+    eh_administrativo = models.BooleanField("É Administrativo?", default=False)
+    eh_pedagogico = models.BooleanField("É Pedagógico?", default=False)
+    ativo = models.BooleanField(default=True) # Para não mostrar professores antigos no feedback
+
     def __str__(self):
-        return self.nome_completo
+        funcoes = []
+        if self.eh_teacher: funcoes.append("Teacher")
+        if self.eh_administrativo: funcoes.append("Admin")
+        if self.eh_pedagogico: funcoes.append("Pedag")
+        return f"{self.nome_completo} ({', '.join(funcoes)})"
 
 # Turma foi atualizada com Stage e Anotações
 class Turma(models.Model):
@@ -107,6 +118,13 @@ class Contrato(models.Model):
     parcelas_matricula = models.IntegerField(default=1)
     ativo = models.BooleanField(default=True)
     observacoes = models.TextField(blank=True, null=True)
+    STATUS_CHOICES = [
+        ('ativo', 'Ativo'),
+        ('trancado', 'Trancado (Gerando Créditos)'),
+        ('cancelado', 'Cancelado'),
+        ('finalizado', 'Finalizado'),
+    ]
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ativo')
 
     def save(self, *args, **kwargs):
         # A lógica agora só se aplica a planos com duração definida.
@@ -121,6 +139,8 @@ class Contrato(models.Model):
     def __str__(self):
         return f"Contrato {self.get_plano_display()} de {self.aluno.nome_completo}"
     
+    
+
     @property
     def valor_total_contrato(self):
         if self.plano == 'anual':
@@ -257,9 +277,12 @@ class HorarioAula(models.Model):
 class Lead(models.Model):
     STATUS_CHOICES = [
         ('novo', 'Novo Contato'),
-        ('contatado', 'Contato Realizado'),
+        ('contatado', 'Em contato'),
+        ('interessado', 'Interessado'),
+        ('teste_nivel', 'Teste de Nível'),
         ('agendado', 'Aula Experimental Agendada'),
-        ('congelado', 'Congelado'),
+        ('congelado', 'Follow-up'),
+        ('negociacao', 'Em Negociação'),
         ('convertido', 'Convertido em Aluno'),
         ('perdido', 'Perdido'),
     ]
@@ -419,3 +442,98 @@ class RespostaAluno(models.Model):
 
     def __str__(self):
         return f"Resposta de {self.aluno_prova.aluno.nome_completo} para Q{self.questao.ordem}"
+    
+class PesquisaSatisfacao(models.Model):
+    # Opções para padronizar os dados (facilita gráficos depois)
+    FAIXA_ETARIA_CHOICES = [
+        ('12-17', '12 a 17 anos (Teen)'),
+        ('18-24', '18 a 24 anos (Jovem Adulto)'),
+        ('25-34', '25 a 34 anos (Adulto)'),
+        ('35-44', '35 a 44 anos (Adulto)'),
+        ('45+', '45 anos ou mais'),
+    ]
+    ESCOLARIDADE_CHOICES = [
+        ('medio', 'Ensino Médio'),
+        ('superior_cursando', 'Ensino Superior (Cursando)'),
+        ('superior_completo', 'Ensino Superior (Completo)'),
+        ('pos_graduacao', 'Pós-Graduação / MBA / Mestrado / Doutorado'),
+    ]
+    COMO_CONHECEU_CHOICES = [
+        ('indicacao', 'Indicação de Amigo/Familiar'),
+        ('instagram', 'Instagram / Redes Sociais'),
+        ('google', 'Google / Pesquisa'),
+        ('evento', 'Eventos / Palestras'),
+        ('outro', 'Outro' ),
+    ]
+
+    aluno = models.ForeignKey(Aluno, on_delete=models.CASCADE, related_name="pesquisas_satisfacao")
+    data_resposta = models.DateTimeField(auto_now_add=True)
+    
+    # 1. Confirmação de Contato
+    email_confirmado = models.EmailField("E-mail confirmado")
+    telefone_atualizado = models.CharField("Telefone atualizado", max_length=20)
+    
+    # 2. Perfil Demográfico (Aprofundado)
+    faixa_etaria = models.CharField("Faixa Etária", max_length=10, choices=FAIXA_ETARIA_CHOICES, null=True, blank=True)
+    escolaridade = models.CharField("Escolaridade", max_length=20, choices=ESCOLARIDADE_CHOICES, null=True, blank=True)
+    bairro_residencia = models.CharField("Bairro onde mora", max_length=100, null=True, blank=True, help_text="Para mapeamento geográfico")
+    
+    # 3. Perfil Profissional & Objetivos
+    area_atuacao = models.CharField("Área de Atuação", max_length=100, null=True, blank=True, help_text="Ex: Psicologia, TI, Engenharia, Vendas...")
+    cargo_atual = models.CharField("Cargo / Ocupação Atual", max_length=100, null=True, blank=True)
+    objetivo_ingles = models.CharField("Maior objetivo com o inglês", max_length=200, null=True, blank=True)
+    
+    # 4. Marketing & Comportamento
+    como_conheceu = models.CharField("Como conheceu a MMS?", max_length=20, choices=COMO_CONHECEU_CHOICES, null=True, blank=True)
+    segue_instagram = models.BooleanField("Segue Instagram?", default=False)
+    conteudo_desejado = models.TextField("Conteúdo desejado", blank=True, null=True)
+
+    # 5. Métricas (NPS) e Texto Livre
+    nps_score = models.IntegerField("NPS (0-10)")
+    comentarios_gerais = models.TextField("Comentários Gerais", blank=True, null=True)
+
+    # Campos antigos que mantivemos por segurança (podem ficar ocultos ou nulos)
+    motivo_nao_seguir = models.TextField(blank=True, null=True)
+    ajuda_extra_classe = models.BooleanField(default=False)
+    detalhe_ajuda = models.TextField(blank=True, null=True)
+    stage_atual_informado = models.IntegerField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Persona: {self.aluno.nome_completo} ({self.area_atuacao})"
+
+class AvaliacaoProfessor(models.Model):
+    pesquisa = models.ForeignKey(PesquisaSatisfacao, on_delete=models.CASCADE, related_name="avaliacoes_professores")
+    professor = models.ForeignKey(Professor, on_delete=models.CASCADE)
+    
+    # Perguntas amigáveis (Escala 1 a 5)
+    satisfacao_aulas = models.IntegerField("De modo geral, o quão satisfeito você está com as aulas deste teacher?")
+    incentivo_teacher = models.IntegerField("O quanto você sente que este teacher te mantém motivado e incentivado?")
+    seguranca_conforto = models.IntegerField("Você se sente seguro e confortável para participar e tirar dúvidas nas aulas dele(a)?")
+    esforco_conteudo = models.IntegerField("O quanto você percebe que o teacher se esforça para explicar o conteúdo de forma clara?")
+    
+    elogio = models.TextField("Mande um 'Que Bom!' (Elogio)", blank=True)
+    sugestao = models.TextField("Deixe um 'Que Pena' (Sugestão de melhoria)", blank=True)
+
+class AvaliacaoAdministrativo(models.Model):
+    pesquisa = models.ForeignKey(PesquisaSatisfacao, on_delete=models.CASCADE, related_name="avaliacoes_adm")
+    membro_equipe = models.ForeignKey(Professor, on_delete=models.CASCADE)
+    
+    educacao_prestatividade = models.IntegerField("O quão educado e prestativo foi o atendimento quando você precisou?")
+    avaliacao_geral = models.IntegerField("Considerando suas últimas experiências, como você avalia o atendimento?")
+    nivel_satisfacao = models.IntegerField("Qual seu nível geral de satisfação com a nossa recepção/administração?")
+    
+    destaques = models.JSONField("O que se destaca no atendimento?", default=list) 
+    
+    elogio = models.TextField("Deixe seu elogio para o atendimento:", blank=True)
+    sugestao = models.TextField("Sua sugestão de melhoria:", blank=True)
+
+class AvaliacaoPedagogico(models.Model):
+    pesquisa = models.ForeignKey(PesquisaSatisfacao, on_delete=models.CASCADE, related_name="avaliacoes_pedagogico")
+    coordenador = models.ForeignKey(Professor, on_delete=models.CASCADE)
+    
+    participou_acompanhamento = models.BooleanField("Você já fez algum Acompanhamento Pedagógico com a teacher?")
+    satisfacao_atendimento = models.IntegerField("Se sim, quão satisfeito você ficou com esse atendimento?", null=True, blank=True)
+    atividades_interessantes = models.TextField("Que atividades você acredita que contribuíram para o seu aprendizado no acompanhamento?", blank=True)
+    
+    elogio = models.TextField("Deixe seu elogio para o pedagógico:", blank=True)
+    sugestao = models.TextField("Sua sugestão de melhoria para o pedagógico:", blank=True)
