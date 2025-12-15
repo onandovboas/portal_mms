@@ -121,4 +121,7 @@ urlpatterns = [
     # Dashboards de Dados
     path('dashboard/marketing/', views.dashboard_marketing, name='dashboard_marketing'),
     path('dashboard/feedback/', views.dashboard_feedback, name='dashboard_feedback'),
+
+    # Rotas de Envio de Emails
+    path('enviar-email/', views.enviar_email_alunos, name='enviar_email_alunos'),
 ]

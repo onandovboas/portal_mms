@@ -193,66 +193,74 @@
 
         <div class="card shadow-sm mb-4">
           <div class="card-header d-flex justify-content-between align-items-center">
-            <h2 class="h6 mb-0 fw-bold">Detalhes do Contrato</h2>
-            {% if contrato_ativo %}
-                <a href="{% url 'cadastros:editar_contrato' contrato_ativo.pk %}" class="btn btn-link btn-sm p-0 text-muted"><i class="bi bi-pencil"></i></a>
-            {% endif %}
+              <h2 class="h6 mb-0 fw-bold">Detalhes do Contrato</h2>
+              {% if contrato_ativo %}
+                  <a href="{% url 'cadastros:editar_contrato' contrato_ativo.pk %}" class="btn btn-link btn-sm p-0 text-muted"><i class="bi bi-pencil"></i></a>
+              {% endif %}
           </div>
           <div class="card-body compact-data">
-            {% if contrato_ativo %}
-              <div class="row g-2">
-                <div class="col-6">
-                    <dt>Início</dt>
-                    <dd>{{ contrato_ativo.data_inicio|date:"d/m/Y" }}</dd>
-                </div>
-                <div class="col-6">
-                    <dt>Fim</dt>
-                    <dd>{{ contrato_ativo.data_fim|date:"d/m/Y"|default:"Indefinido" }}</dd>
-                </div>
-                <div class="col-6">
-                    <dt>Mensalidade</dt>
-                    <dd>R$ {{ contrato_ativo.valor_mensalidade|floatformat:2 }}</dd>
-                </div>
-                {% if contrato_ativo.valor_matricula %}
-                <div class="col-6">
-                    <dt>Matrícula</dt>
-                    <dd>R$ {{ contrato_ativo.valor_matricula|floatformat:2 }} ({{ contrato_ativo.parcelas_matricula }}x)</dd>
-                </div>
-                {% endif %}
-              </div>
-              
-              {% if contrato_ativo.observacoes %}
-                <div class="obs-box">
-                    <i class="bi bi-info-circle-fill me-1"></i> {{ contrato_ativo.observacoes }}
-                </div>
+              {% if contrato_ativo %}
+                  <div class="row g-2">
+                      <div class="col-6">
+                          <dt>Início</dt>
+                          <dd>{{ contrato_ativo.data_inicio|date:"d/m/Y" }}</dd>
+                      </div>
+                      <div class="col-6">
+                          <dt>Fim</dt>
+                          <dd>{{ contrato_ativo.data_fim|date:"d/m/Y"|default:"Indefinido" }}</dd>
+                      </div>
+                      <div class="col-6">
+                          <dt>Mensalidade</dt>
+                          <dd>R$ {{ contrato_ativo.valor_mensalidade|floatformat:2 }}</dd>
+                      </div>
+                      {% if contrato_ativo.valor_matricula %}
+                      <div class="col-6">
+                          <dt>Matrícula</dt>
+                          <dd>R$ {{ contrato_ativo.valor_matricula|floatformat:2 }} ({{ contrato_ativo.parcelas_matricula }}x)</dd>
+                      </div>
+                      {% endif %}
+                  </div>
+                  
+                  {% if contrato_ativo.observacoes %}
+                  <div class="obs-box mt-2 text-muted small border p-2 rounded bg-light">
+                      <i class="bi bi-info-circle-fill me-1"></i> {{ contrato_ativo.observacoes }}
+                  </div>
+                  {% endif %}
+
+                  <div class="mt-3 border-top pt-3">
+                      <div class="d-grid gap-2">
+                          
+                          {% if contrato_ativo.status == 'trancado' %}
+                              <a href="{% url 'cadastros:destrancar_contrato' contrato_ativo.pk %}" 
+                                class="btn btn-success btn-sm" 
+                                onclick="return confirm('Tem certeza que deseja DESTRANCAR este contrato? O aluno voltará a ser Ativo.')">
+                                  <i class="bi bi-unlock-fill"></i> Destrancar Contrato
+                              </a>
+                          {% else %}
+                              <a href="{% url 'cadastros:trancar_contrato' contrato_ativo.pk %}" 
+                                class="btn btn-outline-warning btn-sm" 
+                                onclick="return confirm('Trancar o contrato interrompe cobranças futuras e gera créditos para pagamentos feitos. Confirmar?')">
+                                  <i class="bi bi-pause-fill"></i> Trancar Contrato
+                              </a>
+                          {% endif %}
+
+                          <a href="{% url 'cadastros:cancelar_contrato' contrato_ativo.pk %}" 
+                            class="btn btn-outline-danger btn-sm" 
+                            onclick="return confirm('ATENÇÃO: Isso cancelará o contrato permanentemente e poderá gerar multas. Continuar?')">
+                              <i class="bi bi-x-circle-fill"></i> Cancelar Contrato
+                          </a>
+                      </div>
+                  </div>
+
+              {% else %}
+                  <div class="text-center py-4 text-muted">
+                      <i class="bi bi-file-earmark-x fs-3 d-block mb-2"></i>
+                      <p class="small">Sem contrato ativo.</p>
+                      <a href="{% url 'cadastros:criar_contrato' aluno.pk %}" class="btn btn-sm btn-primary">Criar Contrato</a>
+                  </div>
               {% endif %}
-
-              <div class="mt-3 d-grid gap-2">
-                {% if contrato_ativo.status == 'ativo' %}
-                    <a href="{% url 'cadastros:trancar_contrato' contrato_ativo.pk %}" class="btn btn-outline-warning btn-sm" onclick="return confirm('Confirmar trancamento?')">
-                        <i class="bi bi-pause-fill"></i> Trancar Contrato
-                    </a>
-                {% elif contrato_ativo.status == 'trancado' %}
-                    <button class="btn btn-outline-success btn-sm" disabled title="Funcionalidade em desenvolvimento (Sprint 2)">
-                        <i class="bi bi-play-fill"></i> Destrancar (Em breve)
-                    </button>
-                {% elif contrato_ativo.status == 'trancado' %}
-                  <a href="{% url 'cadastros:destrancar_contrato' contrato_ativo.pk %}" class="btn btn-outline-success btn-sm">
-                      <i class="bi bi-play-fill"></i> Destrancar
-                  </a>
-              
-                {% endif %}
-              </div>
-
-            {% else %}
-              <div class="text-center py-4 text-muted">
-                <i class="bi bi-file-earmark-x fs-3 d-block mb-2"></i>
-                <p class="small">Sem contrato ativo.</p>
-                <a href="{% url 'cadastros:criar_contrato' aluno.pk %}" class="btn btn-sm btn-primary">Criar Contrato</a>
-              </div>
-            {% endif %}
           </div>
-        </div>
+      </div>
 
         <div class="card shadow-sm mb-4">
           <div class="card-header bg-white">

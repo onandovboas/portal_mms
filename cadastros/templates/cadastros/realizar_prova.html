@@ -11,9 +11,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Work+Sans:wght@400;500&display=swap" rel="stylesheet">
   <link href="{% static 'cadastros/mms_style.css' %}" rel="stylesheet">
-  {% if request.resolver_match.url_name == 'dashboard_admin' %}
-      <link href="{% static 'cadastros/dashboard.css' %}" rel="stylesheet">
-  {% endif %}
 </head>
 <body class="bg-light">
 
@@ -31,7 +28,7 @@
         
         {% if instrucao_da_secao %}
           <div class="alert alert-info">
-            {{ instrucao_da_secao }}
+            <i class="bi bi-info-circle-fill me-2"></i>{{ instrucao_da_secao }}
           </div>
         {% endif %}
         
@@ -45,7 +42,7 @@
               {% if field.field.widget.input_type == 'radio' %}
                 <div class="list-group list-group-horizontal-sm">
                   {% for radio in field %}
-                    <label class="list-group-item list-group-item-action d-flex gap-2">
+                    <label class="list-group-item list-group-item-action d-flex gap-2 align-items-center">
                       {{ radio.tag }}
                       {{ radio.choice_label }}
                     </label>
@@ -63,16 +60,24 @@
 
           <hr class="my-4">
 
-          <div class="d-flex justify-content-end">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            
+            {% if secao_atual_num > 1 %}
+              <button type="submit" name="acao" value="anterior" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Voltar
+              </button>
+            {% endif %}
+
             {% if secao_atual_num < total_secoes %}
-              <button type="submit" class="btn btn-primary btn-lg">
+              <button type="submit" name="acao" value="proxima" class="btn btn-primary btn-lg">
                 Próxima Secção <i class="bi bi-arrow-right"></i>
               </button>
             {% else %}
-              <button type="submit" class="btn btn-success btn-lg" onclick="return confirm('Tem a certeza de que deseja finalizar e enviar a prova para correção? Não poderá fazer alterações.')">
-                <i class="bi bi-check-circle-fill me-1"></i> Finalizar e Enviar
+              <button type="submit" name="acao" value="finalizar" class="btn btn-success btn-lg" ...>
+                Finalizar Prova
               </button>
             {% endif %}
+            
           </div>
         </form>
 

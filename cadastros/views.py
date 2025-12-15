@@ -38,6 +38,10 @@ from .decorators import admin_required, professor_required, aluno_required
 from django.db.models import Avg, FloatField, Case, When
 from django.db.models.functions import Cast
 from collections import Counter
+from django.core.mail import send_mail, EmailMultiAlternatives
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
+from .forms import EnviarEmailForm
 
 
 
@@ -859,11 +863,16 @@ def lista_alunos(request):
         status='pago'
     ).order_by('-data_pagamento').values('data_pagamento')[:1]
 
+    pesquisa_respondida = PesquisaSatisfacao.objects.filter(
+        aluno=OuterRef('pk')
+    )
+
     # A query principal anota (adiciona) as informações das subqueries a cada aluno.
     alunos = Aluno.objects.annotate(
         plano_contrato=Subquery(contrato_ativo_plano),
         valor_mensalidade_contrato=Subquery(contrato_ativo_valor),
-        data_ultimo_pagamento=Subquery(ultimo_pagamento)
+        data_ultimo_pagamento=Subquery(ultimo_pagamento),
+        tem_feedback=Exists(pesquisa_respondida)
     ).order_by('nome_completo')
 
     context = {
@@ -1473,7 +1482,7 @@ def portal_aluno(request):
         aluno=aluno
     ).select_related('prova_template').order_by('-data_realizacao')
     
-    provas_pendentes = provas_aluno.filter(status='nao_iniciada')
+    provas_pendentes = provas_aluno.filter(status__in=['nao_iniciada', 'em_progresso'])
     provas_finalizadas = provas_aluno.filter(status='finalizada')
 
     context = {
@@ -1610,113 +1619,32 @@ def iniciar_prova(request, aluno_prova_pk):
 
 @login_required
 def realizar_prova_secao(request, aluno_prova_pk, secao_num):
-    # ... (a lógica inicial da view continua a mesma)
+    # 1. Busca os objetos básicos
     aluno_prova = get_object_or_404(AlunoProva, pk=aluno_prova_pk, aluno__usuario=request.user)
     prova_template = aluno_prova.prova_template
     ordem_sessoes = prova_template.ordem_sessoes
     
+    # Validação de segurança: se tentar acessar uma seção que não existe
     if secao_num > len(ordem_sessoes):
-        # ... (a lógica de finalização da prova continua a mesma)
+        # Só redireciona para a conclusão se a prova já tiver passado da fase de execução
         if aluno_prova.status != 'finalizada':
             aluno_prova.status = 'aguardando_correcao'
             aluno_prova.save()
         return redirect('cadastros:prova_concluida', aluno_prova_pk=aluno_prova.pk)
 
+    # 2. Configura a seção atual
     tipo_secao_atual = ordem_sessoes[secao_num - 1]
-    questoes_da_secao = Questao.objects.filter(
-        prova_template=prova_template, tipo_questao=tipo_secao_atual
-    ).order_by('ordem')
-    
-    # ✅ LÓGICA ADICIONADA PARA BUSCAR A INSTRUÇÃO DA SECÇÃO ✅
     instrucao_da_secao = prova_template.instrucoes_sessoes.get(tipo_secao_atual, "")
 
-    # ... (a lógica de formulário dinâmico e POST continua a mesma) ...
-    respostas_qs = RespostaAluno.objects.filter(aluno_prova=aluno_prova, questao__in=questoes_da_secao)
-    respostas_anteriores = {resposta.questao_id: resposta for resposta in respostas_qs}
-    form_fields = {}
-    for questao in questoes_da_secao:
-        # ... (criação dos campos do formulário)
-        field_name = f'questao_{questao.pk}'
-        initial_value = ''
-        resposta_obj = respostas_anteriores.get(questao.pk)
-        if questao.tipo_questao in ['dictation', 'error_correction', 'gap_fill', 'dissertativa']:
-            if resposta_obj: initial_value = resposta_obj.resposta_texto
-            widget = forms.Textarea(attrs={'class': 'form-control', 'rows': 4}) if questao.tipo_questao in ['dictation', 'dissertativa'] else forms.TextInput(attrs={'class': 'form-control'})
-            form_fields[field_name] = forms.CharField(label=f"Q{questao.ordem}: {questao.enunciado}", required=False, widget=widget, initial=initial_value)
-        elif questao.tipo_questao in ['yes_no', 'multiple_choice', 'oral_multiple_choice']:
-            if resposta_obj: initial_value = resposta_obj.resposta_opcao
-            opcoes = list(questao.dados_questao.get('opcoes', {}).items()) if questao.tipo_questao != 'yes_no' else [('sim', 'Sim'), ('nao', 'Não')]
-            form_fields[field_name] = forms.ChoiceField(label=f"Q{questao.ordem}: {questao.enunciado}", choices=opcoes, widget=forms.RadioSelect, required=False, initial=initial_value)
-    ProvaSecaoForm = type('ProvaSecaoForm', (forms.Form,), form_fields)
-    
-    if request.method == 'POST':
-        # ... (lógica do POST)
-        form = ProvaSecaoForm(request.POST)
-        if form.is_valid():
-            for questao in questoes_da_secao:
-                field_name = f'questao_{questao.pk}'
-                resposta_dada = form.cleaned_data.get(field_name, '')
-                resposta_a_guardar = {}
-                if questao.tipo_questao in ['dictation', 'error_correction', 'gap_fill', 'dissertativa']:
-                    resposta_a_guardar['resposta_texto'] = resposta_dada
-                else:
-                    resposta_a_guardar['resposta_opcao'] = resposta_dada
-                RespostaAluno.objects.update_or_create(aluno_prova=aluno_prova, questao=questao, defaults=resposta_a_guardar)
-            return redirect('cadastros:realizar_prova_secao', aluno_prova_pk=aluno_prova.pk, secao_num=secao_num + 1)
-    else:
-        form = ProvaSecaoForm()
-
-    context = {
-        'aluno_prova': aluno_prova,
-        'form': form,
-        'secao_atual_num': secao_num,
-        'secao_atual_titulo': dict(Questao.TIPO_QUESTAO_CHOICES).get(tipo_secao_atual),
-        'total_secoes': len(ordem_sessoes),
-        'proxima_secao_num': secao_num + 1,
-        'instrucao_da_secao': instrucao_da_secao, # <-- ✅ ENVIANDO A INSTRUÇÃO PARA O TEMPLATE
-    }
-    return render(request, 'cadastros/realizar_prova.html', context)
-
-@login_required
-def prova_concluida(request, aluno_prova_pk):
-    """
-    Página simples de confirmação de que a prova foi enviada.
-    """
-    aluno_prova = get_object_or_404(AlunoProva, pk=aluno_prova_pk, aluno__usuario=request.user)
-    context = {
-        'aluno_prova': aluno_prova
-    }
-    return render(request, 'cadastros/prova_concluida.html', context)
-
-@login_required
-def realizar_prova_secao(request, aluno_prova_pk, secao_num):
-    """
-    View principal que controla a exibição e o salvamento de cada secção da prova.
-    """
-    aluno_prova = get_object_or_404(AlunoProva, pk=aluno_prova_pk, aluno__usuario=request.user)
-    prova_template = aluno_prova.prova_template
-    ordem_sessoes = prova_template.ordem_sessoes
-    
-    if secao_num > len(ordem_sessoes):
-        if aluno_prova.status != 'finalizada':
-            aluno_prova.status = 'aguardando_correcao'
-            aluno_prova.save()
-        return redirect('cadastros:prova_concluida', aluno_prova_pk=aluno_prova.pk)
-
-    tipo_secao_atual = ordem_sessoes[secao_num - 1]
     questoes_da_secao = Questao.objects.filter(
         prova_template=prova_template, tipo_questao=tipo_secao_atual
     ).order_by('ordem')
 
-    # --- LÓGICA DE FORMULÁRIO DINÂMICO ---
-    
-    # ✅ --- BLOCO CORRIGIDO --- ✅
-    # Em vez de .in_bulk(), buscamos o queryset e criamos o dicionário em Python.
+    # 3. Prepara o formulário com respostas anteriores
     respostas_qs = RespostaAluno.objects.filter(
         aluno_prova=aluno_prova, questao__in=questoes_da_secao
     )
     respostas_anteriores = {resposta.questao_id: resposta for resposta in respostas_qs}
-    # ✅ --- FIM DO BLOCO CORRIGIDO --- ✅
 
     form_fields = {}
     for questao in questoes_da_secao:
@@ -1724,9 +1652,10 @@ def realizar_prova_secao(request, aluno_prova_pk, secao_num):
         initial_value = ''
         resposta_obj = respostas_anteriores.get(questao.pk)
 
+        # Configura widgets (Textarea ou Radio)
         if questao.tipo_questao in ['dictation', 'error_correction', 'gap_fill', 'dissertativa']:
             if resposta_obj: initial_value = resposta_obj.resposta_texto
-            widget = forms.Textarea(attrs={'class': 'form-control', 'rows': 4}) if questao.tipo_questao in ['dictation', 'dissertativa'] else forms.TextInput(attrs={'class': 'form-control'})
+            widget = forms.Textarea(attrs={'class': 'form-control', 'rows': 4})
             form_fields[field_name] = forms.CharField(label=f"Q{questao.ordem}: {questao.enunciado}", required=False, widget=widget, initial=initial_value)
         
         elif questao.tipo_questao in ['yes_no', 'multiple_choice', 'oral_multiple_choice']:
@@ -1736,9 +1665,11 @@ def realizar_prova_secao(request, aluno_prova_pk, secao_num):
     
     ProvaSecaoForm = type('ProvaSecaoForm', (forms.Form,), form_fields)
     
+    # 4. Processamento do POST
     if request.method == 'POST':
         form = ProvaSecaoForm(request.POST)
         if form.is_valid():
+            # A. Salva os dados (SEMPRE, independente do botão)
             for questao in questoes_da_secao:
                 field_name = f'questao_{questao.pk}'
                 resposta_dada = form.cleaned_data.get(field_name, '')
@@ -1755,7 +1686,34 @@ def realizar_prova_secao(request, aluno_prova_pk, secao_num):
                     defaults=resposta_a_guardar
                 )
             
-            return redirect('cadastros:realizar_prova_secao', aluno_prova_pk=aluno_prova.pk, secao_num=secao_num + 1)
+            # B. Decide a navegação com base no botão clicado (name="acao")
+            acao = request.POST.get('acao') 
+
+            if acao == 'anterior':
+                # Volta para a seção anterior (mínimo 1)
+                nova_secao = max(1, secao_num - 1)
+                return redirect('cadastros:realizar_prova_secao', aluno_prova_pk=aluno_prova.pk, secao_num=nova_secao)
+            
+            elif acao == 'sair':
+                # Salva e volta para o dashboard
+                messages.success(request, "Progresso salvo. Você pode continuar depois.")
+                return redirect('cadastros:portal_aluno')
+
+            elif acao == 'finalizar':
+                # Finaliza a prova (somente se clicar explicitamente no botão Finalizar)
+                if aluno_prova.status != 'finalizada':
+                    aluno_prova.status = 'aguardando_correcao'
+                    aluno_prova.save()
+                return redirect('cadastros:prova_concluida', aluno_prova_pk=aluno_prova.pk)
+            
+            elif acao == 'proxima':
+                # Avança para a próxima seção
+                return redirect('cadastros:realizar_prova_secao', aluno_prova_pk=aluno_prova.pk, secao_num=secao_num + 1)
+            
+            else:
+                # 🛑 SAFETY NET: Se a ação for desconhecida, MANTÉM na página atual
+                return redirect('cadastros:realizar_prova_secao', aluno_prova_pk=aluno_prova.pk, secao_num=secao_num)
+
     else:
         form = ProvaSecaoForm()
 
@@ -1764,10 +1722,22 @@ def realizar_prova_secao(request, aluno_prova_pk, secao_num):
         'form': form,
         'secao_atual_num': secao_num,
         'secao_atual_titulo': dict(Questao.TIPO_QUESTAO_CHOICES).get(tipo_secao_atual),
+        'instrucao_da_secao': instrucao_da_secao,
         'total_secoes': len(ordem_sessoes),
-        'proxima_secao_num': secao_num + 1,
     }
     return render(request, 'cadastros/realizar_prova.html', context)
+
+@login_required
+def prova_concluida(request, aluno_prova_pk):
+    """
+    Página simples de confirmação de que a prova foi enviada.
+    """
+    aluno_prova = get_object_or_404(AlunoProva, pk=aluno_prova_pk, aluno__usuario=request.user)
+    context = {
+        'aluno_prova': aluno_prova
+    }
+    return render(request, 'cadastros/prova_concluida.html', context)
+
 
 @login_required
 @professor_required
@@ -2719,15 +2689,15 @@ def dashboard_marketing(request):
     
     # Origem dos Leads (Gráfico de Pizza)
     fontes_qs = Lead.objects.values('fonte_contato').annotate(total=Count('id')).order_by('-total')
-    # Traduzindo as chaves do choice para labels legíveis
     dict_fontes = dict(Lead.FONTE_CHOICES)
     dados_fontes = {
         'labels': [dict_fontes.get(item['fonte_contato'], item['fonte_contato']) for item in fontes_qs],
         'data': [item['total'] for item in fontes_qs]
     }
 
-    # --- 2. DADOS DE PERSONA (Vindos da Pesquisa de Satisfação) ---
-    # Faixa Etária
+    # --- 2. DADOS DEMOGRÁFICOS (Pesquisa de Satisfação) ---
+    
+    # A. Faixa Etária
     faixa_etaria_qs = PesquisaSatisfacao.objects.values('faixa_etaria').annotate(total=Count('id'))
     dict_faixa = dict(PesquisaSatisfacao.FAIXA_ETARIA_CHOICES)
     dados_faixa = {
@@ -2735,12 +2705,34 @@ def dashboard_marketing(request):
         'data': [item['total'] for item in faixa_etaria_qs]
     }
 
-    # Como Conheceu (Validar eficácia do marketing)
+    # B. Como Conheceu
     conheceu_qs = PesquisaSatisfacao.objects.values('como_conheceu').annotate(total=Count('id'))
     dict_conheceu = dict(PesquisaSatisfacao.COMO_CONHECEU_CHOICES)
     dados_conheceu = {
         'labels': [dict_conheceu.get(item['como_conheceu'], item['como_conheceu']) for item in conheceu_qs],
         'data': [item['total'] for item in conheceu_qs]
+    }
+
+    # C. Escolaridade
+    escolaridade_qs = PesquisaSatisfacao.objects.values('escolaridade').annotate(total=Count('id'))
+    dict_escolaridade = dict(PesquisaSatisfacao.ESCOLARIDADE_CHOICES)
+    dados_escolaridade = {
+        'labels': [dict_escolaridade.get(item['escolaridade'], item['escolaridade']) for item in escolaridade_qs],
+        'data': [item['total'] for item in escolaridade_qs]
+    }
+
+    # D. Área de Atuação (Top 8 - já que é texto livre)
+    area_qs = PesquisaSatisfacao.objects.values('area_atuacao').annotate(total=Count('id')).order_by('-total')[:8]
+    dados_area = {
+        'labels': [item['area_atuacao'] or 'Não informado' for item in area_qs],
+        'data': [item['total'] for item in area_qs]
+    }
+
+    # E. Objetivo com Inglês (Top 5)
+    objetivo_qs = PesquisaSatisfacao.objects.values('objetivo_ingles').annotate(total=Count('id')).order_by('-total')[:5]
+    dados_objetivo = {
+        'labels': [item['objetivo_ingles'] or 'Não informado' for item in objetivo_qs],
+        'data': [item['total'] for item in objetivo_qs]
     }
 
     context = {
@@ -2750,6 +2742,10 @@ def dashboard_marketing(request):
         'dados_fontes': json.dumps(dados_fontes),
         'dados_faixa': json.dumps(dados_faixa),
         'dados_conheceu': json.dumps(dados_conheceu),
+        # Novos Contextos
+        'dados_escolaridade': json.dumps(dados_escolaridade),
+        'dados_area': json.dumps(dados_area),
+        'dados_objetivo': json.dumps(dados_objetivo),
     }
     return render(request, 'cadastros/dashboard_marketing.html', context)
 
@@ -2757,10 +2753,8 @@ def dashboard_marketing(request):
 @admin_required
 def dashboard_feedback(request):
     # ==========================================
-    # 1. VISÃO GERAL & MARKETING (ESCOLA)
+    # 1. VISÃO GERAL & MARKETING
     # ==========================================
-    
-    # --- NPS ---
     nps_stats = PesquisaSatisfacao.objects.aggregate(
         total=Count('id'),
         promotores=Count('id', filter=Q(nps_score__gte=9)),
@@ -2778,82 +2772,60 @@ def dashboard_feedback(request):
         pct_detratores = detratores / total_respostas
         nps_score = (pct_promotores - pct_detratores) * 100
 
-    # --- INSTAGRAM (Quem segue vs Quem não segue) ---
     insta_stats = PesquisaSatisfacao.objects.aggregate(
         seguem=Count('id', filter=Q(segue_instagram=True)),
         nao_seguem=Count('id', filter=Q(segue_instagram=False))
     )
     
-    # --- CONTEÚDO DESEJADO ---
-    # Filtra respostas vazias e traz as mais recentes
-    sugestoes_conteudo = PesquisaSatisfacao.objects.exclude(
-        conteudo_desejado__exact=''
-    ).exclude(
-        conteudo_desejado__isnull=True
-    ).values('conteudo_desejado', 'data_resposta').order_by('-data_resposta')
-
-    # --- ESPAÇO LIVRE (Comentários Gerais) ---
-    comentarios_gerais = PesquisaSatisfacao.objects.exclude(
-        comentarios_gerais__exact=''
-    ).exclude(
-        comentarios_gerais__isnull=True
-    ).order_by('-data_resposta')
+    sugestoes_conteudo = PesquisaSatisfacao.objects.exclude(conteudo_desejado__exact='').exclude(conteudo_desejado__isnull=True).values('conteudo_desejado', 'data_resposta').order_by('-data_resposta')
+    comentarios_gerais = PesquisaSatisfacao.objects.exclude(comentarios_gerais__exact='').exclude(comentarios_gerais__isnull=True).order_by('-data_resposta')
 
     # ==========================================
-    # 2. ADMINISTRATIVO (DETALHADO)
+    # 2. ADMINISTRATIVO
     # ==========================================
     admins = Professor.objects.filter(eh_administrativo=True, ativo=True)
     admins_data = []
-    
     for a in admins:
         avals = a.avaliacaoadministrativo_set.select_related('pesquisa').all().order_by('-id')
-        
-        # Médias específicas solicitadas
         stats = avals.aggregate(
-            media_atendimento=Avg('avaliacao_geral'),       # Avaliação do Atendimento
-            media_satisfacao=Avg('nivel_satisfacao'),       # Satisfação com Atendimento
-            media_educacao=Avg('educacao_prestatividade')   # Extra (Educação)
+            media_atendimento=Avg('avaliacao_geral'),
+            media_satisfacao=Avg('nivel_satisfacao'),
+            media_educacao=Avg('educacao_prestatividade')
         )
-        
-        # Processamento dos DESTAQUES (Contagem de Tags)
-        # O campo 'destaques' é uma lista JSON (ex: ['Agilidade', 'Simpatia'])
         todos_destaques = []
         for av in avals:
-            if av.destaques and isinstance(av.destaques, list):
-                todos_destaques.extend(av.destaques)
-        
-        # Conta a frequência de cada destaque (Ex: 'Simpatia': 10, 'Agilidade': 5)
+            if av.destaques and isinstance(av.destaques, list): todos_destaques.extend(av.destaques)
         contagem_destaques = Counter(todos_destaques).most_common()
-        
         feedbacks_texto = [av for av in avals if av.elogio or av.sugestao]
+        admins_data.append({'membro': a, 'stats': stats, 'destaques': contagem_destaques, 'feedbacks': feedbacks_texto, 'qtd': avals.count()})
+
+    # ==========================================
+    # 3. PROFESSORES (GERAL - ABA TEACHERS)
+    # ==========================================
+    teachers = Professor.objects.filter(eh_teacher=True, ativo=True)
+    teachers_data = []
+    
+    for t in teachers:
+        # Apenas dados gerais aqui. O detalhe por turma fica na Seção 5.
+        avals = t.avaliacaoprofessor_set.select_related('pesquisa').all().order_by('-id')
+        stats = avals.aggregate(
+            media_sat=Avg('satisfacao_aulas'), 
+            media_inc=Avg('incentivo_teacher'), 
+            media_seg=Avg('seguranca_conforto'), 
+            media_esf=Avg('esforco_conteudo')
+        )
+        feedbacks_texto = [a for a in avals if a.elogio or a.sugestao]
         
-        admins_data.append({
-            'membro': a,
-            'stats': stats,
-            'destaques': contagem_destaques, # Lista de tuplas [('Simpatia', 10), ...]
-            'feedbacks': feedbacks_texto,
+        teachers_data.append({
+            'professor': t, 
+            'stats': stats, 
+            'feedbacks': feedbacks_texto, 
             'qtd': avals.count()
         })
 
     # ==========================================
-    # 3. PROFESSORES E PEDAGÓGICO (MANTIDO)
+    # 4. PEDAGÓGICO
     # ==========================================
-    
-    # Teachers
-    teachers = Professor.objects.filter(eh_teacher=True, ativo=True)
-    teachers_data = []
-    for t in teachers:
-        avals = t.avaliacaoprofessor_set.select_related('pesquisa').all().order_by('-id')
-        stats = avals.aggregate(
-            media_sat=Avg('satisfacao_aulas'),
-            media_inc=Avg('incentivo_teacher'),
-            media_seg=Avg('seguranca_conforto'),
-            media_esf=Avg('esforco_conteudo')
-        )
-        feedbacks_texto = [a for a in avals if a.elogio or a.sugestao]
-        teachers_data.append({'professor': t, 'stats': stats, 'feedbacks': feedbacks_texto, 'qtd': avals.count()})
-
-    # Pedagógico
     pedagogicos = Professor.objects.filter(eh_pedagogico=True, ativo=True)
     peds_data = []
     for p in pedagogicos:
@@ -2862,20 +2834,140 @@ def dashboard_feedback(request):
         feedbacks_texto = [av for av in avals if av.elogio or av.sugestao or av.atividades_interessantes]
         peds_data.append({'coordenador': p, 'stats': stats, 'feedbacks': feedbacks_texto, 'qtd': avals.count()})
 
+    # ==========================================
+    # 5. DETALHAMENTO E GRÁFICO POR TURMA
+    # ==========================================
+    
+    # PARTE A: Dados para o Gráfico de Barras (NPS Médio por Turma)
+    turma_subquery = Inscricao.objects.filter(
+        aluno=OuterRef('aluno'),
+        status__in=['matriculado', 'acompanhando', 'experimental']
+    ).order_by('-id').values('turma__nome')[:1]
+
+    qs_grafico = PesquisaSatisfacao.objects.annotate(
+        turma_atual=Subquery(turma_subquery)
+    ).values('turma_atual').annotate(
+        media_nps=Avg('nps_score'),
+        total_respostas=Count('id')
+    ).exclude(turma_atual__isnull=True).order_by('-media_nps')
+
+    dados_turmas = {
+        'labels': [item['turma_atual'] for item in qs_grafico],
+        'data': [round(item['media_nps'], 1) for item in qs_grafico]
+    }
+
+    # PARTE B: Dados para o Acordeão (Lista detalhada: Turma -> Professores)
+    turmas_ativas = Turma.objects.filter(
+        inscricao__status__in=['matriculado', 'acompanhando', 'experimental']
+    ).distinct().order_by('nome')
+
+    turmas_data = []
+
+    for turma in turmas_ativas:
+        # Descobre quais professores receberam avaliação nesta turma
+        profs_na_turma = Professor.objects.filter(
+            avaliacaoprofessor__pesquisa__aluno__inscricao__turma=turma,
+            eh_teacher=True
+        ).distinct()
+
+        if not profs_na_turma.exists():
+            continue
+
+        lista_profs_turma = []
+        for prof in profs_na_turma:
+            # Filtra avaliações específicas deste par (Professor + Turma)
+            avals_especificas = AvaliacaoProfessor.objects.filter(
+                professor=prof,
+                pesquisa__aluno__inscricao__turma=turma
+            )
+
+            stats_turma = avals_especificas.aggregate(
+                media_sat=Avg('satisfacao_aulas'),
+                media_inc=Avg('incentivo_teacher'),
+                media_seg=Avg('seguranca_conforto'),
+                media_esf=Avg('esforco_conteudo')
+            )
+            
+            feedbacks_turma = [a for a in avals_especificas if a.elogio or a.sugestao]
+
+            lista_profs_turma.append({
+                'professor': prof,
+                'stats': stats_turma,
+                'feedbacks': feedbacks_turma,
+                'qtd': avals_especificas.count()
+            })
+
+        # Ordena os professores pela maior média
+        lista_profs_turma.sort(key=lambda x: x['stats']['media_sat'] or 0, reverse=True)
+
+        turmas_data.append({
+            'turma': turma,
+            'professores': lista_profs_turma
+        })
+
     context = {
-        # Geral
         'nps_score': round(nps_score),
         'total_respostas': total_respostas,
         'distribuicao_nps': json.dumps([promotores, neutros, detratores]),
-        'comentarios_gerais': comentarios_gerais,
-        
-        # Marketing
         'insta_data': json.dumps([insta_stats['seguem'], insta_stats['nao_seguem']]),
+        'dados_turmas': json.dumps(dados_turmas), # Gráfico
+        'turmas_data': turmas_data,               # Acordeão
+        'comentarios_gerais': comentarios_gerais,
         'sugestoes_conteudo': sugestoes_conteudo,
-
-        # Setores
         'teachers_data': teachers_data,
         'admins_data': admins_data,
         'peds_data': peds_data,
     }
     return render(request, 'cadastros/dashboard_feedback.html', context)
+
+@login_required
+@admin_required
+def enviar_email_alunos(request):
+    if request.method == 'POST':
+        form = EnviarEmailForm(request.POST)
+        if form.is_valid():
+            tipo = form.cleaned_data['tipo_destinatario']
+            assunto = form.cleaned_data['assunto']
+            mensagem = form.cleaned_data['mensagem']
+            
+            destinatarios_emails = []
+
+            if tipo == 'todos':
+                # Pega e-mails de alunos ativos
+                destinatarios_emails = list(Aluno.objects.filter(status='ativo').exclude(email='').values_list('email', flat=True))
+            
+            elif tipo == 'turma':
+                turma = form.cleaned_data['turma']
+                if turma:
+                    destinatarios_emails = list(Aluno.objects.filter(
+                        inscricao__turma=turma, 
+                        inscricao__status__in=['matriculado', 'acompanhando']
+                    ).exclude(email='').values_list('email', flat=True))
+            
+            elif tipo == 'aluno':
+                aluno = form.cleaned_data['aluno']
+                if aluno and aluno.email:
+                    destinatarios_emails = [aluno.email]
+
+            # Envia os e-mails (usando BCC para privacidade se for em massa)
+            if destinatarios_emails:
+                try:
+                    # Envia como cópia oculta (BCC) para ninguém ver o e-mail do outro
+                    msg = EmailMultiAlternatives(
+                        subject=f"[MMS Portal] {assunto}",
+                        body=mensagem,
+                        from_email=None, # Usa o DEFAULT_FROM_EMAIL do settings
+                        bcc=destinatarios_emails
+                    )
+                    msg.send()
+                    messages.success(request, f"E-mail enviado para {len(destinatarios_emails)} alunos com sucesso!")
+                except Exception as e:
+                    messages.error(request, f"Erro ao enviar e-mail: {e}")
+            else:
+                messages.warning(request, "Nenhum destinatário com e-mail válido encontrado.")
+                
+            return redirect('cadastros:dashboard_admin')
+    else:
+        form = EnviarEmailForm()
+
+    return render(request, 'cadastros/enviar_email.html', {'form': form})

@@ -2,231 +2,359 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bem-vindo, {{ aluno.nome_completo.split.0 }}</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Work+Sans:wght@400;500&display=swap" rel="stylesheet">
-  <link href="{% static 'cadastros/mms_style.css' %}" rel="stylesheet">
-  {% if request.resolver_match.url_name == 'dashboard_admin' %}
-      <link href="{% static 'cadastros/dashboard.css' %}" rel="stylesheet">
-  {% endif %}
-</head>
-<body class="bg-light">
-
-  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-    <div class="container">
-      <a class="navbar-brand" href="{% url 'cadastros:portal_aluno' %}">Portal do Aluno</a>
-      <div class="d-flex">
-        <div class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle text-white" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-            <i class="bi bi-person-circle me-1"></i> Olá, {{ aluno.nome_completo.split.0 }}
-          </a>
-          <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end">
-            <li><a class="dropdown-item" href="{% url 'cadastros:password_change' %}"><i class="bi bi-key-fill me-2"></i>Alterar Palavra-passe</a></li>
-            <li><hr class="dropdown-divider"></li>
-            <li>
-              <form action="{% url 'cadastros:portal_logout' %}" method="post" class="d-inline">
-                {% csrf_token %}<button type="submit" class="dropdown-item"><i class="bi bi-box-arrow-right me-2"></i>Sair</button>
-              </form>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </nav>
-
-  <main class="container py-4">
-    <h1 class="h3 mb-4">Seu Painel</h1>
-
-    {% if ultimo_acompanhamento and ultimo_acompanhamento.atividades_recomendadas %}
-    <div class="card mb-4">
-      <div class="card-header bg-info text-dark">
-        <h2 class="h5 mb-0"><i class="bi bi-clipboard-check me-2"></i>Feedback e Recomendações</h2>
-      </div>
-      <div class="card-body">
-        <p class="card-text">
-          Abaixo estão as últimas recomendações do seu acompanhamento pedagógico realizado em 
-          <strong>{{ ultimo_acompanhamento.data_realizacao|date:"d/m/Y" }}</strong>:
-        </p>
-        <div class="alert alert-light" style="white-space: pre-wrap;">{{ ultimo_acompanhamento.atividades_recomendadas|linebreaksbr }}</div>
-      </div>
-    </div>
-    {% endif %}
-    <div class="card mb-4">
-      <div class="card-header"><h2 class="h5 mb-0">Minhas Avaliações</h2></div>
-      <div class="card-body">
-        <h3 class="h6 text-muted">Provas Pendentes</h3>
-        {% if provas_pendentes %}
-          <div class="list-group">
-            {% for prova in provas_pendentes %}
-              <a href="{% url 'cadastros:iniciar_prova' prova.pk %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                {{ prova.prova_template.titulo }}
-                <span class="btn btn-success btn-sm">Iniciar Prova</span>
-              </a>
-            {% endfor %}
-          </div>
-        {% else %}
-          <p class="text-muted">Você não tem provas pendentes.</p>
-        {% endif %}
-        
-        <hr class="my-4">
-        <h3 class="h6 text-muted">Resultados Finalizados</h3>
-        {% if provas_finalizadas %}
-          <div class="list-group">
-            {% for prova in provas_finalizadas %}
-              <a href="{% url 'cadastros:ver_resultado_prova' prova.pk %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                {{ prova.prova_template.titulo }}
-                <span class="badge bg-primary rounded-pill">
-                  Nota: {{ prova.nota_final|floatformat:2 }}
-                </span>
-              </a>
-            {% endfor %}
-          </div>
-        {% else %}
-          <p class="text-muted">Nenhum resultado finalizado ainda.</p>
-        {% endif %}
-      </div>
-    </div>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal do Aluno | {{ aluno.nome_completo }}</title>
     
-    <h1 class="h3 mb-4">Seu Painel Financeiro</h1>
-    <div class="row g-3 mb-4">
-      <div class="col-md-6">
-        <div class="card text-bg-warning">
-          <div class="card-body">
-            <h5 class="card-title"><i class="bi bi-hourglass-split me-2"></i>Valor Total Pendente</h5>
-            <p class="card-text fs-2 fw-bold">R$ {{ kpis.total_pendente|default:"0.00"|floatformat:2 }}</p>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-6">
-        <div class="card {% if kpis.contagem_atrasados > 0 %}text-bg-danger{% else %}text-bg-success{% endif %}">
-          <div class="card-body">
-            <h5 class="card-title"><i class="bi bi-exclamation-triangle-fill me-2"></i>Pagamentos em Atraso</h5>
-            <p class="card-text fs-2 fw-bold">{{ kpis.contagem_atrasados|default:0 }}</p>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-header"><h2 class="h5 mb-0">Próximas Cobranças e Pendências</h2></div>
-      <div class="table-responsive">
-        <table class="table table-hover table-striped mb-0">
-          <thead><tr><th scope="col">Descrição</th><th scope="col">Vencimento</th><th scope="col">Valor</th><th scope="col">Status</th></tr></thead>
-          <tbody>
-            {% for p in pagamentos_abertos %}
-              <tr>
-                <td>{{ p.descricao }}</td>
-                <td>{{ p.data_vencimento|date:"d/m/Y" }}</td>
-                <td>R$ {{ p.valor|floatformat:2 }}</td>
-                <td><span class="badge {% if p.status == 'atrasado' %}text-bg-danger{% elif p.status == 'parcial' %}text-bg-warning{% else %}text-bg-secondary{% endif %}">{{ p.get_status_display }}</span></td>
-              </tr>
-            {% empty %}
-              <tr><td colspan="4" class="text-center text-muted p-4"><i class="bi bi-check-circle-fill fs-3 d-block mb-2 text-success"></i>Você está em dia! Nenhuma pendência encontrada.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-    <div class="card mt-4">
-      <div class="card-header"><h2 class="h5 mb-0">Histórico de Pagamentos Recentes</h2></div>
-      <div class="table-responsive">
-        <table class="table mb-0">
-          <thead><tr><th scope="col">Descrição</th><th scope="col">Data do Pagamento</th><th scope="col">Valor Pago</th></tr></thead>
-          <tbody>
-            {% for p in ultimos_pagos %}
-              <tr>
-                <td>{{ p.descricao }}</td>
-                <td>{{ p.data_pagamento|date:"d/m/Y" }}</td>
-                <td>R$ {{ p.valor_pago|floatformat:2 }}</td>
-              </tr>
-            {% empty %}
-              <tr><td colspan="3" class="text-center text-muted p-4">Nenhum pagamento registado ainda.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Work+Sans:wght@400;500&display=swap" rel="stylesheet">
 
-    <div class="row g-4 mt-3">
-      <div class="col-lg-8">
-        <div class="card h-100">
-          <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <div>
-              <h2 class="h5 mb-0">Histórico de Aulas</h2>
-              <small class="text-muted">{{ data_selecionada|date:"F \d\e Y" }}</small>
-            </div>
-            <div class="btn-group btn-group-sm" role="group" aria-label="Navegar por mês">
-              <a href="{% url 'cadastros:portal_aluno' %}?ano={{ nav.ano_anterior }}&mes={{ nav.mes_anterior }}" class="btn btn-outline-secondary">&larr;</a>
-              <a href="{% url 'cadastros:portal_aluno' %}?ano={{ nav.ano_seguinte }}&mes={{ nav.mes_seguinte }}" class="btn btn-outline-secondary">&rarr;</a>
-            </div>
-          </div>
-          <div class="table-responsive">
-            <table class="table mb-0">
-              <thead><tr><th scope="col">Data</th><th scope="col">Turma</th><th scope="col">Status</th></tr></thead>
-              <tbody>
-                {% for presenca in historico_aulas %}
-                  <tr>
-                    <td>{{ presenca.registro_aula.data_aula|date:"d/m/Y" }}</td>
-                    <td>{{ presenca.registro_aula.turma.nome }}</td>
-                    <td>
-                      {% if presenca.presente %}<span class="badge text-bg-success">Presente</span>
-                      {% else %}<span class="badge text-bg-danger">Falta</span>{% endif %}
-                    </td>
-                  </tr>
-                {% empty %}
-                  <tr><td colspan="3" class="text-center text-muted p-4">Nenhum registo de aula encontrado para este mês.</td></tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-      <div class="col-lg-4">
-        <div class="card h-100">
-          <div class="card-body text-center">
-            <h5 class="card-title">Frequência Geral</h5>
-            <p class="display-4 fw-bold">{{ percentual_frequencia|floatformat:1 }}%</p>
-          </div>
-          <div class="card-footer">
-            <canvas id="frequenciaChart" style="height: 150px;"></canvas>
-          </div>
-        </div>
-      </div>
-    </div>
-
-  </main>
-  
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script>
-    // ... (Script do Chart.js existente) ...
-    document.addEventListener('DOMContentLoaded', function() {
-      const ctx = document.getElementById('frequenciaChart')?.getContext('2d');
-      if (!ctx) return;
-      const mesesFrequencia = JSON.parse('{{ meses_frequencia|escapejs }}');
-      new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: mesesFrequencia.map(m => m.mes),
-          datasets: [{
-            label: 'Frequência Mensal (%)',
-            data: mesesFrequencia.map(m => m.percentual),
-            backgroundColor: '#0d6efd',
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: { y: { beginAtZero: true, max: 100 } },
-          plugins: { legend: { display: false } }
+    <style>
+        body {
+            font-family: 'Work Sans', sans-serif;
+            background-color: #f4f6f9;
         }
-      });
-    });
-  </script>
+        h1, h2, h3, h4, h5, .navbar-brand {
+            font-family: 'Poppins', sans-serif;
+        }
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+            transition: transform 0.2s;
+        }
+        .card:hover {
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        }
+        .kpi-card {
+            background: #fff;
+            overflow: hidden;
+            position: relative;
+        }
+        .bg-gradient-primary {
+            background: linear-gradient(135deg, #0d6efd 0%, #0043a8 100%);
+        }
+        .list-group-item {
+            border: none;
+            border-bottom: 1px solid #f0f0f0;
+            padding: 1rem 1.25rem;
+        }
+        .list-group-item:last-child {
+            border-bottom: none;
+        }
+        /* Mobile adjustments */
+        @media (max-width: 768px) {
+            .display-6 { font-size: 2rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top shadow-sm">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="{% url 'cadastros:portal_aluno' %}">
+                <i class="bi bi-mortarboard-fill me-2"></i>MMS Portal
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarUser">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse justify-content-end" id="navbarUser">
+                <ul class="navbar-nav align-items-center">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle text-white fw-bold" href="#" data-bs-toggle="dropdown">
+                            <i class="bi bi-person-circle me-1"></i> {{ aluno.nome_completo.split.0 }}
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end shadow">
+                            <li><a class="dropdown-item" href="{% url 'cadastros:password_change' %}"><i class="bi bi-shield-lock me-2"></i>Segurança</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <form action="{% url 'cadastros:portal_logout' %}" method="post">
+                                    {% csrf_token %}
+                                    <button type="submit" class="dropdown-item text-danger"><i class="bi bi-box-arrow-right me-2"></i>Sair</button>
+                                </form>
+                            </li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container py-4">
+        
+        <div class="row align-items-center mb-4">
+            <div class="col-12 col-md-8">
+                <h2 class="fw-bold text-dark mb-0">Olá, {{ aluno.nome_completo.split.0 }}! 👋</h2>
+                <p class="text-muted mb-0">Aqui está o resumo do seu progresso.</p>
+            </div>
+            <div class="col-12 col-md-4 text-md-end mt-3 mt-md-0">
+                {% if aluno.inscricao_set.first %}
+                 <span class="badge bg-primary rounded-pill px-3 py-2 fs-6 shadow-sm">
+                    <i class="bi bi-star-fill me-1"></i> Stage {{ aluno.inscricao_set.first.turma.stage }}
+                 </span>
+                 {% endif %}
+            </div>
+        </div>
+
+        {% if ultimo_acompanhamento and ultimo_acompanhamento.atividades_recomendadas %}
+        <div class="alert alert-info border-0 shadow-sm d-flex align-items-start fade show mb-4" role="alert">
+            <i class="bi bi-lightbulb-fill fs-4 me-3 mt-1"></i>
+            <div>
+                <h5 class="alert-heading fw-bold h6">Dica do Professor ({{ ultimo_acompanhamento.data_realizacao|date:"d/m" }})</h5>
+                <p class="mb-0 small" style="white-space: pre-wrap;">{{ ultimo_acompanhamento.atividades_recomendadas }}</p>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="row g-3 mb-4">
+            <div class="col-12 col-md-4">
+                <div class="card kpi-card h-100 bg-gradient-primary text-white">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="text-white-50 text-uppercase fw-bold small mb-1">Frequência Geral</h6>
+                                <h2 class="display-5 fw-bold mb-0">{{ percentual_frequencia|floatformat:0 }}<span class="fs-4">%</span></h2>
+                            </div>
+                            <i class="bi bi-graph-up-arrow fs-1 text-white-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-6 col-md-4">
+                <div class="card kpi-card h-100">
+                    <div class="card-body p-4">
+                        <h6 class="text-muted text-uppercase fw-bold small mb-1">Aulas Assistidas</h6>
+                        <h2 class="fw-bold text-dark mb-0">{{ presencas_stats.total_presencas }}</h2>
+                        <small class="text-muted">Total no histórico</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-6 col-md-4">
+                <div class="card kpi-card h-100">
+                    <div class="card-body p-4">
+                        <h6 class="text-muted text-uppercase fw-bold small mb-1">Status Financeiro</h6>
+                        {% if kpis.total_pendente > 0 %}
+                            <h4 class="text-warning fw-bold mb-0">R$ {{ kpis.total_pendente|floatformat:2 }}</h4>
+                            <small class="text-danger fw-bold"><i class="bi bi-exclamation-circle"></i> Pendente</small>
+                        {% else %}
+                            <h4 class="text-success fw-bold mb-0">Em dia! 🎉</h4>
+                            <small class="text-muted">Nenhuma pendência</small>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            
+            <div class="col-lg-8">
+                
+                <div class="card mb-4">
+                    <div class="card-header bg-white border-0 py-3">
+                        <h5 class="fw-bold m-0 h6"><i class="bi bi-bar-chart-line me-2 text-primary"></i> Sua Evolução (6 Meses)</h5>
+                    </div>
+                    <div class="card-body pt-0">
+                        <div style="height: 250px;">
+                            <canvas id="frequenciaChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="fw-bold m-0 h6"><i class="bi bi-calendar-check me-2 text-primary"></i> Aulas em {{ data_selecionada|date:"F/Y" }}</h5>
+                        </div>
+                        <div class="btn-group btn-group-sm">
+                            <a href="?ano={{ nav.ano_anterior }}&mes={{ nav.mes_anterior }}" class="btn btn-outline-secondary"><i class="bi bi-chevron-left"></i></a>
+                            <a href="?ano={{ nav.ano_seguinte }}&mes={{ nav.mes_seguinte }}" class="btn btn-outline-secondary"><i class="bi bi-chevron-right"></i></a>
+                        </div>
+                    </div>
+                    <div class="list-group list-group-flush">
+                        {% for presenca in historico_aulas %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-light rounded p-2 text-center me-3" style="min-width: 50px;">
+                                    <small class="d-block fw-bold text-muted">{{ presenca.registro_aula.data_aula|date:"M"|upper }}</small>
+                                    <span class="h5 fw-bold text-dark mb-0">{{ presenca.registro_aula.data_aula|date:"d" }}</span>
+                                </div>
+                                <div>
+                                    <span class="fw-bold d-block text-dark">{{ presenca.registro_aula.turma.nome }}</span>
+                                    <small class="text-muted">{{ presenca.registro_aula.data_aula|date:"l" }}</small>
+                                </div>
+                            </div>
+                            {% if presenca.presente %}
+                                <span class="badge bg-success-subtle text-success rounded-pill px-3">Presente</span>
+                            {% else %}
+                                <span class="badge bg-danger-subtle text-danger rounded-pill px-3">Falta</span>
+                            {% endif %}
+                        </div>
+                        {% empty %}
+                        <div class="text-center py-5">
+                            <i class="bi bi-calendar-x text-muted fs-1"></i>
+                            <p class="text-muted mt-2">Nenhuma aula registrada neste mês.</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                
+                {% if provas_pendentes %}
+                <div class="card border-warning mb-4 shadow-sm">
+                    <div class="card-header bg-warning text-dark border-0">
+                        <h5 class="h6 fw-bold mb-0"><i class="bi bi-pencil-square me-2"></i> Provas Disponíveis</h5>
+                    </div>
+                    <div class="card-body bg-warning bg-opacity-10">
+                        <p class="small mb-3">Você tem provas aguardando realização.</p>
+                        
+                        {% for prova in provas_pendentes %}
+                            <a href="{% url 'cadastros:iniciar_prova' prova.pk %}" class="btn btn-dark w-100 mb-2 d-flex justify-content-between align-items-center">
+                                <span>{{ prova.prova_template.titulo }}</span>
+                                
+                                {% if prova.status == 'em_progresso' %}
+                                    <span class="badge bg-primary rounded-pill"><i class="bi bi-play-fill"></i> Continuar</span>
+                                {% else %}
+                                    <span class="badge bg-success rounded-pill"><i class="bi bi-star-fill"></i> Iniciar</span>
+                                {% endif %}
+                            </a>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% else %}
+                <div class="card mb-4 border-0 shadow-sm">
+                    <div class="card-body text-center text-muted py-4">
+                        <i class="bi bi-check2-all fs-1 mb-2 d-block text-success opacity-50"></i>
+                        <p class="small mb-0">Nenhuma prova pendente no momento.</p>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="card mb-4">
+                    <div class="card-header bg-white border-0 py-3">
+                        <h5 class="fw-bold m-0 h6 text-danger"><i class="bi bi-wallet2 me-2"></i> Contas a Pagar</h5>
+                    </div>
+                    <div class="list-group list-group-flush">
+                        {% for p in pagamentos_abertos %}
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="fw-bold text-dark">{{ p.descricao }}</span>
+                                <span class="fw-bold text-danger">R$ {{ p.valor|floatformat:2 }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted">Vence: {{ p.data_vencimento|date:"d/m/Y" }}</small>
+                                <span class="badge {% if p.status == 'atrasado' %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+                                    {{ p.get_status_display }}
+                                </span>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="p-4 text-center">
+                            <i class="bi bi-check-circle text-success fs-1"></i>
+                            <p class="text-muted mt-2 mb-0">Tudo pago! Obrigado.</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header bg-white border-0 py-3">
+                        <h5 class="fw-bold m-0 h6"><i class="bi bi-journal-check me-2 text-primary"></i> Últimas Notas</h5>
+                    </div>
+                    <div class="list-group list-group-flush">
+                        {% for prova in provas_finalizadas|slice:":5" %}
+                        <a href="{% url 'cadastros:ver_resultado_prova' prova.pk %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                            <div class="text-truncate me-2" style="max-width: 180px;">
+                                {{ prova.prova_template.titulo }}
+                                <small class="d-block text-muted">{{ prova.data_realizacao|date:"d/m/Y" }}</small>
+                            </div>
+                            <span class="badge rounded-pill fs-6 {% if prova.nota_final >= 70 %}bg-success{% else %}bg-secondary{% endif %}">
+                                {{ prova.nota_final|floatformat:1 }}
+                            </span>
+                        </a>
+                        {% empty %}
+                        <div class="p-3 text-center text-muted small">Nenhuma prova finalizada ainda.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+    
+    {{ meses_frequencia|json_script:"dados-frequencia" }}
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const canvas = document.getElementById('frequenciaChart');
+            
+            // Só executa se o gráfico existir na página
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                
+                // Lê os dados do script JSON definido acima
+                // Isso evita erros de sintaxe no editor
+                const dadosFrequencia = JSON.parse(document.getElementById('dados-frequencia').textContent);
+
+                new Chart(ctx, {
+                    type: 'line', 
+                    data: {
+                        // Mapeia os meses (Eixo X)
+                        labels: dadosFrequencia.map(d => d.mes),
+                        datasets: [{
+                            label: 'Frequência (%)',
+                            // Mapeia os valores (Eixo Y)
+                            data: dadosFrequencia.map(d => d.percentual),
+                            borderColor: '#0d6efd',
+                            backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                            borderWidth: 3,
+                            tension: 0.4, // Deixa a linha curva/suave
+                            fill: true,
+                            pointBackgroundColor: '#fff',
+                            pointBorderColor: '#0d6efd',
+                            pointRadius: 5,
+                            pointHoverRadius: 7
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.parsed.y + '% de Presença';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 100,
+                                grid: { borderDash: [5, 5] },
+                                ticks: { stepSize: 20 }
+                            },
+                            x: {
+                                grid: { display: false }
+                            }
+                        }
+                    }
+                });
+            }
+        });
+    </script>
 
 </body>
 </html>
