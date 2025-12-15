@@ -2,420 +2,482 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-    <meta charset="UTF-8">
-    <title>Dashboard Feedback & Qualidade</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-    <link href="{% static 'cadastros/mms_style.css' %}" rel="stylesheet">
-    <style>
-        .nav-pills .nav-link.active { background-color: #0d6efd; color: white !important; }
-        .nav-pills .nav-link { color: #495057; text-align: left; border-radius: 8px; margin-bottom: 4px; }
-        .feedback-card { border-left: 4px solid #dee2e6; background: #fff; margin-bottom: 1rem; padding: 1rem; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-        .feedback-card.elogio { border-left-color: #198754; background-color: #f8fff9; }
-        .feedback-card.sugestao { border-left-color: #ffc107; background-color: #fffdf0; }
-        .stat-box { background: white; border: 1px solid #e9ecef; border-radius: 8px; padding: 1rem; text-align: center; height: 100%; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
-        .display-stat { font-size: 2rem; font-weight: 700; line-height: 1; margin-bottom: 0.5rem; }
-        .badge-destaque { font-size: 0.85rem; padding: 0.4em 0.8em; margin: 0 0.3rem 0.5rem 0; display: inline-block; background-color: #e7f1ff; color: #0d6efd; border: 1px solid #cce0ff; border-radius: 20px; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard de Qualidade (NPS) - MMS Portal</title>
+  
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    body { font-family: 'Poppins', sans-serif; background-color: #f0f2f5; }
+    
+    /* NPS Score Card */
+    .nps-card { background: linear-gradient(135deg, #0d6efd 0%, #0043a8 100%); color: white; }
+    .nps-score { font-size: 3.5rem; font-weight: 700; }
+    
+    /* Tabs Customizadas */
+    .nav-tabs .nav-link { color: #495057; border: none; font-weight: 600; padding: 1rem 1.5rem; }
+    .nav-tabs .nav-link.active { color: #0d6efd; border-bottom: 3px solid #0d6efd; background: transparent; }
+    
+    /* Cards de Comentários */
+    .feedback-card { border-left: 4px solid #dee2e6; transition: all 0.2s; }
+    .feedback-card.elogio { border-left-color: #198754; background-color: #f8fff9; }
+    .feedback-card.sugestao { border-left-color: #ffc107; background-color: #fffdf5; }
+    
+    .chart-box { height: 250px; position: relative; }
+    .chart-box-lg { height: 350px; position: relative; } /* Altura maior para o gráfico de turmas */
+    .avatar-circle { width: 50px; height: 50px; background-color: #e9ecef; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #495057; }
+  </style>
 </head>
-<body class="bg-light">
+<body>
 
-<div class="container-fluid px-4 my-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h1 class="h3 fw-bold mb-0">Central de Feedback</h1>
-            <p class="text-muted">Gestão de Qualidade e Satisfação (Anônimo)</p>
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow-sm">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="#"><i class="bi bi-heart-pulse-fill me-2"></i>MMS Quality Center</a>
+    <div class="d-flex">
+      <a href="{% url 'cadastros:dashboard_admin' %}" class="btn btn-outline-light btn-sm">
+        <i class="bi bi-arrow-left"></i> Voltar ao Painel
+      </a>
+    </div>
+  </div>
+</nav>
+
+<div class="container pb-5">
+
+  <div class="row g-4 mb-4">
+    
+    <div class="col-md-5">
+      <div class="card nps-card shadow h-100 border-0">
+        <div class="card-body text-center d-flex flex-column justify-content-center">
+          <h6 class="text-uppercase opacity-75 mb-2">Net Promoter Score (NPS)</h6>
+          <div class="nps-score mb-2">{{ nps_score }}</div>
+          
+          <div>
+            {% if nps_score >= 75 %}
+              <span class="badge bg-success border border-white"><i class="bi bi-trophy-fill me-1"></i>Zona de Excelência</span>
+            {% elif nps_score >= 50 %}
+              <span class="badge bg-primary border border-white"><i class="bi bi-check-circle-fill me-1"></i>Zona de Qualidade</span>
+            {% elif nps_score >= 0 %}
+              <span class="badge bg-warning text-dark border border-white"><i class="bi bi-exclamation-triangle-fill me-1"></i>Zona de Aperfeiçoamento</span>
+            {% else %}
+              <span class="badge bg-danger border border-white"><i class="bi bi-exclamation-octagon-fill me-1"></i>Zona Crítica</span>
+            {% endif %}
+          </div>
+          <p class="mt-3 mb-0 opacity-75 small">{{ total_respostas }} alunos responderam</p>
         </div>
-        <a href="{% url 'cadastros:dashboard_admin' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Voltar</a>
+      </div>
     </div>
 
-    <ul class="nav nav-tabs mb-4" id="mainTab" role="tablist">
-        <li class="nav-item"><button class="nav-link active fw-bold" data-bs-toggle="tab" data-bs-target="#geral" type="button"><i class="bi bi-pie-chart me-2"></i>Visão Geral & Marketing</button></li>
-        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#professores" type="button"><i class="bi bi-person-video3 me-2"></i>Professores</button></li>
-        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#adm" type="button"><i class="bi bi-pc-display me-2"></i>Administrativo</button></li>
-        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#ped" type="button"><i class="bi bi-journal-check me-2"></i>Pedagógico</button></li>
-    </ul>
+    <div class="col-md-3">
+      <div class="card shadow-sm h-100 border-0">
+        <div class="card-body">
+          <h6 class="fw-bold text-center mb-3">Distribuição</h6>
+          <div class="chart-box">
+            <canvas id="chartNPS"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
 
-    <div class="tab-content" id="mainTabContent">
+    <div class="col-md-4">
+      <div class="card shadow-sm h-100 border-0">
+        <div class="card-body">
+          <h6 class="fw-bold text-center mb-3">Engajamento Instagram</h6>
+          <div class="chart-box">
+            <canvas id="chartInsta"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-white border-0 py-3">
+            <h5 class="fw-bold mb-0"><i class="bi bi-bar-chart-steps me-2"></i>Média de Satisfação (NPS) por Turma</h5>
+            <small class="text-muted">Média das notas dadas pelos alunos ativos de cada turma.</small>
+        </div>
+        <div class="card-body">
+            <div class="chart-box-lg">
+                <canvas id="chartTurmas"></canvas>
+            </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-header bg-white border-0">
+      <ul class="nav nav-tabs card-header-tabs" id="feedbackTabs" role="tablist">
+        <li class="nav-item">
+          <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#teachers" type="button"><i class="bi bi-person-video3 me-2"></i>Teachers</button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#admin" type="button"><i class="bi bi-building me-2"></i>Administrativo</button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pedag" type="button"><i class="bi bi-journal-bookmark-fill me-2"></i>Pedagógico</button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#geral" type="button"><i class="bi bi-chat-quote-fill me-2"></i>Comentários Gerais</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#teacher-turma" type="button">
+                <i class="bi bi-grid-3x3-gap-fill me-2"></i>Desempenho por Turma
+            </button>
+            </li>
+      </ul>
+    </div>
+    
+    <div class="card-body bg-white">
+      <div class="tab-content" id="feedbackTabsContent">
         
-        <div class="tab-pane fade show active" id="geral" role="tabpanel">
-            <div class="row g-4 mb-4">
-                <div class="col-md-3">
-                    <div class="card border-0 shadow-sm h-100 text-center">
-                        <div class="card-body d-flex flex-column justify-content-center align-items-center">
-                            <h6 class="text-muted text-uppercase fw-bold mb-3">NPS Global</h6>
-                            {% if nps_score >= 75 %}
-                                <div class="display-1 fw-bold text-success">{{ nps_score }}</div>
-                                <span class="badge bg-success mt-2">Zona de Excelência</span>
-                            {% elif nps_score >= 50 %}
-                                <div class="display-1 fw-bold text-primary">{{ nps_score }}</div>
-                                <span class="badge bg-primary mt-2">Zona de Qualidade</span>
-                            {% elif nps_score >= 0 %}
-                                <div class="display-1 fw-bold text-warning">{{ nps_score }}</div>
-                                <span class="badge bg-warning mt-2">Aperfeiçoamento</span>
-                            {% else %}
-                                <div class="display-1 fw-bold text-danger">{{ nps_score }}</div>
-                                <span class="badge bg-danger mt-2">Crítico</span>
+        <div class="tab-pane fade show active" id="teachers">
+          <div class="accordion" id="accordionTeachers">
+            {% for item in teachers_data %}
+            <div class="accordion-item border-0 mb-3 shadow-sm rounded overflow-hidden">
+              <h2 class="accordion-header">
+                <button class="accordion-button collapsed bg-light" type="button" data-bs-toggle="collapse" data-bs-target="#collapseT{{ item.professor.id }}">
+                  <div class="d-flex align-items-center w-100">
+                    <div class="avatar-circle me-3 bg-primary text-white">
+                        {% if item.professor.foto %}
+                            <img src="{{ item.professor.foto.url }}" class="rounded-circle" style="width: 50px; height: 50px; object-fit: cover;">
+                        {% else %}
+                            {{ item.professor.nome_completo|slice:":1" }}
+                        {% endif %}
+                    </div>
+                    <div class="flex-grow-1">
+                      <h6 class="mb-0 fw-bold">{{ item.professor.nome_completo }}</h6>
+                      <small class="text-muted">{{ item.qtd }} avaliações</small>
+                    </div>
+                    <div class="me-4 text-end">
+                      <span class="badge bg-primary rounded-pill fs-6">{{ item.stats.media_sat|default:"-"|floatformat:1 }} <i class="bi bi-star-fill text-warning"></i></span>
+                    </div>
+                  </div>
+                </button>
+              </h2>
+              <div id="collapseT{{ item.professor.id }}" class="accordion-collapse collapse" data-bs-parent="#accordionTeachers">
+                <div class="accordion-body">
+                  <div class="row text-center mb-4">
+                    <div class="col-3"><small class="d-block text-muted">Satisfação</small><strong>{{ item.stats.media_sat|default:"-"|floatformat:1 }}</strong></div>
+                    <div class="col-3"><small class="d-block text-muted">Incentivo</small><strong>{{ item.stats.media_inc|default:"-"|floatformat:1 }}</strong></div>
+                    <div class="col-3"><small class="d-block text-muted">Conforto</small><strong>{{ item.stats.media_seg|default:"-"|floatformat:1 }}</strong></div>
+                    <div class="col-3"><small class="d-block text-muted">Clareza</small><strong>{{ item.stats.media_esf|default:"-"|floatformat:1 }}</strong></div>
+                  </div>
+                  
+                  <h6 class="fw-bold mb-3 border-bottom pb-2">O que dizem os alunos:</h6>
+                  {% if item.feedbacks %}
+                    <div class="row g-3">
+                        {% for fb in item.feedbacks %}
+                            {% if fb.elogio %}
+                            <div class="col-md-6">
+                                <div class="p-3 feedback-card elogio h-100 rounded">
+                                    <i class="bi bi-hand-thumbs-up-fill text-success mb-1"></i>
+                                    <span class="fst-italic">"{{ fb.elogio }}"</span>
+                                </div>
+                            </div>
                             {% endif %}
-                            <p class="text-muted mt-3 small">Baseado em {{ total_respostas }} respostas</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="col-md-3">
-                    <div class="card border-0 shadow-sm h-100">
-                        <div class="card-header bg-white fw-bold text-center">Distribuição NPS</div>
-                        <div class="card-body d-flex align-items-center justify-content-center">
-                            <div style="height: 200px; width: 200px;">
-                                <canvas id="chartNPS"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-md-3">
-                    <div class="card border-0 shadow-sm h-100">
-                        <div class="card-header bg-white fw-bold text-center"><i class="bi bi-instagram text-danger me-1"></i> Instagram da Escola</div>
-                        <div class="card-body d-flex align-items-center justify-content-center">
-                            <div style="height: 200px; width: 200px;">
-                                <canvas id="chartInsta"></canvas>
-                            </div>
-                        </div>
-                        <div class="card-footer bg-white text-center small text-muted">
-                            Engajamento dos Alunos
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-md-3">
-                    <div class="card border-0 shadow-sm h-100">
-                        <div class="card-header bg-white fw-bold"><i class="bi bi-collection-play me-1"></i> Conteúdos Desejados</div>
-                        <div class="card-body p-0 overflow-auto" style="max-height: 280px;">
-                            <ul class="list-group list-group-flush">
-                                {% for item in sugestoes_conteudo %}
-                                <li class="list-group-item small">
-                                    <i class="bi bi-chat-quote me-2 text-primary"></i> {{ item.conteudo_desejado }}
-                                </li>
-                                {% empty %}
-                                <li class="list-group-item text-muted text-center py-4">Nenhuma sugestão ainda.</li>
-                                {% endfor %}
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
-                    <span><i class="bi bi-chat-left-text me-2"></i> Espaço Livre (Comentários Gerais)</span>
-                    <span class="badge bg-secondary rounded-pill">{{ comentarios_gerais|length }}</span>
-                </div>
-                <div class="card-body p-3 bg-light">
-                    <div class="row" data-masonry='{"percentPosition": true }'>
-                        {% for com in comentarios_gerais %}
-                            <div class="col-md-4 mb-3">
-                                <div class="feedback-card h-100">
-                                    <div class="small text-muted mb-2 d-flex justify-content-between">
-                                        <span>Anônimo</span>
-                                        <span>{{ com.data_resposta|date:"d/m/Y" }}</span>
-                                    </div>
-                                    <div class="text-dark">"{{ com.comentarios_gerais }}"</div>
+                            {% if fb.sugestao %}
+                            <div class="col-md-6">
+                                <div class="p-3 feedback-card sugestao h-100 rounded">
+                                    <i class="bi bi-lightbulb-fill text-warning mb-1"></i>
+                                    <span class="fst-italic">"{{ fb.sugestao }}"</span>
                                 </div>
                             </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                  {% else %}
+                    <p class="text-muted text-center fst-italic">Nenhum comentário escrito para este professor ainda.</p>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="admin">
+            {% for item in admins_data %}
+            <div class="card mb-3 shadow-sm border-0">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div class="d-flex align-items-center">
+                            <div class="avatar-circle me-3 bg-secondary text-white">{{ item.membro.nome_completo|slice:":1" }}</div>
+                            <div>
+                                <h5 class="mb-0">{{ item.membro.nome_completo }}</h5>
+                                <span class="badge bg-light text-dark border">{{ item.qtd }} avaliações</span>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <h3 class="mb-0 text-primary">{{ item.stats.media_atendimento|default:"-"|floatformat:1 }}</h3>
+                            <small class="text-muted">Nota Geral</small>
+                        </div>
+                    </div>
+
+                    {% if item.destaques %}
+                    <div class="mb-3">
+                        {% for tag, count in item.destaques %}
+                            <span class="badge bg-info bg-opacity-10 text-info border border-info me-1 mb-1">
+                                {{ tag }} <span class="badge bg-white text-dark ms-1">{{ count }}</span>
+                            </span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div class="bg-light p-3 rounded">
+                        {% for fb in item.feedbacks %}
+                            {% if fb.elogio %}<p class="mb-2"><i class="bi bi-chat-heart-fill text-danger me-2"></i>{{ fb.elogio }}</p>{% endif %}
+                            {% if fb.sugestao %}<p class="mb-2"><i class="bi bi-exclamation-circle-fill text-warning me-2"></i>{{ fb.sugestao }}</p>{% endif %}
                         {% empty %}
-                            <div class="col-12 text-center text-muted py-4">Nenhum comentário geral registrado.</div>
+                            <small class="text-muted">Sem comentários textuais.</small>
                         {% endfor %}
                     </div>
                 </div>
             </div>
+            {% endfor %}
         </div>
 
-        <div class="tab-pane fade" id="professores" role="tabpanel">
-            <div class="row">
-                <div class="col-md-3">
-                    <div class="card shadow-sm border-0">
-                        <div class="card-header bg-white fw-bold">Selecione o Teacher</div>
-                        <div class="card-body p-2">
-                            <div class="nav flex-column nav-pills" id="v-pills-prof-tab" role="tablist">
-                                {% for item in teachers_data %}
-                                    <button class="nav-link {% if forloop.first %}active{% endif %} d-flex justify-content-between align-items-center" 
-                                            id="v-pills-prof-{{ item.professor.id }}-tab" 
-                                            data-bs-toggle="pill" 
-                                            data-bs-target="#v-pills-prof-{{ item.professor.id }}" 
-                                            type="button" role="tab">
-                                        <span>{{ item.professor.nome_completo }}</span>
-                                        {% if item.qtd > 0 %}
-                                            <span class="badge bg-light text-dark border ms-2">{{ item.qtd }}</span>
-                                        {% endif %}
-                                    </button>
-                                {% empty %}
-                                    <div class="text-muted small p-2">Nenhum teacher ativo.</div>
-                                {% endfor %}
-                            </div>
-                        </div>
+        <div class="tab-pane fade" id="pedag">
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle me-2"></i>Exibindo apenas avaliações de alunos que realizaram acompanhamento pedagógico.
+            </div>
+            {% for item in peds_data %}
+            <div class="card mb-3 border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="avatar-circle me-3 bg-warning text-dark">{{ item.coordenador.nome_completo|slice:":1" }}</div>
+                        <h5 class="mb-0 me-3">{{ item.coordenador.nome_completo }}</h5>
+                        <span class="badge bg-warning text-dark">{{ item.stats.media_sat|default:"-"|floatformat:1 }} <i class="bi bi-star-fill"></i></span>
                     </div>
+                    <ul class="list-group list-group-flush">
+                        {% for fb in item.feedbacks %}
+                            <li class="list-group-item bg-transparent">
+                                {% if fb.atividades_interessantes %}
+                                    <div class="small text-muted mb-1">Atividade Útil:</div>
+                                    <p class="mb-1 text-primary">{{ fb.atividades_interessantes }}</p>
+                                {% endif %}
+                                {% if fb.sugestao %}
+                                    <p class="mb-0 text-muted fst-italic"><i class="bi bi-arrow-return-right me-2"></i>{{ fb.sugestao }}</p>
+                                {% endif %}
+                            </li>
+                        {% empty %}
+                            <li class="list-group-item">Sem feedbacks detalhados.</li>
+                        {% endfor %}
+                    </ul>
                 </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="tab-pane fade" id="geral">
+            <h5 class="mb-3">Caixa de Sugestões e Comentários Livres</h5>
+            {% for c in comentarios_gerais %}
+            <div class="card mb-2 border-0 bg-light">
+                <div class="card-body py-2">
+                    <p class="mb-1">"{{ c.comentarios_gerais }}"</p>
+                    <small class="text-muted d-block text-end">{{ c.data_resposta|date:"d/m/Y" }}</small>
+                </div>
+            </div>
+            {% empty %}
+                <p class="text-muted text-center py-5">Nenhum comentário geral registrado.</p>
+            {% endfor %}
+        </div>
+
+        <div class="tab-pane fade" id="teacher-turma">
+  
+            <div class="accordion" id="accordionTurmas">
+                {% for item_turma in turmas_data %}
+                <div class="accordion-item border-0 mb-3 shadow-sm rounded overflow-hidden">
                 
-                <div class="col-md-9">
-                    <div class="tab-content" id="v-pills-prof-tabContent">
-                        {% for item in teachers_data %}
-                        <div class="tab-pane fade {% if forloop.first %}show active{% endif %}" id="v-pills-prof-{{ item.professor.id }}" role="tabpanel">
-                            <h4 class="mb-3">{{ item.professor.nome_completo }}</h4>
-                            
-                            <div class="row g-3 mb-4">
-                                <div class="col-6 col-md-3">
-                                    <div class="stat-box">
-                                        <div class="display-stat text-primary">{{ item.stats.media_sat|default:"0"|floatformat:1 }}</div>
-                                        <small class="text-muted text-uppercase fw-bold" style="font-size: 0.7rem;">Satisfação</small>
-                                    </div>
-                                </div>
-                                <div class="col-6 col-md-3">
-                                    <div class="stat-box">
-                                        <div class="display-stat text-info">{{ item.stats.media_inc|default:"0"|floatformat:1 }}</div>
-                                        <small class="text-muted text-uppercase fw-bold" style="font-size: 0.7rem;">Incentivo</small>
-                                    </div>
-                                </div>
-                                <div class="col-6 col-md-3">
-                                    <div class="stat-box">
-                                        <div class="display-stat text-success">{{ item.stats.media_seg|default:"0"|floatformat:1 }}</div>
-                                        <small class="text-muted text-uppercase fw-bold" style="font-size: 0.7rem;">Segurança</small>
-                                    </div>
-                                </div>
-                                <div class="col-6 col-md-3">
-                                    <div class="stat-box">
-                                        <div class="display-stat text-warning">{{ item.stats.media_esf|default:"0"|floatformat:1 }}</div>
-                                        <small class="text-muted text-uppercase fw-bold" style="font-size: 0.7rem;">Esforço</small>
-                                    </div>
-                                </div>
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed bg-white fw-bold text-dark" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTurma{{ item_turma.turma.id }}">
+                    <div class="d-flex align-items-center w-100">
+                        <i class="bi bi-people-fill me-2 text-primary fs-5"></i> 
+                        <span class="me-3">{{ item_turma.turma.nome }}</span>
+                        <span class="badge bg-light text-dark border">{{ item_turma.professores|length }} Teachers Avaliados</span>
+                    </div>
+                    </button>
+                </h2>
+                
+                <div id="collapseTurma{{ item_turma.turma.id }}" class="accordion-collapse collapse" data-bs-parent="#accordionTurmas">
+                    <div class="accordion-body bg-light">
+                    
+                    {% for item_prof in item_turma.professores %}
+                    <div class="card mb-3 border-0 shadow-sm">
+                        <div class="card-body">
+                        <div class="d-flex align-items-center mb-3 border-bottom pb-3">
+                            <div class="avatar-circle me-3 bg-primary text-white text-uppercase">
+                                {% if item_prof.professor.foto %}
+                                    <img src="{{ item_prof.professor.foto.url }}" class="rounded-circle" style="width: 40px; height: 40px; object-fit: cover;">
+                                {% else %}
+                                    {{ item_prof.professor.nome_completo|slice:":2" }}
+                                {% endif %}
                             </div>
-
-                            <h5 class="fw-bold mb-3 border-bottom pb-2">O que dizem os alunos</h5>
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <h6 class="text-success fw-bold"><i class="bi bi-hand-thumbs-up-fill me-1"></i> Elogios</h6>
-                                    {% for f in item.feedbacks %}
-                                        {% if f.elogio %}
-                                            <div class="feedback-card elogio">
-                                                <div class="fst-italic text-dark">"{{ f.elogio }}"</div>
-                                                <div class="text-end mt-1"><small class="text-muted">{{ f.pesquisa.data_resposta|date:"d/m/Y" }}</small></div>
-                                            </div>
-                                        {% endif %}
-                                    {% endfor %}
-                                </div>
-                                <div class="col-md-6">
-                                    <h6 class="text-warning-emphasis fw-bold"><i class="bi bi-lightbulb-fill me-1"></i> Sugestões</h6>
-                                    {% for f in item.feedbacks %}
-                                        {% if f.sugestao %}
-                                            <div class="feedback-card sugestao">
-                                                <div class="fst-italic text-dark">"{{ f.sugestao }}"</div>
-                                                <div class="text-end mt-1"><small class="text-muted">{{ f.pesquisa.data_resposta|date:"d/m/Y" }}</small></div>
-                                            </div>
-                                        {% endif %}
-                                    {% endfor %}
-                                </div>
+                            
+                            <div class="flex-grow-1">
+                            <h6 class="mb-0 fw-bold">{{ item_prof.professor.nome_completo }}</h6>
+                            <small class="text-muted">{{ item_prof.qtd }} alunos desta turma avaliaram</small>
+                            </div>
+                            
+                            <div class="text-end">
+                            <span class="badge fs-6 
+                                {% if item_prof.stats.media_sat >= 4.5 %}bg-success
+                                {% elif item_prof.stats.media_sat < 3 %}bg-danger
+                                {% else %}bg-primary{% endif %}">
+                                    {{ item_prof.stats.media_sat|default:"-"|floatformat:1 }} <i class="bi bi-star-fill text-warning"></i>
+                            </span>
                             </div>
                         </div>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <div class="tab-pane fade" id="adm" role="tabpanel">
-            <div class="row">
-                <div class="col-md-3">
-                    <div class="card shadow-sm border-0">
-                        <div class="card-header bg-white fw-bold">Selecione o Membro</div>
-                        <div class="card-body p-2">
-                            <div class="nav flex-column nav-pills" id="v-pills-adm-tab" role="tablist">
-                                {% for item in admins_data %}
-                                    <button class="nav-link {% if forloop.first %}active{% endif %} d-flex justify-content-between align-items-center" 
-                                            id="v-pills-adm-{{ item.membro.id }}-tab" 
-                                            data-bs-toggle="pill" 
-                                            data-bs-target="#v-pills-adm-{{ item.membro.id }}" 
-                                            type="button" role="tab">
-                                        <span>{{ item.membro.nome_completo }}</span>
-                                        {% if item.qtd > 0 %}
-                                            <span class="badge bg-light text-dark border ms-2">{{ item.qtd }}</span>
+                        <div class="row text-center mb-3 small text-secondary">
+                            <div class="col-3 border-end">
+                                <span class="d-block text-uppercase" style="font-size: 0.7rem;">Satisfação</span>
+                                <strong class="text-dark fs-6">{{ item_prof.stats.media_sat|default:"-"|floatformat:1 }}</strong>
+                            </div>
+                            <div class="col-3 border-end">
+                                <span class="d-block text-uppercase" style="font-size: 0.7rem;">Incentivo</span>
+                                <strong class="text-dark fs-6">{{ item_prof.stats.media_inc|default:"-"|floatformat:1 }}</strong>
+                            </div>
+                            <div class="col-3 border-end">
+                                <span class="d-block text-uppercase" style="font-size: 0.7rem;">Conforto</span>
+                                <strong class="text-dark fs-6">{{ item_prof.stats.media_seg|default:"-"|floatformat:1 }}</strong>
+                            </div>
+                            <div class="col-3">
+                                <span class="d-block text-uppercase" style="font-size: 0.7rem;">Clareza</span>
+                                <strong class="text-dark fs-6">{{ item_prof.stats.media_esf|default:"-"|floatformat:1 }}</strong>
+                            </div>
+                        </div>
+
+                        {% if item_prof.feedbacks %}
+                            <div class="bg-white p-3 rounded border">
+                                <small class="fw-bold text-muted mb-2 d-block"><i class="bi bi-chat-left-text me-1"></i>O que disseram nesta turma:</small>
+                                {% for fb in item_prof.feedbacks %}
+                                    <div class="mb-2 ps-2 border-start border-3 
+                                        {% if fb.elogio %}border-success{% else %}border-warning{% endif %}">
+                                        {% if fb.elogio %}
+                                            <p class="mb-0 small fst-italic text-dark">"<i class="bi bi-hand-thumbs-up text-success"></i> {{ fb.elogio }}"</p>
                                         {% endif %}
-                                    </button>
-                                {% empty %}
-                                    <div class="text-muted small p-2">Nenhum membro administrativo ativo.</div>
+                                        {% if fb.sugestao %}
+                                            <p class="mb-0 small fst-italic text-dark">"<i class="bi bi-lightbulb text-warning"></i> {{ fb.sugestao }}"</p>
+                                        {% endif %}
+                                    </div>
                                 {% endfor %}
                             </div>
+                        {% else %}
+                            <div class="text-center">
+                                <small class="text-muted fst-italic">Sem comentários escritos nesta turma.</small>
+                            </div>
+                        {% endif %}
+
                         </div>
                     </div>
-                </div>
-                <div class="col-md-9">
-                    <div class="tab-content">
-                        {% for item in admins_data %}
-                        <div class="tab-pane fade {% if forloop.first %}show active{% endif %}" id="v-pills-adm-{{ item.membro.id }}" role="tabpanel">
-                            <h4 class="mb-3">{{ item.membro.nome_completo }} <span class="text-muted fs-6">(Administrativo)</span></h4>
-                            
-                            <div class="row g-3 mb-4">
-                                <div class="col-md-4">
-                                    <div class="stat-box border-primary border-opacity-25">
-                                        <div class="display-stat text-primary">{{ item.stats.media_atendimento|default:"0"|floatformat:1 }}</div>
-                                        <small class="text-muted text-uppercase fw-bold">Avaliação Geral</small>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="stat-box border-success border-opacity-25">
-                                        <div class="display-stat text-success">{{ item.stats.media_satisfacao|default:"0"|floatformat:1 }}</div>
-                                        <small class="text-muted text-uppercase fw-bold">Satisfação</small>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="stat-box border-info border-opacity-25">
-                                        <div class="display-stat text-info">{{ item.stats.media_educacao|default:"0"|floatformat:1 }}</div>
-                                        <small class="text-muted text-uppercase fw-bold">Educação</small>
-                                    </div>
-                                </div>
-                            </div>
+                    {% endfor %}
 
-                            <div class="card border-0 shadow-sm mb-4">
-                                <div class="card-header bg-white fw-bold"><i class="bi bi-stars text-warning me-2"></i>Itens que se destacam</div>
-                                <div class="card-body">
-                                    {% if item.destaques %}
-                                        {% for destaque, count in item.destaques %}
-                                            <span class="badge-destaque">
-                                                {{ destaque }} <span class="fw-bold ms-1">({{ count }})</span>
-                                            </span>
-                                        {% endfor %}
-                                    {% else %}
-                                        <p class="text-muted small mb-0">Nenhum destaque apontado ainda.</p>
-                                    {% endif %}
-                                </div>
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <h6 class="text-success fw-bold">Elogios</h6>
-                                    {% for f in item.feedbacks %}
-                                        {% if f.elogio %}
-                                        <div class="feedback-card elogio">{{ f.elogio }}</div>
-                                        {% endif %}
-                                    {% endfor %}
-                                </div>
-                                <div class="col-md-6">
-                                    <h6 class="text-warning-emphasis fw-bold">Sugestões</h6>
-                                    {% for f in item.feedbacks %}
-                                        {% if f.sugestao %}
-                                        <div class="feedback-card sugestao">{{ f.sugestao }}</div>
-                                        {% endif %}
-                                    {% endfor %}
-                                </div>
-                            </div>
-                        </div>
-                        {% endfor %}
                     </div>
                 </div>
+                </div>
+                {% empty %}
+                <div class="alert alert-light text-center py-5">
+                    <i class="bi bi-inbox fs-1 text-muted d-block mb-3"></i>
+                    Nenhuma turma com avaliações registradas no momento.
+                </div>
+                {% endfor %}
             </div>
-        </div>
-
-        <div class="tab-pane fade" id="ped" role="tabpanel">
-            <div class="row">
-                <div class="col-md-3">
-                    <div class="card shadow-sm border-0">
-                        <div class="card-header bg-white fw-bold">Coordenador(a)</div>
-                        <div class="card-body p-2">
-                            <div class="nav flex-column nav-pills" id="v-pills-ped-tab" role="tablist">
-                                {% for item in peds_data %}
-                                    <button class="nav-link {% if forloop.first %}active{% endif %} d-flex justify-content-between align-items-center" 
-                                            id="v-pills-ped-{{ item.coordenador.id }}-tab" 
-                                            data-bs-toggle="pill" 
-                                            data-bs-target="#v-pills-ped-{{ item.coordenador.id }}" 
-                                            type="button" role="tab">
-                                        <span>{{ item.coordenador.nome_completo }}</span>
-                                        {% if item.qtd > 0 %}
-                                            <span class="badge bg-light text-dark border ms-2">{{ item.qtd }}</span>
-                                        {% endif %}
-                                    </button>
-                                {% empty %}
-                                    <div class="text-muted small p-2">Nenhum coordenador pedagógico ativo.</div>
-                                {% endfor %}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-9">
-                    <div class="tab-content">
-                        {% for item in peds_data %}
-                        <div class="tab-pane fade {% if forloop.first %}show active{% endif %}" id="v-pills-ped-{{ item.coordenador.id }}" role="tabpanel">
-                            <h4 class="mb-3">{{ item.coordenador.nome_completo }} (Pedagógico)</h4>
-                            
-                            <div class="mb-4">
-                                <div class="stat-box d-inline-block px-4">
-                                    <span class="display-stat text-primary">{{ item.stats.media_sat|default:"0"|floatformat:1 }}</span>
-                                    <div class="small text-muted text-uppercase fw-bold">Satisfação com Acompanhamento</div>
-                                </div>
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <h6 class="text-success fw-bold">Atividades Interessantes / Elogios</h6>
-                                    {% for f in item.feedbacks %}
-                                        {% if f.atividades_interessantes or f.elogio %}
-                                        <div class="feedback-card elogio">
-                                            {% if f.atividades_interessantes %}<strong>Ativ:</strong> {{ f.atividades_interessantes }}<br>{% endif %}
-                                            {% if f.elogio %}<strong>Elogio:</strong> {{ f.elogio }}{% endif %}
-                                        </div>
-                                        {% endif %}
-                                    {% endfor %}
-                                </div>
-                                <div class="col-md-6">
-                                    <h6 class="text-warning-emphasis fw-bold">Sugestões</h6>
-                                    {% for f in item.feedbacks %}
-                                        {% if f.sugestao %}
-                                        <div class="feedback-card sugestao">{{ f.sugestao }}</div>
-                                        {% endif %}
-                                    {% endfor %}
-                                </div>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
             </div>
-        </div>
 
+      </div>
     </div>
+  </div>
+
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/masonry-layout@4.2.2/dist/masonry.pkgd.min.js" async></script>
 
 <script>
-    // 1. Gráfico NPS
-    const distNPS = JSON.parse('{{ distribuicao_nps|escapejs }}');
-    new Chart(document.getElementById('chartNPS'), {
-        type: 'doughnut',
-        data: {
-            labels: ['Promotores', 'Neutros', 'Detratores'],
-            datasets: [{
-                data: distNPS,
-                backgroundColor: ['#198754', '#ffc107', '#dc3545'],
-                hoverOffset: 4
-            }]
-        },
-        options: { plugins: { legend: { display: false } }, cutout: '70%' }
-    });
+  // CORES
+  const cPromoter = '#198754'; 
+  const cPassive = '#ffc107'; 
+  const cDetractor = '#dc3545';
+  const cBlue = '#0d6efd';
+  const cGrey = '#ced4da';
+  const cPurple = '#6f42c1';
 
-    // 2. Gráfico Instagram
-    const instaData = JSON.parse('{{ insta_data|escapejs }}');
-    new Chart(document.getElementById('chartInsta'), {
-        type: 'pie',
-        data: {
-            labels: ['Seguem', 'Não Seguem'],
-            datasets: [{
-                data: instaData,
-                backgroundColor: ['#d62976', '#adb5bd'], // Cor Insta / Cinza
-                hoverOffset: 4
-            }]
-        },
-        options: { plugins: { legend: { position: 'bottom' } } }
-    });
+  // --- CORREÇÃO DE LINTING (JSON PARSE) ---
+  // A técnica abaixo remove os erros vermelhos do editor
+  const distNPS = JSON.parse("{{ distribuicao_nps|escapejs }}"); 
+  const instaData = JSON.parse("{{ insta_data|escapejs }}"); 
+  const dadosTurmas = JSON.parse("{{ dados_turmas|escapejs }}"); 
+
+  // 1. GRÁFICO NPS (Doughnut)
+  new Chart(document.getElementById('chartNPS'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Promotores', 'Neutros', 'Detratores'],
+      datasets: [{
+        data: distNPS,
+        backgroundColor: [cPromoter, cPassive, cDetractor],
+        borderWidth: 0,
+        hoverOffset: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } } },
+      cutout: '70%'
+    }
+  });
+
+  // 2. GRÁFICO INSTAGRAM (Pie)
+  new Chart(document.getElementById('chartInsta'), {
+    type: 'pie',
+    data: {
+      labels: ['Seguem @mms', 'Não Seguem'],
+      datasets: [{
+        data: instaData,
+        backgroundColor: [cBlue, cGrey],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: 'right' } }
+    }
+  });
+
+  // 3. NOVO: GRÁFICO POR TURMA (Horizontal Bar)
+  new Chart(document.getElementById('chartTurmas'), {
+    type: 'bar',
+    data: {
+      labels: dadosTurmas.labels,
+      datasets: [{
+        label: 'NPS Médio',
+        data: dadosTurmas.data,
+        backgroundColor: cPurple,
+        borderRadius: 4
+      }]
+    },
+    options: {
+      indexAxis: 'y', // Barra Horizontal
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { 
+            beginAtZero: true, 
+            max: 10,
+            title: { display: true, text: 'Nota Média (0-10)' }
+        }
+      },
+      plugins: { legend: { display: false } }
+    }
+  });
 </script>
+
 </body>
 </html>

@@ -1,0 +1,133 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Enviar Comunicado - MMS Portal</title>
+  
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Work+Sans:wght@400;500&display=swap" rel="stylesheet">
+  
+  <link href="{% static 'cadastros/mms_style.css' %}" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<main class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-sm border-0">
+                
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-3">
+                    <h4 class="h5 mb-0 d-flex align-items-center">
+                        <i class="bi bi-envelope-paper-fill me-2"></i> Enviar Comunicado
+                    </h4>
+                    <a href="{% url 'cadastros:enviar_email_alunos' %}" class="btn btn-sm btn-outline-light text-decoration-none">
+                        <i class="bi bi-arrow-left"></i> Voltar
+                    </a>
+                </div>
+
+                <div class="card-body p-4">
+                    
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label for="{{ form.tipo_destinatario.id_for_label }}" class="form-label fw-bold">Para quem enviar?</label>
+                            {{ form.tipo_destinatario }}
+                            {% if form.tipo_destinatario.errors %}
+                                <div class="text-danger small">{{ form.tipo_destinatario.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div id="div_turma" class="mb-3 bg-light p-3 rounded border" style="display: none;">
+                            <label for="{{ form.turma.id_for_label }}" class="form-label fw-semibold text-primary">Selecione a Turma:</label>
+                            {{ form.turma }}
+                        </div>
+
+                        <div id="div_aluno" class="mb-3 bg-light p-3 rounded border" style="display: none;">
+                            <label for="{{ form.aluno.id_for_label }}" class="form-label fw-semibold text-primary">Selecione o Aluno:</label>
+                            {{ form.aluno }}
+                        </div>
+
+                        <hr class="my-4">
+
+                        <div class="mb-3">
+                            <label for="{{ form.assunto.id_for_label }}" class="form-label fw-bold">Assunto</label>
+                            {{ form.assunto }}
+                            {% if form.assunto.errors %}
+                                <div class="text-danger small">{{ form.assunto.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="{{ form.mensagem.id_for_label }}" class="form-label fw-bold">Mensagem</label>
+                            {{ form.mensagem }}
+                            {% if form.mensagem.errors %}
+                                <div class="text-danger small">{{ form.mensagem.errors }}</div>
+                            {% endif %}
+                            <div class="form-text mt-2">
+                                <i class="bi bi-shield-lock"></i> A mensagem será enviada com cópia oculta (BCC) para proteger a privacidade dos e-mails.
+                            </div>
+                        </div>
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-send-fill me-2"></i> Enviar E-mail
+                            </button>
+                        </div>
+
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    function toggleDestinatario(selectElement) {
+        var valor = selectElement.value;
+        var divTurma = document.getElementById('div_turma');
+        var divAluno = document.getElementById('div_aluno');
+
+        // Oculta ambos inicialmente
+        if(divTurma) divTurma.style.display = 'none';
+        if(divAluno) divAluno.style.display = 'none';
+
+        // Mostra o campo relevante com base na seleção
+        if (valor === 'turma') {
+            if(divTurma) divTurma.style.display = 'block';
+        } else if (valor === 'aluno') {
+            if(divAluno) divAluno.style.display = 'block';
+        }
+    }
+
+    // Executa ao carregar a página (para manter o estado se houver erro de validação)
+    document.addEventListener('DOMContentLoaded', function() {
+        var selectElement = document.querySelector('select[name="tipo_destinatario"]');
+        if (selectElement) {
+            toggleDestinatario(selectElement);
+            // Adiciona o listener caso o onchange inline não funcione
+            selectElement.addEventListener('change', function() {
+                toggleDestinatario(this);
+            });
+        }
+    });
+</script>
+
+</body>
+</html>

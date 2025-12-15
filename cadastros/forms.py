@@ -277,3 +277,36 @@ class EsqueciSenhaForm(forms.Form):
         label="E-mail",
         widget=forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Digite seu e-mail cadastrado'})
     )
+
+class EnviarEmailForm(forms.Form):
+    DESTINATARIO_CHOICES = [
+        ('todos', 'Todos os Alunos Ativos'),
+        ('turma', 'Uma Turma Específica'),
+        ('aluno', 'Um Aluno Específico'),
+    ]
+    
+    tipo_destinatario = forms.ChoiceField(
+        choices=DESTINATARIO_CHOICES, 
+        widget=forms.Select(attrs={'class': 'form-select', 'onchange': 'toggleDestinatario(this)'})
+    )
+    
+    turma = forms.ModelChoiceField(
+        queryset=Turma.objects.all().order_by('nome'),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select', 'id': 'select_turma'})
+    )
+    
+    aluno = forms.ModelChoiceField(
+        queryset=Aluno.objects.filter(status='ativo').order_by('nome_completo'),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select', 'id': 'select_aluno'})
+    )
+    
+    assunto = forms.CharField(
+        max_length=200, 
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Assunto do E-mail'})
+    )
+    
+    mensagem = forms.CharField(
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 6, 'placeholder': 'Escreva sua mensagem aqui...'})
+    )
