@@ -12,6 +12,7 @@ class Command(BaseCommand):
         CONSECUTIVE_ABSENCES_THRESHOLD = 3
         data_limite = timezone.now().date() - timedelta(days=30)
         
+        # 1. Filtramos apenas inscrições de quem está MATRICULADO
         inscricoes_ativas = Inscricao.objects.filter(
             status='matriculado' 
         ).select_related('aluno', 'turma')
@@ -19,10 +20,14 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f'Iniciando processamento de faltas...'))
 
         for inscricao in inscricoes_ativas:
+            # Reforço de segurança: garante que ignoramos 'acompanhando' ou 'experimental'
+            if inscricao.status != 'matriculado':
+                continue
+
             aluno = inscricao.aluno
             turma = inscricao.turma
 
-            # 1. Pega as presenças da mais RECENTE para a mais ANTIGA
+            # O filtro de presenças foca estritamente na turma de matrícula do aluno
             presencas = Presenca.objects.filter(
                 aluno=aluno,
                 registro_aula__turma=turma,
@@ -63,7 +68,7 @@ class Command(BaseCommand):
                         alerta_pendente.save()
                         self.stdout.write(self.style.WARNING(f'  -> Alerta ATUALIZADO: {aluno.nome_completo} agora com {consecutive_absences_counter} faltas.'))
                 else:
-                    # Se não existe alerta pendente, criamos um novo (evitando duplicar se já foi resolvido hoje)
+                    # Se não existe alerta pendente, criamos um novo
                     AcompanhamentoFalta.objects.get_or_create(
                         aluno=aluno,
                         data_inicio_sequencia=data_primeira_falta_na_sequencia,
