@@ -4,80 +4,72 @@ from django.core.management.base import BaseCommand
 from cadastros.models import Aluno, Inscricao, Presenca, AcompanhamentoFalta
 from django.utils import timezone
 from datetime import timedelta
-from django.db.models import Q
 
 class Command(BaseCommand):
-    help = 'Verifica inscrições ativas por sequências de 3 ou mais faltas RECENTES.'
+    help = 'Gere o ciclo de vida de faltas: cria novos alertas, atualiza contadores ou remove alertas se houver presença.'
 
     def handle(self, *args, **options):
         CONSECUTIVE_ABSENCES_THRESHOLD = 3
-        # Continuamos a usar 30 dias como limite de busca
         data_limite = timezone.now().date() - timedelta(days=30)
         
         inscricoes_ativas = Inscricao.objects.filter(
             status='matriculado' 
         ).select_related('aluno', 'turma')
 
-        self.stdout.write(self.style.SUCCESS(f'Iniciando verificação de faltas para {inscricoes_ativas.count()} inscrições ativas...'))
-
-        # Busca de alunos que JÁ TÊM um alerta pendente (para não duplicar)
-        alunos_com_alerta_pendente = set(
-            AcompanhamentoFalta.objects.filter(status='pendente').values_list('aluno_id', flat=True)
-        )
+        self.stdout.write(self.style.SUCCESS(f'Iniciando processamento de faltas...'))
 
         for inscricao in inscricoes_ativas:
             aluno = inscricao.aluno
             turma = inscricao.turma
 
-            # 1. Se o aluno já tem um alerta PENDENTE, pulamos
-            if aluno.id in alunos_com_alerta_pendente:
-                continue
-
-            # 2. Pega as presenças, DA MAIS RECENTE PARA A MAIS ANTIGA
+            # 1. Pega as presenças da mais RECENTE para a mais ANTIGA
             presencas = Presenca.objects.filter(
                 aluno=aluno,
                 registro_aula__turma=turma,
                 registro_aula__data_aula__gte=data_limite
-            ).order_by('-registro_aula__data_aula') # <--- MUDANÇA CRUCIAL: Ordem descendente
+            ).order_by('-registro_aula__data_aula')
 
+            # 2. Verifica a situação atual (Presença ou Falta na última aula registrada)
+            ultima_presenca = presencas.first()
+            alerta_pendente = AcompanhamentoFalta.objects.filter(aluno=aluno, status='pendente').first()
+
+            # TAREFA 2: Se o aluno teve presença e tinha um alerta, resolvemos automaticamente
+            if ultima_presenca and ultima_presenca.presente and alerta_pendente:
+                alerta_pendente.status = 'resolvido'
+                alerta_pendente.motivo = f"Resolvido automaticamente: Presença detectada em {ultima_presenca.registro_aula.data_aula.strftime('%d/%m/%Y')}."
+                alerta_pendente.data_resolucao = timezone.now()
+                alerta_pendente.save()
+                self.stdout.write(self.style.SUCCESS(f'  -> Alerta RESOLVIDO para {aluno.nome_completo} (Voltou às aulas).'))
+                continue
+
+            # 3. Cálculo de faltas consecutivas (da mais nova para mais antiga)
             consecutive_absences_counter = 0
-            data_primeira_falta_na_sequencia = None # A mais antiga
+            data_primeira_falta_na_sequencia = None
 
-            # 3. Itera do mais novo para o mais antigo
-            for presenca in presencas:
-                if not presenca.presente:
-                    # Se faltou, incrementa o contador
+            for p in presencas:
+                if not p.presente:
                     consecutive_absences_counter += 1
-                    # A "data de início" (a mais antiga) será a última que encontrarmos
-                    data_primeira_falta_na_sequencia = presenca.registro_aula.data_aula
+                    data_primeira_falta_na_sequencia = p.registro_aula.data_aula
                 else:
-                    # Se encontrou uma presença, a sequência quebrou.
-                    # Como estamos a ver do mais novo para o mais antigo,
-                    # podemos parar imediatamente.
                     break 
 
-            # 4. Só analisamos DEPOIS que o loop terminar
+            # TAREFA 1 & 2: Gestão de Alertas (Criar ou Atualizar)
             if consecutive_absences_counter >= CONSECUTIVE_ABSENCES_THRESHOLD:
-                # O aluno tem 3+ faltas consecutivas *recentes*
                 
-                # 5. VERIFICAÇÃO FINAL: Já existe um alerta (pendente OU resolvido)
-                #    para esta sequência exata de faltas?
-                #    (Usamos a data da primeira falta para identificar a sequência)
-                
-                if not AcompanhamentoFalta.objects.filter(
-                    aluno=aluno,
-                    data_inicio_sequencia=data_primeira_falta_na_sequencia
-                ).exists():
-                    
-                    # Não existe! Criamos um novo alerta.
-                    AcompanhamentoFalta.objects.create(
+                if alerta_pendente:
+                    # Se o número de faltas aumentou, atualizamos o registro existente
+                    if consecutive_absences_counter > alerta_pendente.numero_de_faltas:
+                        alerta_pendente.numero_de_faltas = consecutive_absences_counter
+                        alerta_pendente.save()
+                        self.stdout.write(self.style.WARNING(f'  -> Alerta ATUALIZADO: {aluno.nome_completo} agora com {consecutive_absences_counter} faltas.'))
+                else:
+                    # Se não existe alerta pendente, criamos um novo (evitando duplicar se já foi resolvido hoje)
+                    AcompanhamentoFalta.objects.get_or_create(
                         aluno=aluno,
                         data_inicio_sequencia=data_primeira_falta_na_sequencia,
-                        numero_de_faltas=consecutive_absences_counter,
-                        status='pendente'
+                        status='pendente',
+                        defaults={'numero_de_faltas': consecutive_absences_counter}
                     )
-                    self.stdout.write(self.style.WARNING(f'  -> Alerta de {consecutive_absences_counter} faltas RECENTES criado para {aluno.nome_completo}.'))
-                    # Adiciona ao set para não criar outro alerta (ex: se ele estiver em 2 turmas)
-                    alunos_com_alerta_pendente.add(aluno.id)
+                    self.stdout.write(self.style.WARNING(f'  -> NOVO Alerta: {aluno.nome_completo} atingiu {consecutive_absences_counter} faltas.'))
 
-        self.stdout.write(self.style.SUCCESS('Verificação de faltas finalizada.'))
+        self.stdout.write(self.style.SUCCESS('Processamento finalizado.'))
