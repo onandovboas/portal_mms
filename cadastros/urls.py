@@ -2,6 +2,10 @@
 from django.contrib.auth import views as auth_views
 from django.urls import path
 from . import views
+from . import views_webhook
+from . import views_leads_public
+from . import views_leads_descarte
+from . import views_leads_match
 from .forms import MyPasswordChangeForm
 
 app_name = 'cadastros'
@@ -10,6 +14,7 @@ urlpatterns = [
     # Rotas principais da Aplicação
     path('', views.portal_professor, name='portal_professor'),
     path('dashboard/', views.dashboard_admin, name='dashboard_admin'),
+    path('api/webhook/whatsapp/', views_webhook.whatsapp_webhook, name='whatsapp_webhook'),
 
     # Rotas de Alunos
     path('aluno/<int:pk>/', views.perfil_aluno, name='perfil_aluno'),
@@ -66,6 +71,9 @@ urlpatterns = [
     path('inscricao/<int:inscricao_pk>/desistiu/', views.marcar_experimental_desistiu, name='marcar_experimental_desistiu'),
     path('leads/atualizar-status/', views.atualizar_status_lead, name='atualizar_status_lead'),
     path('leads/excluir/<int:pk>/', views.excluir_lead, name='excluir_lead'), # Nova
+    path('leads/disponibilidade/<uuid:token>/', views_leads_public.coletar_disponibilidade_lead, name='coletar_disponibilidade_lead'),
+    path('leads/descartar/', views_leads_descarte.descartar_lead, name='descartar_lead'),
+    path('leads/match/', views_leads_match.dashboard_match_horarios, name='dashboard_match_horarios'),
 
     # Rotas de Turmas
     path('turma/<int:pk>/', views.detalhe_turma, name='detalhe_turma'),

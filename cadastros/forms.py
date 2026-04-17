@@ -128,13 +128,14 @@ class RegistroAulaForm(forms.ModelForm):
 class LeadForm(forms.ModelForm):
     class Meta:
         model = Lead
-        fields = ['nome_completo', 'telefone', 'email', 'status', 'fonte_contato', 'disponibilidade_horarios', 'observacoes']
+        fields = ['nome_completo', 'telefone', 'email', 'status', 'fonte_contato', 'stage_interesse', 'disponibilidade_horarios', 'observacoes']
         widgets = {
             'nome_completo': forms.TextInput(attrs={'class': 'form-control'}),
             'telefone': forms.TextInput(attrs={'class': 'form-control'}),
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
             'status': forms.Select(attrs={'class': 'form-select'}),
             'fonte_contato': forms.Select(attrs={'class': 'form-select'}),
+            'stage_interesse': forms.Select(attrs={'class': 'form-select'}, choices=[("", "Selecione um Stage...")] + [(i, f"Stage {i}") for i in range(1, 13)]),
             'disponibilidade_horarios': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'observacoes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }

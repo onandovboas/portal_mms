@@ -292,6 +292,7 @@ class Lead(models.Model):
         ('instagram', 'Instagram'),
         ('google', 'Google'),
         ('fachada', 'Fachada da Escola'),
+        ('whatsapp', 'WhatsApp'),
         ('outro', 'Outro'),
     ]
 
@@ -302,6 +303,9 @@ class Lead(models.Model):
     fonte_contato = models.CharField("Origem do Contato", max_length=15, choices=FONTE_CHOICES, blank=True)
     disponibilidade_horarios = models.TextField("Disponibilidade de Horários", blank=True)
     observacoes = models.TextField(blank=True)
+    motivo_descarte = models.TextField("Motivo do Descarte", blank=True, null=True)
+    stage_interesse = models.IntegerField("Stage de Interesse", blank=True, null=True)
+    token_disponibilidade = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     data_criacao = models.DateTimeField(auto_now_add=True)
     data_atualizacao = models.DateTimeField(auto_now=True)
 
@@ -310,6 +314,27 @@ class Lead(models.Model):
 
     def __str__(self):
         return f"{self.nome_completo} ({self.get_status_display()})"
+    
+class HorarioDisponivelLead(models.Model):
+    DIA_CHOICES = [
+        (0, 'Segunda-feira'),
+        (1, 'Terça-feira'),
+        (2, 'Quarta-feira'),
+        (3, 'Quinta-feira'),
+        (4, 'Sexta-feira'),
+        (5, 'Sábado'),
+        (6, 'Domingo'),
+    ]
+    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name="horarios_disponiveis")
+    dia_semana = models.IntegerField("Dia da semana", choices=DIA_CHOICES)
+    horario_inicio = models.TimeField("Horário de Início")
+    horario_fim = models.TimeField("Horário de Fim")
+
+    class Meta:
+        ordering = ['dia_semana', 'horario_inicio']
+
+    def __str__(self):
+        return f"{self.lead.nome_completo} - {self.get_dia_semana_display()} {self.horario_inicio.strftime('%H:%M')}"
     
 class TokenAtualizacaoAluno(models.Model):
     """
