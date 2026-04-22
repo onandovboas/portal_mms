@@ -305,7 +305,7 @@ class Lead(models.Model):
     observacoes = models.TextField(blank=True)
     motivo_descarte = models.TextField("Motivo do Descarte", blank=True, null=True)
     stage_interesse = models.IntegerField("Stage de Interesse", blank=True, null=True)
-    token_disponibilidade = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    token_disponibilidade = models.UUIDField(default=uuid.uuid4, editable=False, null=True)
     data_criacao = models.DateTimeField(auto_now_add=True)
     data_atualizacao = models.DateTimeField(auto_now=True)
 
