@@ -22,7 +22,7 @@ DEBUG = config('DEBUG', default=False, cast=bool)
 # Em vez de uma lista vazia, vamos ler os domínios permitidos do ambiente.
 # No seu .env local, você pode ter: ALLOWED_HOSTS=127.0.0.1,localhost
 # No PythonAnywhere, você definirá: ALLOWED_HOSTS=seunome.pythonanywhere.com
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='127.0.0.1,localhost', cast=Csv())
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -149,3 +149,10 @@ DEFAULT_FROM_EMAIL = 'MMS Institute <info@mmsinstitute.com.br>'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# ==============================================================================
+# CONFIGURAÇÕES DA API DO WHATSAPP (META)
+# ==============================================================================
+META_ACCESS_TOKEN = config('META_ACCESS_TOKEN', default='')
+META_PHONE_NUMBER_ID = config('META_PHONE_NUMBER_ID', default='')
+WHATSAPP_VERIFY_TOKEN = config('META_VERIFY_TOKEN', default='mms_portal_whatsapp_token')

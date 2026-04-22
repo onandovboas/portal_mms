@@ -562,3 +562,44 @@ class AvaliacaoPedagogico(models.Model):
     
     elogio = models.TextField("Deixe seu elogio para o pedagógico:", blank=True)
     sugestao = models.TextField("Sua sugestão de melhoria para o pedagógico:", blank=True)
+
+class MensagemWhatsApp(models.Model):
+    DIRECAO_CHOICES = [
+        ('entrada', 'Recebida (Cliente -> Escola)'),
+        ('saida', 'Enviada (Escola -> Cliente)'),
+    ]
+    STATUS_CHOICES = [
+        ('enviado', 'Enviado'),
+        ('entregue', 'Entregue'),
+        ('lido', 'Lido'),
+        ('falha', 'Falha'),
+    ]
+
+    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name='mensagens_whatsapp')
+    direcao = models.CharField("Direção da Mensagem", max_length=10, choices=DIRECAO_CHOICES)
+    conteudo_texto = models.TextField("Conteúdo da Mensagem")
+    wamid = models.CharField("WhatsApp Message ID", max_length=100, blank=True, null=True)
+    status = models.CharField("Status de Entrega", max_length=15, choices=STATUS_CHOICES, blank=True, null=True)
+    data_envio = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['data_envio']
+
+    def __str__(self):
+        return f"[{self.get_direcao_display()}] {self.lead.nome_completo}: {self.conteudo_texto[:30]}"
+
+class TemplateMensagem(models.Model):
+    CATEGORIA_CHOICES = [
+        ('triagem', 'Triagem'),
+        ('follow_up', 'Follow Up'),
+        ('objecao', 'Quebra de Objeção'),
+        ('aviso', 'Aviso / Lembrete'),
+        ('outro', 'Outro'),
+    ]
+    titulo = models.CharField("Título do Template", max_length=100)
+    conteudo = models.TextField("Conteúdo (Variáveis: {{nome}})", help_text="Use {{nome}} para injetar o nome do lead.")
+    categoria = models.CharField("Categoria", max_length=20, choices=CATEGORIA_CHOICES, default='outro')
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.get_categoria_display()} - {self.titulo}"

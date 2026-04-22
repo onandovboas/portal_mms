@@ -6,6 +6,7 @@ from . import views_webhook
 from . import views_leads_public
 from . import views_leads_descarte
 from . import views_leads_match
+from . import views_leads_chat
 from .forms import MyPasswordChangeForm
 
 app_name = 'cadastros'
@@ -132,4 +133,11 @@ urlpatterns = [
 
     # Rotas de Envio de Emails
     path('enviar-email/', views.enviar_email_alunos, name='enviar_email_alunos'),
+
+
+    # Rotas do Chat Integrado (Inbox Omnichannel)
+    path('leads/chat/', views_leads_chat.caixa_de_entrada_chat, name='caixa_de_entrada_chat'),
+    path('leads/chat/lead/<int:lead_pk>/', views_leads_chat.caixa_de_entrada_chat, name='caixa_de_entrada_chat_lead'),
+    path('leads/chat/lead/<int:lead_pk>/enviar/', views_leads_chat.enviar_mensagem_api, name='enviar_mensagem_chat'),
+    path('leads/chat/lead/<int:lead_pk>/buscar/', views_leads_chat.buscar_mensagens_api, name='buscar_mensagens_chat'),
 ]
