@@ -3,6 +3,11 @@
 import uuid
 from django.db import migrations, models
 
+def gen_uuid(apps, schema_editor):
+    Aluno = apps.get_model('cadastros', 'Aluno')
+    for row in Aluno.objects.all():
+        row.token_disponibilidade = uuid.uuid4()
+        row.save(update_fields=['token_disponibilidade'])
 
 class Migration(migrations.Migration):
 
@@ -11,6 +16,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RunPython(gen_uuid, reverse_code=migrations.RunPython.noop),
         migrations.AlterField(
             model_name='aluno',
             name='token_disponibilidade',
