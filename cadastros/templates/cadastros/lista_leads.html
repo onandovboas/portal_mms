@@ -150,7 +150,13 @@
                                 <ul class="dropdown-menu dropdown-menu-end shadow border-0">
                                     <li><h6 class="dropdown-header">Ações</h6></li>
                                     <li><a class="dropdown-item small" href="{% url 'cadastros:editar_lead' lead.pk %}"><i class="bi bi-pencil me-2"></i>Editar</a></li>
-                                    <li><button class="dropdown-item small btn-copiar-link" data-link="{{ request.scheme }}://{{ request.get_host }}{% url 'cadastros:coletar_disponibilidade_lead' lead.token_disponibilidade %}"><i class="bi bi-link-45deg me-2"></i>Copiar Link Horários</button></li>
+                                    
+                                    {% if lead.token_disponibilidade %}
+                                        <li><button class="dropdown-item small btn-copiar-link" data-link="{{ request.scheme }}://{{ request.get_host }}{% url 'cadastros:coletar_disponibilidade_lead' lead.token_disponibilidade %}"><i class="bi bi-link-45deg me-2"></i>Copiar Link Horários</button></li>
+                                    {% else %}
+                                        <li><span class="dropdown-item small text-muted" title="Edite e salve este lead uma vez para gerar o link."><i class="bi bi-link-45deg me-2"></i>Link Pendente (Edite p/ Gerar)</span></li>
+                                    {% endif %}
+                                    
                                     <li><button class="dropdown-item small text-warning btn-sem-interesse" data-pk="{{ lead.pk }}" data-nome="{{ lead.nome_completo }}"><i class="bi bi-x-circle me-2"></i>Sem Interesse / Descartar</button></li>
 
                                     {% if lead.status == 'agendado' or lead.status == 'negociacao' or lead.status == 'interessado' %}

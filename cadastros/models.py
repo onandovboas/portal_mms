@@ -25,6 +25,9 @@ class Aluno(models.Model):
     observacoes_trancamento = models.TextField("Anotações de Trancamento", blank=True, null=True)
 
     def save(self, *args, **kwargs):
+        if not self.token_disponibilidade:
+            self.token_disponibilidade = uuid.uuid4()
+            
         # Auto create user if email is provided and no user is linked
         if self.email and not self.usuario:
             # Check if user already exists
@@ -358,6 +361,11 @@ class Lead(models.Model):
 
     class Meta:
         ordering = ['-data_criacao']
+
+    def save(self, *args, **kwargs):
+        if not self.token_disponibilidade:
+            self.token_disponibilidade = uuid.uuid4()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.nome_completo} ({self.get_status_display()})"
