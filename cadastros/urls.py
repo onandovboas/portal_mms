@@ -2,6 +2,10 @@
 from django.contrib.auth import views as auth_views
 from django.urls import path
 from . import views
+from . import views_leads_public
+from . import views_leads_descarte
+from . import views_leads_match
+from . import views_alunos_public
 from .forms import MyPasswordChangeForm
 
 app_name = 'cadastros'
@@ -17,6 +21,8 @@ urlpatterns = [
     path("aluno/<int:pk>/exportar-pagamentos/", views.exportar_pagamentos_aluno, name="exportar_pagamentos_aluno"),
     path("aluno/<int:pk>/pagamentos/novo/", views.novo_pagamento, name="novo_pagamento"),
     path('alunos/', views.lista_alunos, name='lista_alunos'),
+    path('alunos/trancados/', views.lista_alunos_trancados, name='lista_alunos_trancados'),
+    path('aluno/disponibilidade/<uuid:token>/', views_alunos_public.coletar_disponibilidade_aluno, name='coletar_disponibilidade_aluno'),
     path('aluno/<int:pk>/quitar-dividas/', views.quitar_dividas_aluno, name='quitar_dividas_aluno'),
     path('aluno/novo-experimental/', views.novo_aluno_experimental, name='novo_aluno_experimental'),
     path('aluno/<int:aluno_pk>/criar-contrato/', views.criar_contrato, name='criar_contrato'),
@@ -66,6 +72,9 @@ urlpatterns = [
     path('inscricao/<int:inscricao_pk>/desistiu/', views.marcar_experimental_desistiu, name='marcar_experimental_desistiu'),
     path('leads/atualizar-status/', views.atualizar_status_lead, name='atualizar_status_lead'),
     path('leads/excluir/<int:pk>/', views.excluir_lead, name='excluir_lead'), # Nova
+    path('leads/disponibilidade/<uuid:token>/', views_leads_public.coletar_disponibilidade_lead, name='coletar_disponibilidade_lead'),
+    path('leads/descartar/', views_leads_descarte.descartar_lead, name='descartar_lead'),
+    path('leads/match/', views_leads_match.dashboard_match_horarios, name='dashboard_match_horarios'),
 
     # Rotas de Turmas
     path('turma/<int:pk>/', views.detalhe_turma, name='detalhe_turma'),
@@ -124,4 +133,5 @@ urlpatterns = [
 
     # Rotas de Envio de Emails
     path('enviar-email/', views.enviar_email_alunos, name='enviar_email_alunos'),
+
 ]

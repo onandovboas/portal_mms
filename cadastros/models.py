@@ -21,6 +21,24 @@ class Aluno(models.Model):
     data_matricula = models.DateField(auto_now_add=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="ativo")
     creditos_aulas = models.IntegerField("Créditos (Mensalidades)", default=0)
+    token_disponibilidade = models.UUIDField(default=uuid.uuid4, editable=False, unique=True, null=True)
+    observacoes_trancamento = models.TextField("Anotações de Trancamento", blank=True, null=True)
+
+    def save(self, *args, **kwargs):
+        if not self.token_disponibilidade:
+            self.token_disponibilidade = uuid.uuid4()
+            
+        # Auto create user if email is provided and no user is linked
+        if self.email and not self.usuario:
+            # Check if user already exists
+            user_exists = User.objects.filter(username=self.email).exists()
+            if not user_exists:
+                # Create user with a random password, they can reset it later
+                from django.utils.crypto import get_random_string
+                random_password = get_random_string(12)
+                user = User.objects.create_user(username=self.email, email=self.email, password=random_password)
+                self.usuario = user
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.nome_completo
@@ -182,6 +200,20 @@ class Pagamento(models.Model):
 
     def __str__(self):
         return f"{self.descricao} - {self.aluno.nome_completo} ({self.get_status_display()})"
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        old_status = None
+        if not is_new:
+            old_status = Pagamento.objects.get(pk=self.pk).status
+
+        super().save(*args, **kwargs)
+
+        if self.tipo == 'mensalidade' and self.status == 'pago' and old_status != 'pago':
+            if self.contrato and self.contrato.status == 'trancado':
+                self.aluno.creditos_aulas += 1
+                self.aluno.save(update_fields=['creditos_aulas'])
+
     
 class AcompanhamentoFalta(models.Model):
     STATUS_CHOICES = [
@@ -274,6 +306,24 @@ class HorarioAula(models.Model):
     def __str__(self):
         return f"{self.turma.nome} - {self.get_dia_semana_display()} às {self.horario_inicio.strftime('%H:%M')}"
     
+class HorarioDisponivelAluno(models.Model):
+    DIA_CHOICES = [
+        (0, 'Segunda-feira'),
+        (1, 'Terça-feira'),
+        (2, 'Quarta-feira'),
+        (3, 'Quinta-feira'),
+        (4, 'Sexta-feira'),
+        (5, 'Sábado'),
+        (6, 'Domingo'),
+    ]
+    aluno = models.ForeignKey(Aluno, on_delete=models.CASCADE, related_name='horarios_disponiveis')
+    dia_semana = models.IntegerField(choices=DIA_CHOICES)
+    horario_inicio = models.TimeField()
+    horario_fim = models.TimeField()
+
+    def __str__(self):
+        return f"{self.aluno.nome_completo} - {self.get_dia_semana_display()} às {self.horario_inicio}"
+
 class Lead(models.Model):
     STATUS_CHOICES = [
         ('novo', 'Novo Contato'),
@@ -292,6 +342,7 @@ class Lead(models.Model):
         ('instagram', 'Instagram'),
         ('google', 'Google'),
         ('fachada', 'Fachada da Escola'),
+        ('whatsapp', 'WhatsApp'),
         ('outro', 'Outro'),
     ]
 
@@ -302,14 +353,43 @@ class Lead(models.Model):
     fonte_contato = models.CharField("Origem do Contato", max_length=15, choices=FONTE_CHOICES, blank=True)
     disponibilidade_horarios = models.TextField("Disponibilidade de Horários", blank=True)
     observacoes = models.TextField(blank=True)
+    motivo_descarte = models.TextField("Motivo do Descarte", blank=True, null=True)
+    stage_interesse = models.IntegerField("Stage de Interesse", blank=True, null=True)
+    token_disponibilidade = models.UUIDField(default=uuid.uuid4, editable=False, null=True)
     data_criacao = models.DateTimeField(auto_now_add=True)
     data_atualizacao = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['-data_criacao']
 
+    def save(self, *args, **kwargs):
+        if not self.token_disponibilidade:
+            self.token_disponibilidade = uuid.uuid4()
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.nome_completo} ({self.get_status_display()})"
+    
+class HorarioDisponivelLead(models.Model):
+    DIA_CHOICES = [
+        (0, 'Segunda-feira'),
+        (1, 'Terça-feira'),
+        (2, 'Quarta-feira'),
+        (3, 'Quinta-feira'),
+        (4, 'Sexta-feira'),
+        (5, 'Sábado'),
+        (6, 'Domingo'),
+    ]
+    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name="horarios_disponiveis")
+    dia_semana = models.IntegerField("Dia da semana", choices=DIA_CHOICES)
+    horario_inicio = models.TimeField("Horário de Início")
+    horario_fim = models.TimeField("Horário de Fim")
+
+    class Meta:
+        ordering = ['dia_semana', 'horario_inicio']
+
+    def __str__(self):
+        return f"{self.lead.nome_completo} - {self.get_dia_semana_display()} {self.horario_inicio.strftime('%H:%M')}"
     
 class TokenAtualizacaoAluno(models.Model):
     """
@@ -537,3 +617,24 @@ class AvaliacaoPedagogico(models.Model):
     
     elogio = models.TextField("Deixe seu elogio para o pedagógico:", blank=True)
     sugestao = models.TextField("Sua sugestão de melhoria para o pedagógico:", blank=True)
+
+class FollowUp(models.Model):
+    TIPO_CHOICES = [
+        ('whatsapp', 'WhatsApp'),
+        ('ligacao', 'Ligação'),
+        ('email', 'E-mail'),
+        ('presencial', 'Presencial'),
+    ]
+
+    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name='follow_ups')
+    data_contato = models.DateTimeField(auto_now_add=True)
+    tipo_contato = models.CharField("Tipo de Contato", max_length=15, choices=TIPO_CHOICES, default='whatsapp')
+    anotacoes = models.TextField("Anotações / Resumo da Conversa")
+    lead_respondeu = models.BooleanField("O lead respondeu?", default=False)
+    
+    class Meta:
+        ordering = ['-data_contato']
+
+    def __str__(self):
+        return f"FollowUp {self.get_tipo_contato_display()} com {self.lead.nome_completo}"
+

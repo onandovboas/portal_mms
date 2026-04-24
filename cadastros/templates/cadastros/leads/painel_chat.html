@@ -1,0 +1,238 @@
+{% extends 'base.html' %} {% load static %}
+
+{% block title %}Chat - {{ lead.nome_completo }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-lg-8 col-md-12 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-whatsapp"></i> Chat: {{ lead.nome_completo }}
+                    </h5>
+                    <span class="badge bg-light text-success">{{ lead.get_status_display }}</span>
+                </div>
+                
+                <div class="card-body overflow-auto bg-light" id="chat-window" style="height: 500px; display: flex; flex-direction: column;">
+                    {% for msg in mensagens %}
+                        {% if msg.direcao == 'saida' %}
+                            <div class="align-self-end mb-3" style="max-width: 75%;" data-msg-id="{{ msg.id }}">
+                                <div class="bg-success text-white p-3 rounded-3 shadow-sm">
+                                    {{ msg.conteudo_texto|linebreaksbr }}
+                                </div>
+                                <div class="text-end text-muted small mt-1">
+                                    {{ msg.data_envio|date:"H:i" }} <i class="bi bi-check-all"></i>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="align-self-start mb-3" style="max-width: 75%;" data-msg-id="{{ msg.id }}">
+                                <div class="bg-white text-dark p-3 rounded-3 shadow-sm border">
+                                    {{ msg.conteudo_texto|linebreaksbr }}
+                                </div>
+                                <div class="text-start text-muted small mt-1">
+                                    {{ msg.data_envio|date:"H:i" }}
+                                </div>
+                            </div>
+                        {% endif %}
+                    {% empty %}
+                        <div class="text-center text-muted mt-5" id="no-messages">
+                            <p>Nenhuma mensagem ainda. Envie a primeira mensagem para começar!</p>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <div class="card-footer bg-white">
+                    <form id="form-chat" class="d-flex align-items-center">
+                        {% csrf_token %}
+                        <textarea id="mensagem-input" class="form-control me-2" rows="2" placeholder="Digite sua mensagem aqui..." style="resize: none;"></textarea>
+                        <button type="submit" class="btn btn-success btn-lg rounded-circle shadow-sm" id="btn-enviar" style="width: 50px; height: 50px; display: flex; align-items: center; justify-content: center;">
+                            <i class="bi bi-send-fill"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4 col-md-12">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-dark text-white">
+                    <h6 class="mb-0"><i class="bi bi-person-lines-fill"></i> Dados do Lead</h6>
+                </div>
+                <div class="card-body">
+                    <p><strong>Telefone:</strong> {{ lead.telefone }}</p>
+                    <p><strong>Origem:</strong> {{ lead.get_fonte_contato_display|default:"Não informada" }}</p>
+                    <p><strong>Observações:</strong><br> {{ lead.observacoes|default:"Nenhuma observação." }}</p>
+                    <a href="{% url 'cadastros:editar_lead' lead.pk %}" class="btn btn-outline-primary btn-sm w-100">Ver Perfil Completo</a>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h6 class="mb-0"><i class="bi bi-lightning-fill"></i> Respostas Rápidas</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        {% for template in templates %}
+                            <button type="button" class="list-group-item list-group-item-action btn-usar-template" data-texto="{{ template.conteudo }}">
+                                <strong>{{ template.get_categoria_display }}</strong>: {{ template.titulo }}
+                            </button>
+                        {% empty %}
+                            <div class="p-3 text-muted small text-center">Nenhum template cadastrado.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const chatWindow = document.getElementById("chat-window");
+    const formChat = document.getElementById("form-chat");
+    const inputMensagem = document.getElementById("mensagem-input");
+    const btnEnviar = document.getElementById("btn-enviar");
+    const noMessagesDiv = document.getElementById("no-messages");
+    
+    // IDs das rotas geradas pelo Django
+    const urlEnviar = "{% url 'cadastros:enviar_mensagem_chat' lead.pk %}";
+    const urlBuscar = "{% url 'cadastros:buscar_mensagens_chat' lead.pk %}";
+    
+    // Pega o token CSRF do cookie (Padrão Django)
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    const csrftoken = getCookie('csrftoken');
+
+    // Desce o scroll para a mensagem mais recente ao abrir
+    function rolarParaFim() {
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+    rolarParaFim();
+
+    // Lógica para enviar mensagem
+    formChat.addEventListener("submit", function(e) {
+        e.preventDefault();
+        const texto = inputMensagem.value.trim();
+        if (!texto) return;
+
+        // Desativa input enquanto envia
+        inputMensagem.disabled = true;
+        btnEnviar.disabled = true;
+
+        fetch(urlEnviar, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": csrftoken
+            },
+            body: JSON.stringify({ texto: texto })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'sucesso') {
+                inputMensagem.value = "";
+                buscarNovasMensagens(); // Força uma busca imediata para renderizar na tela
+            } else {
+                alert("Erro ao enviar: " + data.mensagem);
+            }
+        })
+        .catch(error => {
+            console.error("Erro:", error);
+            alert("Erro de comunicação com o servidor.");
+        })
+        .finally(() => {
+            inputMensagem.disabled = false;
+            btnEnviar.disabled = false;
+            inputMensagem.focus();
+        });
+    });
+
+    // Inserir Template na caixa de texto
+    document.querySelectorAll(".btn-usar-template").forEach(btn => {
+        btn.addEventListener("click", function() {
+            let textoTemplate = this.getAttribute("data-texto");
+            // Substitui a variável {{nome}} pelo primeiro nome do lead
+            const nomeLead = "{{ lead.nome_completo }}".split(' ')[0];
+            textoTemplate = textoTemplate.replace('{{nome}}', nomeLead).replace('{{ nome }}', nomeLead);
+            
+            inputMensagem.value = textoTemplate;
+            inputMensagem.focus();
+        });
+    });
+
+    // Lógica de Polling (Buscar novas mensagens)
+    function buscarNovasMensagens() {
+        // Encontra o ID da última mensagem renderizada na tela
+        const mensagensRenderizadas = chatWindow.querySelectorAll('[data-msg-id]');
+        let ultimaMsgId = 0;
+        if (mensagensRenderizadas.length > 0) {
+            const ultimaMsg = mensagensRenderizadas[mensagensRenderizadas.length - 1];
+            ultimaMsgId = ultimaMsg.getAttribute('data-msg-id');
+        }
+
+        fetch(`${urlBuscar}?ultima_msg_id=${ultimaMsgId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'sucesso' && data.mensagens.length > 0) {
+                if (noMessagesDiv) noMessagesDiv.style.display = 'none';
+
+                let htmlNovo = "";
+                data.mensagens.forEach(msg => {
+                    const formatTexto = msg.conteudo_texto.replace(/\n/g, "<br>");
+                    if (msg.direcao === 'saida') {
+                        htmlNovo += `
+                            <div class="align-self-end mb-3" style="max-width: 75%;" data-msg-id="${msg.id}">
+                                <div class="bg-success text-white p-3 rounded-3 shadow-sm">
+                                    ${formatTexto}
+                                </div>
+                                <div class="text-end text-muted small mt-1">
+                                    ${msg.data_envio} <i class="bi bi-check-all"></i>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        htmlNovo += `
+                            <div class="align-self-start mb-3" style="max-width: 75%;" data-msg-id="${msg.id}">
+                                <div class="bg-white text-dark p-3 rounded-3 shadow-sm border">
+                                    ${formatTexto}
+                                </div>
+                                <div class="text-start text-muted small mt-1">
+                                    ${msg.data_envio}
+                                </div>
+                            </div>
+                        `;
+                    }
+                });
+
+                chatWindow.insertAdjacentHTML('beforeend', htmlNovo);
+                rolarParaFim();
+            }
+        });
+    }
+
+    // Inicia o Polling a cada 3 segundos
+    setInterval(buscarNovasMensagens, 3000);
+    
+    // Permite enviar com "Enter" (sem Shift)
+    inputMensagem.addEventListener('keypress', function (e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            formChat.dispatchEvent(new Event('submit'));
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -114,6 +114,9 @@
                 <button onclick="window.location.reload()" class="btn btn-light btn-sm border" title="Atualizar quadro">
                     <i class="bi bi-arrow-clockwise"></i>
                 </button>
+                <a href="{% url 'cadastros:dashboard_match_horarios' %}" class="btn btn-outline-info">
+                    <i class="bi bi-calendar-check"></i> Match de Horários
+                </a>
                 <a href="{% url 'cadastros:adicionar_lead' %}" class="btn btn-primary">
                     <i class="bi bi-plus-lg"></i> Novo Lead
                 </a>
@@ -148,6 +151,14 @@
                                     <li><h6 class="dropdown-header">Ações</h6></li>
                                     <li><a class="dropdown-item small" href="{% url 'cadastros:editar_lead' lead.pk %}"><i class="bi bi-pencil me-2"></i>Editar</a></li>
                                     
+                                    {% if lead.token_disponibilidade %}
+                                        <li><button class="dropdown-item small btn-copiar-link" data-link="{{ request.scheme }}://{{ request.get_host }}{% url 'cadastros:coletar_disponibilidade_lead' lead.token_disponibilidade %}"><i class="bi bi-link-45deg me-2"></i>Copiar Link Horários</button></li>
+                                    {% else %}
+                                        <li><span class="dropdown-item small text-muted" title="Edite e salve este lead uma vez para gerar o link."><i class="bi bi-link-45deg me-2"></i>Link Pendente (Edite p/ Gerar)</span></li>
+                                    {% endif %}
+                                    
+                                    <li><button class="dropdown-item small text-warning btn-sem-interesse" data-pk="{{ lead.pk }}" data-nome="{{ lead.nome_completo }}"><i class="bi bi-x-circle me-2"></i>Sem Interesse / Descartar</button></li>
+
                                     {% if lead.status == 'agendado' or lead.status == 'negociacao' or lead.status == 'interessado' %}
                                     <li><a class="dropdown-item small text-success fw-bold" href="{% url 'cadastros:converter_lead' lead.pk %}"><i class="bi bi-check-circle me-2"></i>Converter em Aluno</a></li>
                                     {% endif %}
@@ -204,6 +215,39 @@
 
     </div>
 
+    <!-- Modal Sem Interesse -->
+    <div class="modal fade" id="modalSemInteresse" tabindex="-1" aria-labelledby="modalSemInteresseLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form id="formSemInteresse" action="{% url 'cadastros:descartar_lead' %}" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="lead_pk" id="leadPkDescarte">
+            <div class="modal-header">
+              <h5 class="modal-title" id="modalSemInteresseLabel">Descartar Lead: <span id="nomeLeadDescarte"></span></h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <div class="mb-3">
+                <label for="motivoDescarte" class="form-label">Qual o motivo da perda do lead?</label>
+                <textarea class="form-control" id="motivoDescarte" name="motivo_descarte" rows="3" required placeholder="Ex: Achou caro, fechou com concorrente, não tem tempo..."></textarea>
+              </div>
+              <div class="mb-3">
+                <label for="acaoDescarte" class="form-label">Ação</label>
+                <select class="form-select" id="acaoDescarte" name="acao" required>
+                    <option value="perdido">Marcar como Perdido (Descartar)</option>
+                    <option value="congelado">Congelar para Follow-up Futuro</option>
+                </select>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+              <button type="submit" class="btn btn-warning">Confirmar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         function allowDrop(ev) { ev.preventDefault(); }
@@ -257,6 +301,32 @@
                 alert('Erro de conexão com o servidor.');
             });
         }
+
+        function copiarLink(link) {
+            navigator.clipboard.writeText(link).then(() => {
+                alert('Link copiado para a área de transferência!');
+            }).catch(err => {
+                alert('Erro ao copiar: ', err);
+            });
+        }
+
+        function abrirModalSemInteresse(pk, nome) {
+            document.getElementById('leadPkDescarte').value = pk;
+            document.getElementById('nomeLeadDescarte').textContent = nome;
+            var modal = new bootstrap.Modal(document.getElementById('modalSemInteresse'));
+            modal.show();
+        }
+
+        document.addEventListener('click', function(e) {
+            const btnCopiar = e.target.closest('.btn-copiar-link');
+            if (btnCopiar) {
+                copiarLink(btnCopiar.dataset.link);
+            }
+            const btnSemInteresse = e.target.closest('.btn-sem-interesse');
+            if (btnSemInteresse) {
+                abrirModalSemInteresse(btnSemInteresse.dataset.pk, btnSemInteresse.dataset.nome);
+            }
+        });
     </script>
 </body>
 </html>

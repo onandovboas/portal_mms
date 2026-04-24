@@ -128,18 +128,27 @@ class RegistroAulaForm(forms.ModelForm):
 class LeadForm(forms.ModelForm):
     class Meta:
         model = Lead
-        fields = ['nome_completo', 'telefone', 'email', 'status', 'fonte_contato', 'disponibilidade_horarios', 'observacoes']
+        fields = ['nome_completo', 'telefone', 'email', 'status', 'fonte_contato', 'stage_interesse', 'disponibilidade_horarios', 'observacoes']
         widgets = {
             'nome_completo': forms.TextInput(attrs={'class': 'form-control'}),
             'telefone': forms.TextInput(attrs={'class': 'form-control'}),
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
             'status': forms.Select(attrs={'class': 'form-select'}),
             'fonte_contato': forms.Select(attrs={'class': 'form-select'}),
+            'stage_interesse': forms.Select(attrs={'class': 'form-select'}, choices=[("", "Selecione um Stage...")] + [(i, f"Stage {i}") for i in range(1, 13)]),
             'disponibilidade_horarios': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'observacoes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
 
 class AcompanhamentoPedagogicoForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            if self.instance.data_agendamento:
+                self.initial['data_agendamento'] = self.instance.data_agendamento.strftime('%Y-%m-%dT%H:%M')
+            if self.instance.data_realizacao:
+                self.initial['data_realizacao'] = self.instance.data_realizacao.strftime('%Y-%m-%dT%H:%M')
+
     class Meta:
         model = AcompanhamentoPedagogico
         # Campos que o utilizador irá preencher. 'aluno' e 'criado_por' são definidos na view.

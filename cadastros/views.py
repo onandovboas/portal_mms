@@ -1,7 +1,7 @@
 # cadastros/views.py
 from django.core.paginator import Paginator
 from django.contrib.auth.decorators import login_required
-from .models import Turma, Inscricao, RegistroAula, Professor, Presenca, Pagamento, Contrato, AcompanhamentoFalta, Aluno, Inscricao, RegistroAula, Presenca, Lead, TokenAtualizacaoAluno, AcompanhamentoPedagogico, AlunoProva, Questao, ProvaTemplate, RespostaAluno, PesquisaSatisfacao, AvaliacaoProfessor, AvaliacaoAdministrativo, AvaliacaoPedagogico
+from .models import Turma, Inscricao, RegistroAula, Professor, Presenca, Pagamento, Contrato, AcompanhamentoFalta, Aluno, Inscricao, RegistroAula, Presenca, Lead, TokenAtualizacaoAluno, AcompanhamentoPedagogico, AlunoProva, Questao, ProvaTemplate, RespostaAluno, PesquisaSatisfacao, AvaliacaoProfessor, AvaliacaoAdministrativo, AvaliacaoPedagogico, FollowUp
 from .forms import (
     AlunoForm, PagamentoForm, AlunoExperimentalForm, ContratoForm, 
     RegistroAulaForm, LeadForm, AcompanhamentoPedagogicoForm, 
@@ -9,7 +9,7 @@ from .forms import (
 )
 from django.utils import timezone
 from datetime import date, timedelta
-from django.db.models import F, Sum, Count, Min, Q, Subquery, OuterRef, Max, DecimalField, Exists
+from django.db.models import F, Sum, Count, Min, Q, Subquery, OuterRef, Max, DecimalField, Exists, Value, BooleanField, DateTimeField
 from decimal import Decimal
 from dateutil.relativedelta import relativedelta 
 import calendar
@@ -385,6 +385,26 @@ def dashboard_admin(request):
         status='experimental'
     ).select_related('aluno', 'turma')
 
+    # --- Lógica de Rodízio de Acompanhamentos no Dashboard ---
+    dois_meses_atras = hoje - timedelta(days=60)
+    
+    ultimo_acomp_subquery = AcompanhamentoPedagogico.objects.filter(
+        aluno=OuterRef('pk'), status='realizado'
+    ).order_by('-data_realizacao').values('data_realizacao')[:1]
+
+    possui_agendado_subquery = AcompanhamentoPedagogico.objects.filter(
+        aluno=OuterRef('pk'), status='agendado'
+    )
+
+    alunos_precisam_acompanhamento = Aluno.objects.filter(status='ativo').annotate(
+        ultimo_acompanhamento=Subquery(ultimo_acomp_subquery),
+        possui_agendado=Exists(possui_agendado_subquery)
+    ).filter(
+        Q(possui_agendado=False),
+        Q(ultimo_acompanhamento__lt=dois_meses_atras) | 
+        Q(ultimo_acompanhamento__isnull=True, data_matricula__lt=dois_meses_atras)
+    ).order_by('ultimo_acompanhamento', 'nome_completo')
+
     # Aplicar filtros adicionais se existirem
     if turma_filtrada_id:
         alunos_da_turma = Inscricao.objects.filter(turma__id=turma_filtrada_id).values_list('aluno__id', flat=True)
@@ -412,6 +432,7 @@ def dashboard_admin(request):
         'contratos_vencidos': contratos_vencidos_sem_renovacao,
         'acompanhamentos_pendentes': acompanhamentos_pendentes,
         'inscricoes_experimentais': inscricoes_experimentais,
+        'alunos_precisam_acompanhamento': alunos_precisam_acompanhamento,
         'nav': {
             'mes_anterior': mes_anterior, 
             'ano_anterior': ano_anterior,
@@ -844,20 +865,17 @@ def lista_alunos(request):
     # Usamos Subquery para buscar informações de outros modelos de forma eficiente,
     # evitando o problema de N+1 queries.
 
-    # Subquery para buscar o plano do contrato ativo mais recente.
     contrato_ativo_plano = Contrato.objects.filter(
         Q(aluno=OuterRef('pk')) & (Q(data_fim__gte=timezone.now()) | Q(data_fim__isnull=True)),
         ativo=True
     ).order_by('-data_inicio').values('plano')[:1]
 
-    # Subquery para buscar o valor da mensalidade do mesmo contrato.
     contrato_ativo_valor = Contrato.objects.filter(
         Q(data_fim__gte=timezone.now()) | Q(data_fim__isnull=True),
         aluno=OuterRef('pk'), 
         ativo=True
     ).order_by('-data_inicio').values('valor_mensalidade')[:1]
     
-    # Subquery para buscar a data do último pagamento efetuado.
     ultimo_pagamento = Pagamento.objects.filter(
         aluno=OuterRef('pk'),
         status='pago'
@@ -866,19 +884,63 @@ def lista_alunos(request):
     pesquisa_respondida = PesquisaSatisfacao.objects.filter(
         aluno=OuterRef('pk')
     )
+    
+    turma_atual = Inscricao.objects.filter(
+        aluno=OuterRef('pk'), 
+        status__in=['matriculado', 'experimental', 'acompanhando']
+    ).order_by('-id').values('turma__nome')[:1]
+    
+    stage_atual = Inscricao.objects.filter(
+        aluno=OuterRef('pk'), 
+        status__in=['matriculado', 'experimental', 'acompanhando']
+    ).order_by('-id').values('turma__stage')[:1]
+    
+    tem_atraso = Pagamento.objects.filter(
+        aluno=OuterRef('pk'), 
+        status__in=['atrasado', 'pendente'],
+        data_vencimento__lt=timezone.now().date()
+    )
 
-    # A query principal anota (adiciona) as informações das subqueries a cada aluno.
     alunos = Aluno.objects.annotate(
         plano_contrato=Subquery(contrato_ativo_plano),
         valor_mensalidade_contrato=Subquery(contrato_ativo_valor),
         data_ultimo_pagamento=Subquery(ultimo_pagamento),
-        tem_feedback=Exists(pesquisa_respondida)
+        tem_feedback=Exists(pesquisa_respondida),
+        turma_nome=Subquery(turma_atual),
+        turma_stage=Subquery(stage_atual),
+        inadimplente=Exists(tem_atraso)
     ).order_by('nome_completo')
 
     context = {
         'alunos': alunos,
     }
     return render(request, 'cadastros/lista_alunos.html', context)
+
+@login_required
+@admin_required
+def lista_alunos_trancados(request):
+    # Subqueries similares à lista_alunos para mostrar informações úteis
+    turma_anterior = Inscricao.objects.filter(
+        aluno=OuterRef('pk'), 
+        status='trancado'
+    ).order_by('-id').values('turma__nome')[:1]
+    
+    stage_anterior = Inscricao.objects.filter(
+        aluno=OuterRef('pk'), 
+        status='trancado'
+    ).order_by('-id').values('turma__stage')[:1]
+
+    # Alunos com status trancado
+    alunos_trancados = Aluno.objects.filter(status='trancado').annotate(
+        turma_nome=Subquery(turma_anterior),
+        turma_stage=Subquery(stage_anterior)
+    ).order_by('nome_completo')
+
+    context = {
+        'alunos': alunos_trancados,
+    }
+    return render(request, 'cadastros/alunos/lista_alunos_trancados.html', context)
+
 
 @login_required
 @admin_required
@@ -1186,17 +1248,47 @@ def adicionar_lead(request):
 def editar_lead(request, pk):
     lead = get_object_or_404(Lead, pk=pk)
     if request.method == 'POST':
-        form = LeadForm(request.POST, instance=lead)
-        if form.is_valid():
-            form.save()
-            messages.success(request, f'Lead "{lead.nome_completo}" atualizado com sucesso.')
-            return redirect('cadastros:lista_leads')
+        if 'adicionar_followup' in request.POST:
+            tipo_contato = request.POST.get('tipo_contato')
+            anotacoes = request.POST.get('anotacoes')
+            lead_respondeu = request.POST.get('lead_respondeu') == 'on'
+            
+            FollowUp.objects.create(
+                lead=lead,
+                tipo_contato=tipo_contato,
+                anotacoes=anotacoes,
+                lead_respondeu=lead_respondeu
+            )
+            messages.success(request, 'Follow-up adicionado com sucesso.')
+            return redirect('cadastros:editar_lead', pk=lead.pk)
+        
+        elif 'atualizar_followup' in request.POST:
+            followup_id = request.POST.get('followup_id')
+            followup = get_object_or_404(FollowUp, pk=followup_id, lead=lead)
+            followup.lead_respondeu = request.POST.get('lead_respondeu') == 'on'
+            followup.save()
+            messages.success(request, 'Status de resposta do follow-up atualizado.')
+            return redirect('cadastros:editar_lead', pk=lead.pk)
+        
+        else:
+            form = LeadForm(request.POST, instance=lead)
+            if form.is_valid():
+                form.save()
+                messages.success(request, f'Lead "{lead.nome_completo}" atualizado com sucesso.')
+                return redirect('cadastros:lista_leads')
     else:
         form = LeadForm(instance=lead)
+
+    follow_ups = lead.follow_ups.all()
+    total_followups = follow_ups.count()
+    respondidos = follow_ups.filter(lead_respondeu=True).count()
+    eficacia = (respondidos / total_followups * 100) if total_followups > 0 else 0
 
     context = {
         'form': form,
         'lead': lead,
+        'follow_ups': follow_ups,
+        'eficacia': round(eficacia, 1),
     }
     return render(request, 'cadastros/editar_lead.html', context)
 
@@ -1304,10 +1396,26 @@ def lista_acompanhamento_pedagogico(request):
     ).values('turma__nome')[:1]
 
     
+    # Lógica de Rodízio: 2 meses sem acompanhamento
+    dois_meses_atras = timezone.now() - timedelta(days=60)
+
+    possui_agendado_subquery = AcompanhamentoPedagogico.objects.filter(
+        aluno=OuterRef('pk'), status='agendado'
+    )
+
     alunos_list = Aluno.objects.filter(status='ativo').annotate(
         ultimo_acompanhamento=Subquery(ultimo_acompanhamento_subquery),
-        turma_atual=Subquery(turma_atual_subquery)  
-    ).order_by('nome_completo')
+        turma_atual=Subquery(turma_atual_subquery),
+        possui_agendado=Exists(possui_agendado_subquery)
+    ).annotate(
+        precisa_acompanhamento=Case(
+            When(possui_agendado=True, then=Value(False)),
+            When(ultimo_acompanhamento__lt=dois_meses_atras, then=Value(True)),
+            When(ultimo_acompanhamento__isnull=True, data_matricula__lt=dois_meses_atras.date(), then=Value(True)),
+            default=Value(False),
+            output_field=BooleanField()
+        )
+    ).order_by('-precisa_acompanhamento', 'nome_completo')
 
     context = {
         'agendamentos_pendentes': agendamentos_pendentes,
@@ -1337,8 +1445,19 @@ def adicionar_acompanhamento(request, aluno_pk):
                 # Se não for um professor, não associa ninguém (pode ser um admin)
                 pass
             
-            # Se a data de realização for preenchida, o status muda para 'realizado'
-            if acompanhamento.data_realizacao:
+            # Lógica de Status Baseada no Botão Clicado
+            acao = request.POST.get('status_acao')
+            
+            if acao == 'realizado':
+                acompanhamento.status = 'realizado'
+                if not acompanhamento.data_realizacao:
+                    acompanhamento.data_realizacao = timezone.now()
+            elif acao == 'cancelado':
+                acompanhamento.status = 'cancelado'
+                acompanhamento.data_realizacao = None
+            
+            # Fallback caso usem o select de status diretamente
+            if not acao and acompanhamento.data_realizacao:
                 acompanhamento.status = 'realizado'
 
             acompanhamento.save()
@@ -1367,9 +1486,21 @@ def editar_acompanhamento(request, pk):
         form = AcompanhamentoPedagogicoForm(request.POST, instance=acompanhamento)
         if form.is_valid():
             acompanhamento = form.save(commit=False)
-            # Se a data de realização for preenchida, o status muda para 'realizado'
-            if acompanhamento.data_realizacao:
+            # Lógica de Status Baseada no Botão Clicado
+            acao = request.POST.get('status_acao')
+            
+            if acao == 'realizado':
                 acompanhamento.status = 'realizado'
+                if not acompanhamento.data_realizacao:
+                    acompanhamento.data_realizacao = timezone.now()
+            elif acao == 'cancelado':
+                acompanhamento.status = 'cancelado'
+                acompanhamento.data_realizacao = None
+            
+            # Fallback caso usem o select de status diretamente
+            if not acao and acompanhamento.data_realizacao:
+                acompanhamento.status = 'realizado'
+
             acompanhamento.save()
 
             messages.success(request, f"Acompanhamento de {aluno.nome_completo} atualizado com sucesso.")
@@ -2509,14 +2640,8 @@ def quitar_pagamento_especifico(request, pk):
     pagamento.data_pagamento = timezone.now().date()
     pagamento.save()
 
-    # 2. Regra do Trancamento (Acúmulo de Crédito)
-    # Se o contrato está trancado e é uma mensalidade, o aluno ganha +1 crédito
-    if contrato and contrato.status == 'trancado' and pagamento.tipo == 'mensalidade':
-        aluno.creditos_aulas += 1
-        aluno.save()
-        messages.success(request, f"Pagamento confirmado! O aluno ganhou +1 CRÉDITO DE AULA (Total: {aluno.creditos_aulas}).")
-    else:
-        messages.success(request, "Pagamento quitado com sucesso.")
+    # O acúmulo de crédito agora é gerido pelo Pagamento.save() no models.py
+    messages.success(request, "Pagamento quitado com sucesso.")
 
     # Retorna para a página anterior (Dashboard ou Perfil)
     return redirect(request.META.get('HTTP_REFERER', 'cadastros:dashboard_admin'))
