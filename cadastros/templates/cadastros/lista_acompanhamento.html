@@ -4,136 +4,393 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Acompanhamento Pedagógico</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <title>Acompanhamento Pedagógico | MMS Portal</title>
+  
+  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Work+Sans:wght@400;500&display=swap" rel="stylesheet">
-  <link href="{% static 'cadastros/mms_style.css' %}" rel="stylesheet">
-  {% if request.resolver_match.url_name == 'dashboard_admin' %}
-      <link href="{% static 'cadastros/dashboard.css' %}" rel="stylesheet">
-  {% endif %}
-</head>
-<body class="bg-light">
-  <div class="container my-4">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+  
+  <!-- Icons & Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  
+  <style>
+    :root {
+      --primary-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+      --warning-gradient: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      --danger-gradient: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+      --glass-bg: rgba(255, 255, 255, 0.7);
+      --glass-border: rgba(255, 255, 255, 0.4);
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+      --bg-soft: #f8fafc;
+    }
 
-    <header class="d-flex align-items-center justify-content-between mb-4">
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-soft);
+      color: var(--text-main);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.05) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(168, 85, 247, 0.05) 0px, transparent 50%);
+      min-height: 100vh;
+    }
+
+    h1, h2, h3, h4, h5, .poppins {
+      font-family: 'Poppins', sans-serif;
+    }
+
+    .glass-card {
+      background: var(--glass-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--glass-border);
+      border-radius: 1.5rem;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      overflow: hidden;
+    }
+
+    .glass-card:hover {
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.08);
+    }
+
+    .card-header-custom {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+      background: rgba(255, 255, 255, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .btn-primary-gradient {
+      background: var(--primary-gradient);
+      border: none;
+      color: white;
+      padding: 0.6rem 1.2rem;
+      border-radius: 1rem;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.4);
+    }
+
+    .btn-primary-gradient:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.5);
+      color: white;
+    }
+
+    .btn-outline-custom {
+      border: 2px solid #e2e8f0;
+      border-radius: 1rem;
+      padding: 0.6rem 1.2rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      transition: all 0.3s ease;
+      background: white;
+    }
+
+    .btn-outline-custom:hover {
+      background: #f1f5f9;
+      color: var(--text-main);
+      border-color: #cbd5e1;
+    }
+
+    .badge-pendente {
+      background: var(--danger-gradient);
+      color: white;
+      padding: 0.4rem 0.8rem;
+      border-radius: 2rem;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.3);
+    }
+
+    .list-group-item-custom {
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+      padding: 1.25rem 1.5rem;
+      transition: background 0.2s ease;
+    }
+
+    .list-group-item-custom:hover {
+      background: rgba(255, 255, 255, 0.4);
+    }
+
+    .search-box {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 1.25rem;
+      padding: 0.75rem 1.25rem;
+      transition: all 0.3s ease;
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .search-box:focus {
+      outline: none;
+      border-color: #6366f1;
+      box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+    }
+
+    .table-custom thead th {
+      background: rgba(255, 255, 255, 0.5);
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 1rem 1.5rem;
+    }
+
+    .table-custom tbody td {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+    }
+
+    .avatar-circle {
+      width: 40px;
+      height: 40px;
+      background: #f1f5f9;
+      color: var(--text-main);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+
+    .section-icon {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 0.75rem;
+      margin-right: 0.75rem;
+    }
+
+    .bg-icon-primary { background: rgba(99, 102, 241, 0.1); color: #6366f1; }
+    .bg-icon-warning { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+    .bg-icon-success { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+
+    @media (max-width: 768px) {
+      .header-actions {
+        width: 100%;
+        margin-top: 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container py-4">
+
+    <!-- Header Section -->
+    <header class="d-flex flex-wrap align-items-center justify-content-between mb-5">
       <div>
-        <h1 class="h3 mb-1">Acompanhamento Pedagógico</h1>
-        <p class="text-muted mb-0">Gestão do desenvolvimento individual dos alunos.</p>
+        <h1 class="h2 mb-1">Acompanhamento Pedagógico</h1>
+        <p class="text-muted mb-0">Gestão de desenvolvimento e progresso dos alunos</p>
       </div>
-      <a href="{% url 'cadastros:portal_professor' %}" class="btn btn-outline-secondary">
-        &larr; Voltar ao Portal
-      </a>
+      <div class="header-actions">
+        <a href="{% url 'cadastros:portal_professor' %}" class="btn btn-outline-custom">
+          <i class="bi bi-house-door me-2"></i>Voltar ao Portal
+        </a>
+      </div>
     </header>
 
-    <section class="card mb-4">
-      <div class="card-header bg-primary text-white">
-        <h2 class="h5 mb-0"><i class="bi bi-pencil-fill me-2"></i>Provas Aguardando Correção</h2>
-      </div>
-      <div class="card-body">
-        {% if provas_para_corrigir %}
-          <div class="list-group">
-            {% for prova in provas_para_corrigir %}
-              <div class="list-group-item d-flex justify-content-between align-items-center">
-                <div>
-                  <h6 class="mb-1">{{ prova.aluno.nome_completo }}</h6>
-                  <small class="text-muted">
-                    Prova: <strong>{{ prova.prova_template.titulo }}</strong> - Realizada em: {{ prova.data_realizacao|date:"d/m/Y" }}
-                  </small>
-                </div>
-                <a href="{% url 'cadastros:corrigir_prova' prova.pk %}" class="btn btn-primary btn-sm">
-                  <i class="bi bi-pencil-square me-1"></i> Corrigir
-                </a>
+    <div class="row g-4">
+      
+      <!-- Provas Column -->
+      <div class="col-lg-6">
+        <section class="glass-card h-100">
+          <div class="card-header-custom">
+            <div class="d-flex align-items-center">
+              <div class="section-icon bg-icon-primary">
+                <i class="bi bi-file-earmark-check"></i>
               </div>
-            {% endfor %}
+              <h2 class="h5 mb-0">Provas para Corrigir</h2>
+            </div>
+            {% if provas_para_corrigir %}
+              <span class="badge rounded-pill bg-primary">{{ provas_para_corrigir|length }}</span>
+            {% endif %}
           </div>
-        {% else %}
-          <div class="text-center text-muted p-3">
-            <i class="bi bi-check-all fs-1 d-block mb-2"></i>
-            Nenhuma prova aguardando correção. Tudo em dia!
-          </div>
-        {% endif %}
-      </div>
-    </section>
-    
-    <section class="card mb-4">
-      <div class="card-header bg-warning-subtle border-warning">
-        <h2 class="h5 mb-0"><i class="bi bi-clock-history me-2"></i>Área Priorizada: Agendamentos</h2>
-      </div>
-      <div class="card-body">
-        {% if agendamentos_pendentes %}
-          <div class="list-group">
-            {% for agendamento in agendamentos_pendentes %}
-              <div class="list-group-item d-flex justify-content-between align-items-center">
-                <div>
-                  <h6 class="mb-1">{{ agendamento.aluno.nome_completo }}</h6>
-                  <small class="text-muted">
-                    Agendado para: <strong>{{ agendamento.data_agendamento|date:"d/m/Y, H:i" }}</strong>
-                  </small>
-                </div>
-                <a href="{% url 'cadastros:editar_acompanhamento' agendamento.pk %}" class="btn btn-outline-primary btn-sm">
-                  <i class="bi bi-pencil-square me-1"></i> Realizar/Editar
-                </a>
-              </div>
-            {% endfor %}
-          </div>
-        {% else %}
-          <div class="text-center text-muted p-3">
-            <i class="bi bi-check-circle fs-1 d-block mb-2"></i>
-            Nenhum acompanhamento agendado no momento.
-          </div>
-        {% endif %}
-      </div>
-    </section>
-
-    <section class="card">
-      <div class="card-header">
-        <h2 class="h5 mb-0"><i class="bi bi-people-fill me-2"></i>Lista de Alunos</h2>
-      </div>
-      <div class="card-body">
-        <table class="table table-hover align-middle">
-          <thead class="table-light">
-            <tr>
-              <th scope="col">Aluno</th>
-              <th scope="col">Último Acompanhamento</th>
-              <th scope="col" class="text-end">Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for aluno in alunos %}
-              <tr>
-                <td>{{ aluno.nome_completo }}</td>
-                <td>
-                  {% if aluno.ultimo_acompanhamento %}
-                    <span class="badge bg-secondary">{{ aluno.ultimo_acompanhamento|date:"d/m/Y" }}</span>
-                  {% else %}
-                    <span class="badge bg-light text-dark border">Nenhum</span>
-                  {% endif %}
-                </td>
-                <td class="text-end">
-                  <div class="btn-group btn-group-sm" role="group" aria-label="Ações para {{ aluno.nome_completo }}">
-                    <a href="{% url 'cadastros:historico_acompanhamentos_aluno' aluno.pk %}" class="btn btn-outline-secondary">
-                      <i class="bi bi-clock-history me-1"></i> Histórico
-                    </a>
-                    <a href="{% url 'cadastros:adicionar_acompanhamento' aluno.pk %}" class="btn btn-primary">
-                      <i class="bi bi-plus-circle me-1"></i> Novo
+          
+          <div class="card-body p-0">
+            {% if provas_para_corrigir %}
+              <div class="list-group list-group-flush">
+                {% for prova in provas_para_corrigir %}
+                  <div class="list-group-item list-group-item-custom d-flex justify-content-between align-items-center">
+                    <div>
+                      <h6 class="mb-1">{{ prova.aluno.nome_completo }}</h6>
+                      <p class="text-muted small mb-0">
+                        <i class="bi bi-journal-text me-1"></i> {{ prova.prova_template.titulo }}
+                        <span class="mx-1">•</span>
+                        <i class="bi bi-calendar3 me-1"></i> {{ prova.data_realizacao|date:"d/m/Y" }}
+                      </p>
+                    </div>
+                    <a href="{% url 'cadastros:corrigir_prova' prova.pk %}" class="btn btn-primary-gradient btn-sm">
+                      Corrigir
                     </a>
                   </div>
-                </td>
-              </tr>
-            {% empty %}
-              <tr>
-                <td colspan="3" class="text-center text-muted p-4">Nenhum aluno ativo encontrado.</td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="text-center py-5">
+                <i class="bi bi-check2-circle fs-1 text-muted opacity-25 d-block mb-2"></i>
+                <p class="text-muted mb-0">Nenhuma prova aguardando correção</p>
+              </div>
+            {% endif %}
+          </div>
+        </section>
       </div>
-    </section>
 
+      <!-- Agendamentos Column -->
+      <div class="col-lg-6">
+        <section class="glass-card h-100">
+          <div class="card-header-custom">
+            <div class="d-flex align-items-center">
+              <div class="section-icon bg-icon-warning">
+                <i class="bi bi-calendar-event"></i>
+              </div>
+              <h2 class="h5 mb-0">Agendamentos</h2>
+            </div>
+            {% if agendamentos_pendentes %}
+              <span class="badge rounded-pill bg-warning text-dark">{{ agendamentos_pendentes|length }}</span>
+            {% endif %}
+          </div>
+          
+          <div class="card-body p-0">
+            {% if agendamentos_pendentes %}
+              <div class="list-group list-group-flush">
+                {% for agendamento in agendamentos_pendentes %}
+                  <div class="list-group-item list-group-item-custom d-flex justify-content-between align-items-center">
+                    <div>
+                      <h6 class="mb-1">{{ agendamento.aluno.nome_completo }}</h6>
+                      <p class="text-muted small mb-0">
+                        <i class="bi bi-clock me-1"></i> {{ agendamento.data_agendamento|date:"d/m/Y, H:i" }}
+                      </p>
+                    </div>
+                    <a href="{% url 'cadastros:editar_acompanhamento' agendamento.pk %}" class="btn btn-outline-custom btn-sm">
+                      Realizar
+                    </a>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="text-center py-5">
+                <i class="bi bi-calendar-x fs-1 text-muted opacity-25 d-block mb-2"></i>
+                <p class="text-muted mb-0">Sem sessões agendadas no momento</p>
+              </div>
+            {% endif %}
+          </div>
+        </section>
+      </div>
+
+      <!-- Alunos Full Width -->
+      <div class="col-12">
+        <section class="glass-card">
+          <div class="card-header-custom flex-column flex-md-row gap-3">
+            <div class="d-flex align-items-center">
+              <div class="section-icon bg-icon-success">
+                <i class="bi bi-people"></i>
+              </div>
+              <h2 class="h5 mb-0">Alunos Ativos</h2>
+            </div>
+            <div class="d-flex gap-3 flex-grow-1 justify-content-md-end w-100 w-md-auto">
+              <div class="position-relative flex-grow-1 flex-md-grow-0">
+                <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+                <input type="text" id="alunoSearch" class="search-box ps-5" placeholder="Procurar aluno...">
+              </div>
+            </div>
+          </div>
+          
+          <div class="table-responsive">
+            <table class="table table-custom align-middle mb-0" id="alunosTable">
+              <thead>
+                <tr>
+                  <th>Aluno</th>
+                  <th>Último Acompanhamento</th>
+                  <th class="text-end">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for aluno in alunos %}
+                  <tr class="aluno-row">
+                    <td>
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="avatar-circle">
+                          {{ aluno.nome_completo|truncatechars:1|upper }}
+                        </div>
+                        <div>
+                          <div class="fw-semibold">{{ aluno.nome_completo }}</div>
+                          {% if aluno.precisa_acompanhamento %}
+                            <span class="badge-pendente">
+                              <i class="bi bi-exclamation-triangle-fill me-1"></i>Pendente (+2m)
+                            </span>
+                          {% endif %}
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      {% if aluno.ultimo_acompanhamento %}
+                        <span class="text-muted">
+                          <i class="bi bi-calendar-check me-1"></i> {{ aluno.ultimo_acompanhamento|date:"d/m/Y" }}
+                        </span>
+                      {% else %}
+                        <span class="text-muted opacity-50">Nenhum registro</span>
+                      {% endif %}
+                    </td>
+                    <td class="text-end">
+                      <div class="d-flex justify-content-end gap-2">
+                        <a href="{% url 'cadastros:historico_acompanhamentos_aluno' aluno.pk %}" class="btn btn-outline-custom btn-sm" title="Ver Histórico">
+                          <i class="bi bi-clock-history"></i> <span class="d-none d-md-inline ms-1">Histórico</span>
+                        </a>
+                        <a href="{% url 'cadastros:adicionar_acompanhamento' aluno.pk %}" class="btn btn-primary-gradient btn-sm">
+                          <i class="bi bi-plus-lg"></i> <span class="d-none d-md-inline ms-1">Novo</span>
+                        </a>
+                      </div>
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr>
+                    <td colspan="3" class="text-center py-5 text-muted">Nenhum aluno ativo encontrado</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+    </div>
   </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const searchInput = document.getElementById('alunoSearch');
+      const table = document.getElementById('alunosTable');
+      const rows = table.querySelectorAll('.aluno-row');
+
+      searchInput.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+        
+        rows.forEach(row => {
+          const nome = row.querySelector('.fw-semibold').textContent.toLowerCase();
+          if (nome.includes(searchTerm)) {
+            row.style.display = '';
+          } else {
+            row.style.display = 'none';
+          }
+        });
+      });
+    });
+  </script>
 </body>
 </html>

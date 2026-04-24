@@ -141,6 +141,14 @@ class LeadForm(forms.ModelForm):
         }
 
 class AcompanhamentoPedagogicoForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            if self.instance.data_agendamento:
+                self.initial['data_agendamento'] = self.instance.data_agendamento.strftime('%Y-%m-%dT%H:%M')
+            if self.instance.data_realizacao:
+                self.initial['data_realizacao'] = self.instance.data_realizacao.strftime('%Y-%m-%dT%H:%M')
+
     class Meta:
         model = AcompanhamentoPedagogico
         # Campos que o utilizador irá preencher. 'aluno' e 'criado_por' são definidos na view.

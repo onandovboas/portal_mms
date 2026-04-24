@@ -21,6 +21,21 @@ class Aluno(models.Model):
     data_matricula = models.DateField(auto_now_add=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="ativo")
     creditos_aulas = models.IntegerField("Créditos (Mensalidades)", default=0)
+    token_disponibilidade = models.UUIDField(default=uuid.uuid4, editable=False, unique=True, null=True)
+    observacoes_trancamento = models.TextField("Anotações de Trancamento", blank=True, null=True)
+
+    def save(self, *args, **kwargs):
+        # Auto create user if email is provided and no user is linked
+        if self.email and not self.usuario:
+            # Check if user already exists
+            user_exists = User.objects.filter(username=self.email).exists()
+            if not user_exists:
+                # Create user with a random password, they can reset it later
+                from django.utils.crypto import get_random_string
+                random_password = get_random_string(12)
+                user = User.objects.create_user(username=self.email, email=self.email, password=random_password)
+                self.usuario = user
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.nome_completo
@@ -182,6 +197,20 @@ class Pagamento(models.Model):
 
     def __str__(self):
         return f"{self.descricao} - {self.aluno.nome_completo} ({self.get_status_display()})"
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        old_status = None
+        if not is_new:
+            old_status = Pagamento.objects.get(pk=self.pk).status
+
+        super().save(*args, **kwargs)
+
+        if self.tipo == 'mensalidade' and self.status == 'pago' and old_status != 'pago':
+            if self.contrato and self.contrato.status == 'trancado':
+                self.aluno.creditos_aulas += 1
+                self.aluno.save(update_fields=['creditos_aulas'])
+
     
 class AcompanhamentoFalta(models.Model):
     STATUS_CHOICES = [
@@ -274,6 +303,24 @@ class HorarioAula(models.Model):
     def __str__(self):
         return f"{self.turma.nome} - {self.get_dia_semana_display()} às {self.horario_inicio.strftime('%H:%M')}"
     
+class HorarioDisponivelAluno(models.Model):
+    DIA_CHOICES = [
+        (0, 'Segunda-feira'),
+        (1, 'Terça-feira'),
+        (2, 'Quarta-feira'),
+        (3, 'Quinta-feira'),
+        (4, 'Sexta-feira'),
+        (5, 'Sábado'),
+        (6, 'Domingo'),
+    ]
+    aluno = models.ForeignKey(Aluno, on_delete=models.CASCADE, related_name='horarios_disponiveis')
+    dia_semana = models.IntegerField(choices=DIA_CHOICES)
+    horario_inicio = models.TimeField()
+    horario_fim = models.TimeField()
+
+    def __str__(self):
+        return f"{self.aluno.nome_completo} - {self.get_dia_semana_display()} às {self.horario_inicio}"
+
 class Lead(models.Model):
     STATUS_CHOICES = [
         ('novo', 'Novo Contato'),
@@ -563,43 +610,23 @@ class AvaliacaoPedagogico(models.Model):
     elogio = models.TextField("Deixe seu elogio para o pedagógico:", blank=True)
     sugestao = models.TextField("Sua sugestão de melhoria para o pedagógico:", blank=True)
 
-class MensagemWhatsApp(models.Model):
-    DIRECAO_CHOICES = [
-        ('entrada', 'Recebida (Cliente -> Escola)'),
-        ('saida', 'Enviada (Escola -> Cliente)'),
-    ]
-    STATUS_CHOICES = [
-        ('enviado', 'Enviado'),
-        ('entregue', 'Entregue'),
-        ('lido', 'Lido'),
-        ('falha', 'Falha'),
+class FollowUp(models.Model):
+    TIPO_CHOICES = [
+        ('whatsapp', 'WhatsApp'),
+        ('ligacao', 'Ligação'),
+        ('email', 'E-mail'),
+        ('presencial', 'Presencial'),
     ]
 
-    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name='mensagens_whatsapp')
-    direcao = models.CharField("Direção da Mensagem", max_length=10, choices=DIRECAO_CHOICES)
-    conteudo_texto = models.TextField("Conteúdo da Mensagem")
-    wamid = models.CharField("WhatsApp Message ID", max_length=100, blank=True, null=True)
-    status = models.CharField("Status de Entrega", max_length=15, choices=STATUS_CHOICES, blank=True, null=True)
-    data_envio = models.DateTimeField(auto_now_add=True)
-
+    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name='follow_ups')
+    data_contato = models.DateTimeField(auto_now_add=True)
+    tipo_contato = models.CharField("Tipo de Contato", max_length=15, choices=TIPO_CHOICES, default='whatsapp')
+    anotacoes = models.TextField("Anotações / Resumo da Conversa")
+    lead_respondeu = models.BooleanField("O lead respondeu?", default=False)
+    
     class Meta:
-        ordering = ['data_envio']
+        ordering = ['-data_contato']
 
     def __str__(self):
-        return f"[{self.get_direcao_display()}] {self.lead.nome_completo}: {self.conteudo_texto[:30]}"
+        return f"FollowUp {self.get_tipo_contato_display()} com {self.lead.nome_completo}"
 
-class TemplateMensagem(models.Model):
-    CATEGORIA_CHOICES = [
-        ('triagem', 'Triagem'),
-        ('follow_up', 'Follow Up'),
-        ('objecao', 'Quebra de Objeção'),
-        ('aviso', 'Aviso / Lembrete'),
-        ('outro', 'Outro'),
-    ]
-    titulo = models.CharField("Título do Template", max_length=100)
-    conteudo = models.TextField("Conteúdo (Variáveis: {{nome}})", help_text="Use {{nome}} para injetar o nome do lead.")
-    categoria = models.CharField("Categoria", max_length=20, choices=CATEGORIA_CHOICES, default='outro')
-    criado_em = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"{self.get_categoria_display()} - {self.titulo}"

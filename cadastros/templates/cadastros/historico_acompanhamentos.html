@@ -1,120 +1,378 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Histórico Pedagógico de {{ aluno.nome_completo }}</title>
+  <title>Histórico Pedagógico | {{ aluno.nome_completo }}</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+  
+  <!-- Icons & Bootstrap -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-</head>
-<body class="bg-light">
-  <div class="container my-4">
+  
+  <style>
+    :root {
+      --primary-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+      --glass-bg: rgba(255, 255, 255, 0.7);
+      --glass-border: rgba(255, 255, 255, 0.4);
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+      --bg-soft: #f8fafc;
+    }
 
-    <header class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
-      <div>
-        <h1 class="h3 mb-1">Histórico Pedagógico</h1>
-        <p class="text-muted mb-0">Aluno: <strong>{{ aluno.nome_completo }}</strong></p>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-soft);
+      color: var(--text-main);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.05) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(168, 85, 247, 0.05) 0px, transparent 50%);
+      min-height: 100vh;
+    }
+
+    h1, h2, h3, h4, h5, .poppins {
+      font-family: 'Poppins', sans-serif;
+    }
+
+    .glass-card {
+      background: var(--glass-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--glass-border);
+      border-radius: 1.5rem;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .glass-card:hover {
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.08);
+    }
+
+    .btn-primary-gradient {
+      background: var(--primary-gradient);
+      border: none;
+      color: white;
+      padding: 0.75rem 1.5rem;
+      border-radius: 1rem;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.4);
+    }
+
+    .btn-primary-gradient:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.5);
+      color: white;
+    }
+
+    .btn-outline-custom {
+      border: 2px solid #e2e8f0;
+      border-radius: 1rem;
+      padding: 0.6rem 1.2rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      transition: all 0.3s ease;
+    }
+
+    .btn-outline-custom:hover {
+      background: #f1f5f9;
+      color: var(--text-main);
+      border-color: #cbd5e1;
+    }
+
+    .badge-status {
+      padding: 0.5rem 1rem;
+      border-radius: 0.75rem;
+      font-weight: 600;
+      font-size: 0.75rem;
+    }
+
+    .timeline-item {
+      position: relative;
+      padding-left: 2rem;
+      padding-bottom: 2rem;
+      border-left: 2px solid #e2e8f0;
+    }
+
+    .timeline-item:last-child {
+      border-left: 2px solid transparent;
+    }
+
+    .timeline-dot {
+      position: absolute;
+      left: -9px;
+      top: 0;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: white;
+      border: 3px solid #6366f1;
+    }
+
+    .timeline-content {
+      background: white;
+      padding: 1.5rem;
+      border-radius: 1.25rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+      border: 1px solid #f1f5f9;
+    }
+
+    .prova-item {
+      transition: all 0.2s ease;
+      border-radius: 1rem !important;
+      margin-bottom: 0.5rem;
+      border: 1px solid #f1f5f9 !important;
+    }
+
+    .prova-item:hover {
+      background: #f8fafc;
+      transform: translateX(5px);
+    }
+
+    .nav-header {
+      padding: 2rem 0;
+    }
+
+    .student-avatar {
+      width: 64px;
+      height: 64px;
+      background: var(--primary-gradient);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      font-weight: 700;
+      box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.3);
+    }
+
+    /* Accordion Customization */
+    .accordion-button {
+      background: transparent !important;
+      color: var(--text-main) !important;
+      font-weight: 600;
+      padding: 1.25rem;
+      border-radius: 1.25rem !important;
+    }
+
+    .accordion-button:not(.collapsed) {
+      box-shadow: none;
+      color: #6366f1 !important;
+    }
+
+    .accordion-item {
+      border: none;
+      background: transparent;
+      margin-bottom: 1rem;
+    }
+
+    .accordion-header {
+      background: white;
+      border-radius: 1.25rem;
+      border: 1px solid #f1f5f9;
+    }
+
+    .accordion-body {
+      background: rgba(255, 255, 255, 0.4);
+      border-radius: 0 0 1.25rem 1.25rem;
+      margin-top: -0.5rem;
+      padding-top: 1.5rem;
+    }
+
+    .info-label {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.25rem;
+    }
+
+    .info-value {
+      font-weight: 500;
+      color: var(--text-main);
+    }
+
+    @media (max-width: 768px) {
+      .glass-card {
+        padding: 1rem !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container py-4">
+    
+    <!-- Header Section -->
+    <header class="nav-header d-flex flex-column flex-md-row align-items-center justify-content-between gap-4">
+      <div class="d-flex align-items-center gap-3">
+        <div class="student-avatar">
+          {{ aluno.nome_completo|truncatechars:1|upper }}
+        </div>
+        <div>
+          <h1 class="h2 mb-0">Histórico Pedagógico</h1>
+          <p class="text-muted mb-0">Gestão de progresso de <strong>{{ aluno.nome_completo }}</strong></p>
+        </div>
       </div>
-      <div class="d-flex gap-2">
-        <a href="{% url 'cadastros:liberar_prova' aluno.pk %}" class="btn btn-primary">
-          <i class="bi bi-send me-1"></i> Liberar Nova Prova
+      
+      <div class="d-flex gap-2 w-100 w-md-auto">
+        <a href="{% url 'cadastros:liberar_prova' aluno.pk %}" class="btn btn-primary-gradient flex-grow-1 flex-md-grow-0">
+          <i class="bi bi-journal-plus me-2"></i>Nova Prova
         </a>
-        <a href="{% url 'cadastros:lista_acompanhamento_pedagogico' %}" class="btn btn-outline-secondary">
-          &larr; Voltar aos Acompanhamentos
+        <a href="{% url 'cadastros:lista_acompanhamento_pedagogico' %}" class="btn btn-outline-custom">
+          <i class="bi bi-arrow-left me-2"></i>Painel
         </a>
       </div>
     </header>
 
-    <section class="card mb-4">
-      <div class="card-header"><h2 class="h5 mb-0">Avaliações e Provas</h2></div>
-      <div class="list-group list-group-flush">
-        {% for prova in provas %}
-          <a 
-            {% if prova.status == 'finalizada' %}
-              href="{% url 'cadastros:ver_resultado_prova' prova.pk %}"
-            {% elif prova.status == 'aguardando_correcao' %}
-              href="{% url 'cadastros:corrigir_prova' prova.pk %}"
-            {% else %}
-              href="#" class="disabled"
-            {% endif %}
-            class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
-          >
-            <div>
-              <h6 class="mb-1">{{ prova.prova_template.titulo }}</h6>
-              <small class="text-muted">Liberada em: {{ prova.data_realizacao|date:"d/m/Y" }}</small>
-            </div>
-            <span class="badge 
-              {% if prova.status == 'nao_iniciada' %}text-bg-secondary
-              {% elif prova.status == 'em_progresso' %}text-bg-info
-              {% elif prova.status == 'aguardando_correcao' %}text-bg-warning
-              {% elif prova.status == 'finalizada' %}text-bg-success
-              {% endif %}">
-              {{ prova.get_status_display }}
-            </span>
-          </a>
-          {% empty %}
-          <div class="card-body text-center text-muted">Nenhuma prova liberada para este aluno.</div>
-        {% endfor %}
-      </div>
-    </section>
-
-    <section class="card">
-      <div class="card-header"><h2 class="h5 mb-0">Acompanhamentos Individuais</h2></div>
-      <div class="accordion" id="accordionAcompanhamentos">
-        {% for acomp in acompanhamentos %}
+    <div class="row g-4">
+      
+      <!-- Left Column: Provas -->
+      <div class="col-lg-4">
+        <section class="glass-card p-4 h-100">
+          <div class="d-flex align-items-center justify-content-between mb-4">
+            <h3 class="h5 mb-0"><i class="bi bi-award me-2 text-primary"></i>Avaliações</h3>
+            <span class="badge rounded-pill bg-primary-subtle text-primary">{{ provas|length }} total</span>
+          </div>
           
-          <div class="accordion-item">
-            <h2 class="accordion-header" id="heading-{{ acomp.pk }}">
-              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ acomp.pk }}" aria-expanded="false" aria-controls="collapse-{{ acomp.pk }}">
-                <strong>
-                  {% if acomp.status == 'realizado' %}
-                    Realizado em: {{ acomp.data_realizacao|date:"d/m/Y" }}
-                  {% else %}
-                    Agendado para: {{ acomp.data_agendamento|date:"d/m/Y" }} ({{ acomp.get_status_display }})
-                  {% endif %}
-                </strong>
-              </button>
-            </h2>
-            <div id="collapse-{{ acomp.pk }}" class="accordion-collapse collapse" aria-labelledby="heading-{{ acomp.pk }}" data-bs-parent="#accordionAcompanhamentos">
-              <div class="card-body">
-                <dl class="row">
-                  <dt class="col-sm-3">Status</dt>
-                  <dd class="col-sm-9">{{ acomp.get_status_display }}</dd>
+          <div class="list-group list-group-flush bg-transparent">
+            {% for prova in provas %}
+              <a 
+                {% if prova.status == 'finalizada' %}
+                  href="{% url 'cadastros:ver_resultado_prova' prova.pk %}"
+                {% elif prova.status == 'aguardando_correcao' %}
+                  href="{% url 'cadastros:corrigir_prova' prova.pk %}"
+                {% else %}
+                  href="#" class="disabled"
+                {% endif %}
+                class="list-group-item list-group-item-action prova-item d-flex align-items-center gap-3 p-3"
+              >
+                <div class="icon-box p-2 rounded-3 bg-light">
+                  <i class="bi bi-file-earmark-text text-primary"></i>
+                </div>
+                <div class="flex-grow-1">
+                  <h6 class="mb-0 text-truncate" style="max-width: 180px;">{{ prova.prova_template.titulo }}</h6>
+                  <small class="text-muted">{{ prova.data_realizacao|date:"d M Y" }}</small>
+                </div>
+                <div>
+                  <span class="badge badge-status 
+                    {% if prova.status == 'nao_iniciada' %}text-bg-secondary
+                    {% elif prova.status == 'em_progresso' %}text-bg-info
+                    {% elif prova.status == 'aguardando_correcao' %}text-bg-warning
+                    {% elif prova.status == 'finalizada' %}text-bg-success
+                    {% endif %}">
+                    {{ prova.get_status_display }}
+                  </span>
+                </div>
+              </a>
+            {% empty %}
+              <div class="text-center py-5 text-muted">
+                <i class="bi bi-journal-x fs-1 d-block mb-2 opacity-25"></i>
+                Nenhuma prova registada.
+              </div>
+            {% endfor %}
+          </div>
+        </section>
+      </div>
 
-                  <dt class="col-sm-3">Stage no momento</dt>
-                  <dd class="col-sm-9">{{ acomp.stage_no_momento }}</dd>
-                  
-                  <dt class="col-sm-3">Dificuldades</dt>
-                  <dd class="col-sm-9">{{ acomp.dificuldades|linebreaksbr|default:"-" }}</dd>
+      <!-- Right Column: Acompanhamentos -->
+      <div class="col-lg-8">
+        <section class="glass-card p-4">
+          <div class="d-flex align-items-center justify-content-between mb-4">
+            <h3 class="h5 mb-0"><i class="bi bi-chat-dots me-2 text-primary"></i>Acompanhamentos Individuais</h3>
+            <a href="{% url 'cadastros:adicionar_acompanhamento' aluno.pk %}" class="btn btn-sm btn-link text-decoration-none">
+              <i class="bi bi-plus-lg me-1"></i>Adicionar Novo
+            </a>
+          </div>
 
-                  <dt class="col-sm-3">Pontos Fortes</dt>
-                  <dd class="col-sm-9">{{ acomp.pontos_fortes|linebreaksbr|default:"-" }}</dd>
-                  
-                  <dt class="col-sm-3">Pontos a Melhorar</dt>
-                  <dd class="col-sm-9">{{ acomp.pontos_melhorar|linebreaksbr|default:"-" }}</dd>
-
-                  <dt class="col-sm-3">Estratégia</dt>
-                  <dd class="col-sm-9">{{ acomp.estrategia|linebreaksbr|default:"-" }}</dd>
-                  
-                  <dt class="col-sm-3">Atividades e Recomendações</dt>
-                  <dd class="col-sm-9">{{ acomp.atividades_recomendadas|linebreaksbr|default:"-" }}</dd>
-                </dl>
-                <hr>
-                <div class="text-end">
-                  <a href="{% url 'cadastros:editar_acompanhamento' acomp.pk %}" class="btn btn-outline-secondary btn-sm">
-                    <i class="bi bi-pencil me-1"></i> Editar
-                  </a>
+          <div class="accordion" id="accordionAcompanhamentos">
+            {% for acomp in acompanhamentos %}
+              <div class="accordion-item shadow-sm">
+                <h2 class="accordion-header" id="heading-{{ acomp.pk }}">
+                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ acomp.pk }}">
+                    <div class="d-flex align-items-center gap-3 w-100 pe-3">
+                      <div class="flex-grow-1">
+                        {% if acomp.status == 'realizado' %}
+                          <span class="text-dark">Sessão Realizada</span>
+                          <span class="text-muted mx-2">•</span>
+                          <span class="text-muted small fw-normal">{{ acomp.data_realizacao|date:"d \d\e F, Y" }}</span>
+                        {% else %}
+                          <span class="text-primary">Sessão Agendada</span>
+                          <span class="text-muted mx-2">•</span>
+                          <span class="text-muted small fw-normal">{{ acomp.data_agendamento|date:"d/m/Y H:i" }}</span>
+                        {% endif %}
+                      </div>
+                      {% if acomp.status == 'realizado' %}
+                        <span class="badge bg-success-subtle text-success badge-status">Finalizado</span>
+                      {% else %}
+                        <span class="badge bg-warning-subtle text-warning badge-status">Pendente</span>
+                      {% endif %}
+                    </div>
+                  </button>
+                </h2>
+                <div id="collapse-{{ acomp.pk }}" class="accordion-collapse collapse" data-bs-parent="#accordionAcompanhamentos">
+                  <div class="accordion-body">
+                    <div class="row g-4">
+                      <div class="col-md-6">
+                        <div class="mb-4">
+                          <label class="info-label">Stage no Momento</label>
+                          <div class="info-value">Stage {{ acomp.stage_no_momento }}</div>
+                        </div>
+                        <div class="mb-4">
+                          <label class="info-label">Dificuldades Identificadas</label>
+                          <div class="info-value">{{ acomp.dificuldades|linebreaksbr|default:"Nenhuma relatada" }}</div>
+                        </div>
+                        <div class="mb-4">
+                          <label class="info-label">Pontos Fortes</label>
+                          <div class="info-value">{{ acomp.pontos_fortes|linebreaksbr|default:"-" }}</div>
+                        </div>
+                      </div>
+                      <div class="col-md-6">
+                        <div class="mb-4">
+                          <label class="info-label">Estratégia Pedagógica</label>
+                          <div class="info-value">{{ acomp.estrategia|linebreaksbr|default:"-" }}</div>
+                        </div>
+                        <div class="mb-4">
+                          <label class="info-label">Recomendações</label>
+                          <div class="info-value p-3 bg-white rounded-3 border border-primary-subtle text-primary">
+                            {{ acomp.atividades_recomendadas|linebreaksbr|default:"Nenhuma recomendação específica" }}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="d-flex align-items-center justify-content-between mt-4 pt-3 border-top">
+                      <div class="text-muted small">
+                        <i class="bi bi-person-circle me-1"></i> Criado por: {{ acomp.criado_por.nome_completo|default:"Sistema" }}
+                      </div>
+                      <a href="{% url 'cadastros:editar_acompanhamento' acomp.pk %}" class="btn btn-outline-custom btn-sm">
+                        <i class="bi bi-pencil me-1"></i>Editar Registro
+                      </a>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            {% empty %}
+              <div class="text-center py-5 glass-card">
+                <i class="bi bi-chat-square-text fs-1 d-block mb-2 opacity-25 text-primary"></i>
+                <p class="text-muted">Nenhum acompanhamento registado para este aluno.</p>
+                <a href="{% url 'cadastros:adicionar_acompanhamento' aluno.pk %}" class="btn btn-primary-gradient mt-2">
+                  Agendar Primeiro
+                </a>
+              </div>
+            {% endfor %}
           </div>
-          {% empty %}
-          <div class="card-body text-center text-muted">Nenhum acompanhamento individual registado.</div>
-        {% endfor %}
+        </section>
       </div>
-    </section>
 
+    </div>
   </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
