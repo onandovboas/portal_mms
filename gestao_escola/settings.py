@@ -154,6 +154,10 @@ LOGIN_REDIRECT_URL = 'cadastros:portal_aluno' # Redirecionamento padrão para o 
 LOGOUT_REDIRECT_URL = 'cadastros:portal_login' # Para onde vai após o logout
 
 # Configurações de E-mail (Hostgator)
+# Patch para resolver o problema 'Invalid HELO name' em servidores SMTP rigorosos (RFC2821 4.1.1.1)
+import socket
+socket.getfqdn = lambda name="": 'mmsinstitute.com.br'
+
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'mail.mmsinstitute.com.br'  # Geralmente é mail.seudominio
 EMAIL_PORT = 587
