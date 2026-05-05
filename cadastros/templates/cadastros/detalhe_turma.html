@@ -94,6 +94,9 @@
                           <a href="{% url 'cadastros:corrigir_prova' prova.pk %}" class="btn btn-warning btn-sm">Corrigir</a>
                         {% elif prova.status == 'finalizada' %}
                           <a href="{% url 'cadastros:ver_resultado_prova' prova.pk %}" class="btn btn-info btn-sm">Ver Resultado</a>
+                          <a href="{% url 'cadastros:corrigir_prova' prova.pk %}" class="btn btn-outline-warning btn-sm" title="Recorrigir Prova">
+                            <i class="bi bi-pencil-square"></i> Recorrigir
+                          </a>
                         {% endif %}
                       </td>
                     </tr>
