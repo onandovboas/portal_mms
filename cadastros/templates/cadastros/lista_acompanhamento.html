@@ -292,6 +292,59 @@
         </section>
       </div>
 
+      <!-- Provas Finalizadas Full Width -->
+      <div class="col-12">
+        <section class="glass-card">
+          <div class="card-header-custom" data-bs-toggle="collapse" data-bs-target="#collapseProvas" style="cursor: pointer;" title="Clique para expandir">
+            <div class="d-flex align-items-center">
+              <div class="section-icon bg-icon-success">
+                <i class="bi bi-check2-all"></i>
+              </div>
+              <h2 class="h5 mb-0">Provas Finalizadas (Recorrigir)</h2>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                {% if provas_finalizadas %}
+                  <span class="badge rounded-pill bg-success">{{ provas_finalizadas|length }}</span>
+                {% endif %}
+                <i class="bi bi-chevron-down text-muted"></i>
+            </div>
+          </div>
+          
+          <div class="collapse" id="collapseProvas">
+            <div class="card-body p-0">
+              {% if provas_finalizadas %}
+                <div class="list-group list-group-flush">
+                  {% for prova in provas_finalizadas %}
+                    <div class="list-group-item list-group-item-custom d-flex justify-content-between align-items-center flex-wrap gap-2">
+                      <div>
+                        <h6 class="mb-1">{{ prova.aluno.nome_completo }}</h6>
+                        <p class="text-muted small mb-0">
+                          <i class="bi bi-journal-text me-1"></i> {{ prova.prova_template.titulo }}
+                          <span class="mx-1">•</span>
+                          <i class="bi bi-calendar3 me-1"></i> {{ prova.data_realizacao|date:"d/m/Y" }}
+                        </p>
+                      </div>
+                      <div class="d-flex gap-2">
+                        <a href="{% url 'cadastros:ver_resultado_prova' prova.pk %}" class="btn btn-outline-custom btn-sm">
+                          Ver Resultado
+                        </a>
+                        <a href="{% url 'cadastros:corrigir_prova' prova.pk %}" class="btn btn-warning btn-sm text-white" title="Recorrigir Prova">
+                          <i class="bi bi-pencil-square"></i> Recorrigir
+                        </a>
+                      </div>
+                    </div>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <div class="text-center py-4">
+                  <p class="text-muted mb-0">Nenhuma prova finalizada recente</p>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        </section>
+      </div>
+
       <!-- Alunos Full Width -->
       <div class="col-12">
         <section class="glass-card">

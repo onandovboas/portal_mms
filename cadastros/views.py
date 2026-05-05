@@ -1384,6 +1384,10 @@ def lista_acompanhamento_pedagogico(request):
         status='aguardando_correcao'
     ).select_related('aluno', 'prova_template').order_by('data_realizacao')
 
+    # ✅ PROVAS FINALIZADAS PARA RECORREÇÃO ✅
+    provas_finalizadas = AlunoProva.objects.filter(
+        status='finalizada'
+    ).select_related('aluno', 'prova_template').order_by('-data_realizacao')[:15]
 
     ultimo_acompanhamento_subquery = AcompanhamentoPedagogico.objects.filter(
         aluno=OuterRef('pk'), status='realizado'
@@ -1420,6 +1424,7 @@ def lista_acompanhamento_pedagogico(request):
     context = {
         'agendamentos_pendentes': agendamentos_pendentes,
         'provas_para_corrigir': provas_para_corrigir, # <-- Enviando para o template
+        'provas_finalizadas': provas_finalizadas,
         'alunos': alunos_list,
     }
     return render(request, 'cadastros/lista_acompanhamento.html', context)
@@ -1944,10 +1949,6 @@ def liberar_prova_turma(request, turma_pk):
 def corrigir_prova(request, aluno_prova_pk):
     aluno_prova = get_object_or_404(AlunoProva.objects.select_related('aluno', 'prova_template'), pk=aluno_prova_pk)
     
-    if aluno_prova.status == 'finalizada':
-        messages.info(request, "Esta prova já foi corrigida e finalizada.")
-        return redirect('cadastros:lista_acompanhamento_pedagogico')
-
     prova_template = aluno_prova.prova_template
     ordem_sessoes = prova_template.ordem_sessoes
     
