@@ -211,9 +211,6 @@
     <!-- Header Section -->
     <header class="nav-header d-flex flex-column flex-md-row align-items-center justify-content-between gap-4">
       <div class="d-flex align-items-center gap-3">
-        <div class="student-avatar">
-          {{ aluno.nome_completo|truncatechars:1|upper }}
-        </div>
         <div>
           <h1 class="h2 mb-0">Histórico Pedagógico</h1>
           <p class="text-muted mb-0">Gestão de progresso de <strong>{{ aluno.nome_completo }}</strong></p>
@@ -300,11 +297,11 @@
                         {% if acomp.status == 'realizado' %}
                           <span class="text-dark">Sessão Realizada</span>
                           <span class="text-muted mx-2">•</span>
-                          <span class="text-muted small fw-normal">{{ acomp.data_realizacao|date:"d \d\e F, Y" }}</span>
+                          <span class="text-muted small fw-normal">{{ acomp.data|date:"d \d\e F, Y" }}</span>
                         {% else %}
                           <span class="text-primary">Sessão Agendada</span>
                           <span class="text-muted mx-2">•</span>
-                          <span class="text-muted small fw-normal">{{ acomp.data_agendamento|date:"d/m/Y H:i" }}</span>
+                          <span class="text-muted small fw-normal">{{ acomp.data|date:"d/m/Y H:i" }}</span>
                         {% endif %}
                       </div>
                       {% if acomp.status == 'realizado' %}
@@ -320,22 +317,22 @@
                     <div class="row g-4">
                       <div class="col-md-6">
                         <div class="mb-4">
-                          <label class="info-label">Stage no Momento</label>
-                          <div class="info-value">Stage {{ acomp.stage_no_momento }}</div>
+                          <label class="info-label">Tipo / Stage</label>
+                          <div class="info-value">{{ acomp.get_tipo_display }} / Stage {{ acomp.stage_no_momento }}</div>
                         </div>
                         <div class="mb-4">
-                          <label class="info-label">Dificuldades Identificadas</label>
+                          <label class="info-label">Issues (Dificuldades)</label>
                           <div class="info-value">{{ acomp.dificuldades|linebreaksbr|default:"Nenhuma relatada" }}</div>
                         </div>
                         <div class="mb-4">
-                          <label class="info-label">Pontos Fortes</label>
-                          <div class="info-value">{{ acomp.pontos_fortes|linebreaksbr|default:"-" }}</div>
+                          <label class="info-label">Improvements (Pontos a Melhorar)</label>
+                          <div class="info-value">{{ acomp.pontos_melhorar|linebreaksbr|default:"-" }}</div>
                         </div>
                       </div>
                       <div class="col-md-6">
                         <div class="mb-4">
-                          <label class="info-label">Estratégia Pedagógica</label>
-                          <div class="info-value">{{ acomp.estrategia|linebreaksbr|default:"-" }}</div>
+                          <label class="info-label">Comentários Extras</label>
+                          <div class="info-value">{{ acomp.comentarios_extras|linebreaksbr|default:"-" }}</div>
                         </div>
                         <div class="mb-4">
                           <label class="info-label">Recomendações</label>
