@@ -150,9 +150,6 @@
       
       <!-- Header -->
       <header class="d-flex align-items-center gap-3 mb-4 pb-4 border-bottom border-secondary border-opacity-10">
-        <div class="student-avatar shadow-sm">
-          {{ aluno.nome_completo|truncatechars:1|upper }}
-        </div>
         <div>
           <h1 class="h3 mb-0">{% if acompanhamento %}Editar{% else %}Novo{% endif %} Acompanhamento</h1>
           <p class="text-muted mb-0">Aluno: <strong>{{ aluno.nome_completo }}</strong></p>
@@ -183,14 +180,14 @@
                 <div class="invalid-feedback">Selecione o status do acompanhamento.</div>
               </div>
               <div class="col-md-4">
-                {{ form.data_agendamento.label_tag }} 
-                {{ form.data_agendamento }}
-                <div class="invalid-feedback">A data de agendamento é obrigatória.</div>
+                {{ form.tipo.label_tag }} 
+                {{ form.tipo }}
+                <div class="invalid-feedback">Selecione o tipo do acompanhamento.</div>
               </div>
               <div class="col-md-4">
-                {{ form.data_realizacao.label_tag }} 
-                {{ form.data_realizacao }}
-                <div class="invalid-feedback">Informe a data de realização se aplicável.</div>
+                {{ form.data.label_tag }} 
+                {{ form.data }}
+                <div class="invalid-feedback">A data é obrigatória.</div>
               </div>
             </div>
           </div>
@@ -205,22 +202,54 @@
                 <div class="invalid-feedback">Informe o stage atual do aluno.</div>
               </div>
               
-              <div class="col-12">
-                {{ form.dificuldades.label_tag }} 
-                {{ form.dificuldades }}
+              <!-- First Acompanhamento Fields -->
+              <div id="primeiro_fields" class="row g-3">
+                <div class="col-12">
+                  {{ form.relacao_lingua.label_tag }} 
+                  {{ form.relacao_lingua }}
+                </div>
+                <div class="col-12">
+                  {{ form.objetivo_estudo.label_tag }} 
+                  {{ form.objetivo_estudo }}
+                </div>
+                <div class="col-12">
+                  {{ form.correcao_ditados.label_tag }} 
+                  {{ form.correcao_ditados }}
+                </div>
+                <div class="col-md-6">
+                  {{ form.pontos_fortes.label_tag }} 
+                  {{ form.pontos_fortes }}
+                </div>
+                <div class="col-md-6">
+                  {{ form.estrategia.label_tag }} 
+                  {{ form.estrategia }}
+                </div>
               </div>
-              <div class="col-12">
-                {{ form.relacao_lingua.label_tag }} 
-                {{ form.relacao_lingua }}
+
+              <!-- Seguinte Acompanhamento Fields -->
+              <div id="seguinte_fields" class="row g-3" style="display: none;">
+                <div class="col-md-6">
+                  {{ form.grammar.label_tag }} 
+                  {{ form.grammar }}
+                </div>
+                <div class="col-md-6">
+                  {{ form.vocabulary.label_tag }} 
+                  {{ form.vocabulary }}
+                </div>
+                <div class="col-md-4">
+                  {{ form.listening.label_tag }} 
+                  {{ form.listening }}
+                </div>
+                <div class="col-md-4">
+                  {{ form.speaking.label_tag }} 
+                  {{ form.speaking }}
+                </div>
+                <div class="col-md-4">
+                  {{ form.reading.label_tag }} 
+                  {{ form.reading }}
+                </div>
               </div>
-              <div class="col-12">
-                {{ form.objetivo_estudo.label_tag }} 
-                {{ form.objetivo_estudo }}
-              </div>
-              <div class="col-12">
-                {{ form.correcao_ditados.label_tag }} 
-                {{ form.correcao_ditados }}
-              </div>
+
             </div>
           </div>
           
@@ -229,16 +258,12 @@
             <h2 class="section-title"><i class="bi bi-diagram-3"></i> Análise e Estratégia Pedagógica</h2>
             <div class="row g-3">
               <div class="col-md-6">
-                {{ form.pontos_fortes.label_tag }} 
-                {{ form.pontos_fortes }}
+                {{ form.dificuldades.label_tag }} 
+                {{ form.dificuldades }}
               </div>
               <div class="col-md-6">
                 {{ form.pontos_melhorar.label_tag }} 
                 {{ form.pontos_melhorar }}
-              </div>
-              <div class="col-12">
-                {{ form.estrategia.label_tag }} 
-                {{ form.estrategia }}
               </div>
               <div class="col-12">
                 {{ form.atividades_recomendadas.label_tag }}
@@ -253,37 +278,14 @@
 
         </div>
 
-        <hr class="my-5 border-secondary border-opacity-10">
-
-        <div class="row mt-5">
-          <div class="col-12">
-            <h2 class="section-title"><i class="bi bi-flag"></i> Resultado do Atendimento</h2>
-            <div class="glass-card p-4 bg-white bg-opacity-50 border-primary border-opacity-10">
-              <p class="text-muted small mb-3">Como deseja finalizar este registro?</p>
-              <div class="d-flex flex-column flex-md-row gap-3">
-                <button type="submit" name="status_acao" value="realizado" class="btn btn-primary-gradient flex-grow-1 py-3">
-                  <i class="bi bi-check-circle-fill me-2"></i> Atendimento Realizado
-                  <div class="small fw-normal opacity-75">Salva os dados e atualiza a data de acompanhamento</div>
-                </button>
-                <button type="submit" name="status_acao" value="cancelado" class="btn btn-outline-danger flex-grow-1 py-3 bg-white">
-                  <i class="bi bi-x-circle me-2"></i> Não Realizado / Cancelar
-                  <div class="small fw-normal opacity-75">O aluno voltará para a lista de rodízio pedagógico</div>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <hr class="my-5 border-secondary border-opacity-10">
-
         <!-- Actions -->
-        <div class="d-flex justify-content-between align-items-center">
+        <div class="d-flex justify-content-between align-items-center mt-4">
           <a href="{% url 'cadastros:lista_acompanhamento_pedagogico' %}" class="text-muted text-decoration-none">
-            <i class="bi bi-x-lg me-1"></i> Descartar Alterações
+            <i class="bi bi-x-lg me-1"></i> Cancelar
           </a>
-          <div class="text-muted small d-none d-md-block">
-            <i class="bi bi-info-circle me-1"></i> Escolha uma opção acima para salvar
-          </div>
+          <button type="submit" class="btn btn-primary-gradient px-4 py-2">
+            <i class="bi bi-save me-2"></i> Salvar Acompanhamento
+          </button>
         </div>
       </form>
       
@@ -325,6 +327,26 @@
         
         form.classList.add('was-validated');
       }, false);
+
+      // 3. Lógica para alternar os campos com base no Tipo de Acompanhamento
+      const tipoSelect = document.getElementById('id_tipo');
+      const primeiroFields = document.getElementById('primeiro_fields');
+      const seguinteFields = document.getElementById('seguinte_fields');
+
+      function toggleFields() {
+        if (tipoSelect.value === 'primeiro') {
+          primeiroFields.style.display = 'flex';
+          seguinteFields.style.display = 'none';
+        } else {
+          primeiroFields.style.display = 'none';
+          seguinteFields.style.display = 'flex';
+        }
+      }
+
+      if (tipoSelect) {
+        tipoSelect.addEventListener('change', toggleFields);
+        toggleFields(); // Call on load to set initial state
+      }
     });
   </script>
 </body>

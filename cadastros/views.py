@@ -1377,7 +1377,7 @@ def lista_acompanhamento_pedagogico(request):
     """
     agendamentos_pendentes = AcompanhamentoPedagogico.objects.filter(
         status='agendado'
-    ).select_related('aluno', 'criado_por').order_by('data_agendamento')
+    ).select_related('aluno', 'criado_por').order_by('data')
 
     # ✅ NOVA CONSULTA PARA PROVAS AGUARDANDO CORREÇÃO ✅
     provas_para_corrigir = AlunoProva.objects.filter(
@@ -1391,7 +1391,7 @@ def lista_acompanhamento_pedagogico(request):
 
     ultimo_acompanhamento_subquery = AcompanhamentoPedagogico.objects.filter(
         aluno=OuterRef('pk'), status='realizado'
-    ).order_by('-data_realizacao').values('data_realizacao')[:1]
+    ).order_by('-data').values('data')[:1]
 
     
     turma_atual_subquery = Inscricao.objects.filter(
@@ -1455,15 +1455,8 @@ def adicionar_acompanhamento(request, aluno_pk):
             
             if acao == 'realizado':
                 acompanhamento.status = 'realizado'
-                if not acompanhamento.data_realizacao:
-                    acompanhamento.data_realizacao = timezone.now()
             elif acao == 'cancelado':
                 acompanhamento.status = 'cancelado'
-                acompanhamento.data_realizacao = None
-            
-            # Fallback caso usem o select de status diretamente
-            if not acao and acompanhamento.data_realizacao:
-                acompanhamento.status = 'realizado'
 
             acompanhamento.save()
             messages.success(request, f"Acompanhamento para {aluno.nome_completo} salvo com sucesso.")
@@ -1496,15 +1489,8 @@ def editar_acompanhamento(request, pk):
             
             if acao == 'realizado':
                 acompanhamento.status = 'realizado'
-                if not acompanhamento.data_realizacao:
-                    acompanhamento.data_realizacao = timezone.now()
             elif acao == 'cancelado':
                 acompanhamento.status = 'cancelado'
-                acompanhamento.data_realizacao = None
-            
-            # Fallback caso usem o select de status diretamente
-            if not acao and acompanhamento.data_realizacao:
-                acompanhamento.status = 'realizado'
 
             acompanhamento.save()
 
@@ -1531,7 +1517,7 @@ def historico_acompanhamentos_aluno(request, aluno_pk):
     # Busca todos os acompanhamentos do aluno, ordenados do mais recente para o mais antigo
     acompanhamentos = AcompanhamentoPedagogico.objects.filter(
         aluno=aluno
-    ).select_related('criado_por').order_by('-data_agendamento')
+    ).select_related('criado_por').order_by('-data')
 
     provas_do_aluno = AlunoProva.objects.filter(
         aluno=aluno
@@ -1559,7 +1545,7 @@ def portal_aluno(request):
     
     ultimo_acompanhamento = AcompanhamentoPedagogico.objects.filter(
         aluno=aluno, status='realizado'
-    ).order_by('-data_realizacao').first()
+    ).order_by('-data').first()
 
     # --- DADOS FINANCEIROS (já existentes) ---
     kpis_financeiros = Pagamento.objects.filter(aluno=aluno).aggregate(
@@ -2353,7 +2339,7 @@ def exportar_acompanhamentos_csv(request):
     ])
 
     # Busca os dados
-    acompanhamentos = AcompanhamentoPedagogico.objects.select_related('aluno', 'criado_por').all().order_by('-data_agendamento')
+    acompanhamentos = AcompanhamentoPedagogico.objects.select_related('aluno', 'criado_por').all().order_by('-data')
 
     for a in acompanhamentos:
         writer.writerow([

@@ -144,25 +144,23 @@ class AcompanhamentoPedagogicoForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.instance and self.instance.pk:
-            if self.instance.data_agendamento:
-                self.initial['data_agendamento'] = self.instance.data_agendamento.strftime('%Y-%m-%dT%H:%M')
-            if self.instance.data_realizacao:
-                self.initial['data_realizacao'] = self.instance.data_realizacao.strftime('%Y-%m-%dT%H:%M')
+            if self.instance.data:
+                self.initial['data'] = self.instance.data.strftime('%Y-%m-%dT%H:%M')
 
     class Meta:
         model = AcompanhamentoPedagogico
         # Campos que o utilizador irá preencher. 'aluno' e 'criado_por' são definidos na view.
         fields = [
-            'status', 'data_agendamento', 'data_realizacao', 'stage_no_momento',
-            'dificuldades', 'relacao_lingua', 'objetivo_estudo', 'correcao_ditados',
-            'pontos_fortes', 'pontos_melhorar', 'estrategia', 'comentarios_extras',
-            'atividades_recomendadas'
+            'status', 'tipo', 'data', 'stage_no_momento',
+            'relacao_lingua', 'objetivo_estudo', 'correcao_ditados', 'pontos_fortes', 'estrategia',
+            'dificuldades', 'pontos_melhorar', 'grammar', 'vocabulary', 'listening', 'speaking', 'reading',
+            'comentarios_extras', 'atividades_recomendadas'
         ]
 
         widgets = {
             'status': forms.Select(attrs={'class': 'form-select'}),
-            'data_agendamento': forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-control'}),
-            'data_realizacao': forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-control'}),
+            'tipo': forms.Select(attrs={'class': 'form-select'}),
+            'data': forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-control'}),
             'stage_no_momento': forms.NumberInput(attrs={'class': 'form-control'}),
             'dificuldades': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'relacao_lingua': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
@@ -171,6 +169,11 @@ class AcompanhamentoPedagogicoForm(forms.ModelForm):
             'pontos_fortes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'pontos_melhorar': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'estrategia': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'grammar': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'vocabulary': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'listening': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'speaking': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'reading': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'comentarios_extras': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'atividades_recomendadas': forms.Textarea(attrs={'class': 'form-control', 'rows': 4, 'placeholder': 'Cole links, descreva atividades ou faça recomendações. Essas informações aparecerão para os alunos!'}),
         }

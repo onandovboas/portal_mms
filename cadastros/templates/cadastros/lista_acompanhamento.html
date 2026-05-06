@@ -273,7 +273,7 @@
                     <div>
                       <h6 class="mb-1">{{ agendamento.aluno.nome_completo }}</h6>
                       <p class="text-muted small mb-0">
-                        <i class="bi bi-clock me-1"></i> {{ agendamento.data_agendamento|date:"d/m/Y, H:i" }}
+                        <i class="bi bi-clock me-1"></i> {{ agendamento.data|date:"d/m/Y, H:i" }}
                       </p>
                     </div>
                     <a href="{% url 'cadastros:editar_acompanhamento' agendamento.pk %}" class="btn btn-outline-custom btn-sm">
@@ -355,7 +355,17 @@
               </div>
               <h2 class="h5 mb-0">Alunos Ativos</h2>
             </div>
-            <div class="d-flex gap-3 flex-grow-1 justify-content-md-end w-100 w-md-auto">
+            
+            <ul class="nav nav-pills ms-md-3 flex-grow-1" id="alunosTab" role="tablist">
+              <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="pendentes-tab" data-bs-toggle="pill" data-bs-target="#pendentes" type="button" role="tab" aria-controls="pendentes" aria-selected="true">Pendentes (+2m)</button>
+              </li>
+              <li class="nav-item ms-2" role="presentation">
+                <button class="nav-link" id="atendidos-tab" data-bs-toggle="pill" data-bs-target="#atendidos" type="button" role="tab" aria-controls="atendidos" aria-selected="false">Atendidos</button>
+              </li>
+            </ul>
+
+            <div class="d-flex gap-3 justify-content-md-end w-100 w-md-auto">
               <div class="position-relative flex-grow-1 flex-md-grow-0">
                 <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
                 <input type="text" id="alunoSearch" class="search-box ps-5" placeholder="Procurar aluno...">
@@ -363,60 +373,112 @@
             </div>
           </div>
           
-          <div class="table-responsive">
-            <table class="table table-custom align-middle mb-0" id="alunosTable">
-              <thead>
-                <tr>
-                  <th>Aluno</th>
-                  <th>Último Acompanhamento</th>
-                  <th class="text-end">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for aluno in alunos %}
-                  <tr class="aluno-row">
-                    <td>
-                      <div class="d-flex align-items-center gap-3">
-                        <div class="avatar-circle">
-                          {{ aluno.nome_completo|truncatechars:1|upper }}
-                        </div>
-                        <div>
-                          <div class="fw-semibold">{{ aluno.nome_completo }}</div>
-                          {% if aluno.precisa_acompanhamento %}
-                            <span class="badge-pendente">
-                              <i class="bi bi-exclamation-triangle-fill me-1"></i>Pendente (+2m)
+          <div class="tab-content" id="alunosTabContent">
+            <!-- Aba Pendentes -->
+            <div class="tab-pane fade show active" id="pendentes" role="tabpanel" aria-labelledby="pendentes-tab" tabindex="0">
+              <div class="table-responsive">
+                <table class="table table-custom align-middle mb-0" id="alunosTablePendentes">
+                  <thead>
+                    <tr>
+                      <th>Aluno</th>
+                      <th>Último Acompanhamento</th>
+                      <th class="text-end">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for aluno in alunos %}
+                      {% if aluno.precisa_acompanhamento %}
+                      <tr class="aluno-row">
+                        <td>
+                          <div class="d-flex align-items-center gap-3">
+                            <div>
+                              <div class="fw-semibold">{{ aluno.nome_completo }}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          {% if aluno.ultimo_acompanhamento %}
+                            <span class="text-muted">
+                              <i class="bi bi-calendar-check me-1"></i> {{ aluno.ultimo_acompanhamento|date:"d/m/Y" }}
                             </span>
+                          {% else %}
+                            <span class="text-muted opacity-50">Nenhum registro</span>
                           {% endif %}
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      {% if aluno.ultimo_acompanhamento %}
-                        <span class="text-muted">
-                          <i class="bi bi-calendar-check me-1"></i> {{ aluno.ultimo_acompanhamento|date:"d/m/Y" }}
-                        </span>
-                      {% else %}
-                        <span class="text-muted opacity-50">Nenhum registro</span>
+                        </td>
+                        <td class="text-end">
+                          <div class="d-flex justify-content-end gap-2">
+                            <a href="{% url 'cadastros:historico_acompanhamentos_aluno' aluno.pk %}" class="btn btn-outline-custom btn-sm" title="Ver Histórico">
+                              <i class="bi bi-clock-history"></i> <span class="d-none d-md-inline ms-1">Histórico</span>
+                            </a>
+                            <a href="{% url 'cadastros:adicionar_acompanhamento' aluno.pk %}" class="btn btn-primary-gradient btn-sm">
+                              <i class="bi bi-plus-lg"></i> <span class="d-none d-md-inline ms-1">Novo</span>
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
                       {% endif %}
-                    </td>
-                    <td class="text-end">
-                      <div class="d-flex justify-content-end gap-2">
-                        <a href="{% url 'cadastros:historico_acompanhamentos_aluno' aluno.pk %}" class="btn btn-outline-custom btn-sm" title="Ver Histórico">
-                          <i class="bi bi-clock-history"></i> <span class="d-none d-md-inline ms-1">Histórico</span>
-                        </a>
-                        <a href="{% url 'cadastros:adicionar_acompanhamento' aluno.pk %}" class="btn btn-primary-gradient btn-sm">
-                          <i class="bi bi-plus-lg"></i> <span class="d-none d-md-inline ms-1">Novo</span>
-                        </a>
-                      </div>
-                    </td>
-                  </tr>
-                {% empty %}
-                  <tr>
-                    <td colspan="3" class="text-center py-5 text-muted">Nenhum aluno ativo encontrado</td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
+                    {% empty %}
+                      <tr>
+                        <td colspan="3" class="text-center py-5 text-muted">Nenhum aluno ativo encontrado</td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Aba Atendidos -->
+            <div class="tab-pane fade" id="atendidos" role="tabpanel" aria-labelledby="atendidos-tab" tabindex="0">
+              <div class="table-responsive">
+                <table class="table table-custom align-middle mb-0" id="alunosTableAtendidos">
+                  <thead>
+                    <tr>
+                      <th>Aluno</th>
+                      <th>Último Acompanhamento</th>
+                      <th class="text-end">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for aluno in alunos %}
+                      {% if not aluno.precisa_acompanhamento %}
+                      <tr class="aluno-row">
+                        <td>
+                          <div class="d-flex align-items-center gap-3">
+                            <div>
+                              <div class="fw-semibold">{{ aluno.nome_completo }}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          {% if aluno.ultimo_acompanhamento %}
+                            <span class="text-muted">
+                              <i class="bi bi-calendar-check me-1"></i> {{ aluno.ultimo_acompanhamento|date:"d/m/Y" }}
+                            </span>
+                          {% else %}
+                            <span class="text-muted opacity-50">Nenhum registro</span>
+                          {% endif %}
+                        </td>
+                        <td class="text-end">
+                          <div class="d-flex justify-content-end gap-2">
+                            <a href="{% url 'cadastros:historico_acompanhamentos_aluno' aluno.pk %}" class="btn btn-outline-custom btn-sm" title="Ver Histórico">
+                              <i class="bi bi-clock-history"></i> <span class="d-none d-md-inline ms-1">Histórico</span>
+                            </a>
+                            <a href="{% url 'cadastros:adicionar_acompanhamento' aluno.pk %}" class="btn btn-primary-gradient btn-sm">
+                              <i class="bi bi-plus-lg"></i> <span class="d-none d-md-inline ms-1">Novo</span>
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                      {% endif %}
+                    {% empty %}
+                      <tr>
+                        <td colspan="3" class="text-center py-5 text-muted">Nenhum aluno ativo encontrado</td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </section>
       </div>
@@ -428,8 +490,7 @@
   <script>
     document.addEventListener('DOMContentLoaded', function() {
       const searchInput = document.getElementById('alunoSearch');
-      const table = document.getElementById('alunosTable');
-      const rows = table.querySelectorAll('.aluno-row');
+      const rows = document.querySelectorAll('.aluno-row');
 
       searchInput.addEventListener('input', function() {
         const searchTerm = this.value.toLowerCase();

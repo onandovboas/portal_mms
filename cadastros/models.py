@@ -237,26 +237,37 @@ class AcompanhamentoPedagogico(models.Model):
         ('realizado', 'Realizado'),
         ('cancelado', 'Cancelado'),
     ]
+    TIPO_CHOICES = [
+        ('primeiro', 'Primeiro Acompanhamento'),
+        ('seguinte', 'Acompanhamento Seguinte'),
+    ]
 
     aluno = models.ForeignKey(Aluno, on_delete=models.CASCADE, related_name="acompanhamentos_pedagogicos")
     status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='agendado')
+    tipo = models.CharField("Tipo", max_length=15, choices=TIPO_CHOICES, default='primeiro')
     
-    # Datas
-    data_agendamento = models.DateTimeField("Data e Hora do Agendamento")
-    data_realizacao = models.DateTimeField("Data e Hora de Realização", null=True, blank=True)
+    # Data única para o atendimento (podendo agendar e mudar o status depois)
+    data = models.DateTimeField("Data e Hora")
     
     # Contexto no momento do acompanhamento
     stage_no_momento = models.IntegerField("Stage do Aluno no Momento do Acompanhamento")
     
-    # Campos da Entrevista
-    dificuldades = models.TextField(blank=True)
+    # Campos da Entrevista (Primeiro Acompanhamento)
     relacao_lingua = models.TextField("Relação com a língua", blank=True)
     objetivo_estudo = models.TextField("Objetivo do estudo", blank=True)
     correcao_ditados = models.TextField("Correção de ditados", blank=True)
-    pontos_fortes = models.TextField(blank=True)
-    pontos_melhorar = models.TextField("Pontos a serem melhorados", blank=True)
+    pontos_fortes = models.TextField("Pontos Fortes", blank=True)
     estrategia = models.TextField("Estratégia", blank=True)
-    comentarios_extras = models.TextField(blank=True)
+
+    # Campos Gerais (Ambos)
+    dificuldades = models.TextField("Issues (Dificuldades)", blank=True)
+    pontos_melhorar = models.TextField("Improvements (Pontos a Melhorar)", blank=True)
+    grammar = models.TextField("Grammar", blank=True)
+    vocabulary = models.TextField("Vocabulary", blank=True)
+    listening = models.TextField("Listening", blank=True)
+    speaking = models.TextField("Speaking", blank=True)
+    reading = models.TextField("Reading", blank=True)
+    comentarios_extras = models.TextField("Comentários Extras", blank=True)
     atividades_recomendadas = models.TextField("Atividades e Recomendações", blank=True, null=True)
 
     # Rastreabilidade
@@ -265,10 +276,10 @@ class AcompanhamentoPedagogico(models.Model):
     atualizado_em = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['-data_agendamento']
+        ordering = ['-data']
 
     def __str__(self):
-        return f"Acompanhamento de {self.aluno.nome_completo} em {self.data_agendamento.strftime('%d/%m/%Y')}"
+        return f"Acompanhamento de {self.aluno.nome_completo} em {self.data.strftime('%d/%m/%Y')}"
     
 
 class TesteStage(models.Model):
