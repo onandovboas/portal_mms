@@ -390,7 +390,7 @@ def dashboard_admin(request):
     
     ultimo_acomp_subquery = AcompanhamentoPedagogico.objects.filter(
         aluno=OuterRef('pk'), status='realizado'
-    ).order_by('-data_realizacao').values('data_realizacao')[:1]
+    ).order_by('-data').values('data')[:1]
 
     possui_agendado_subquery = AcompanhamentoPedagogico.objects.filter(
         aluno=OuterRef('pk'), status='agendado'
@@ -2347,8 +2347,8 @@ def exportar_acompanhamentos_csv(request):
             a.aluno.id,
             smart_str(a.aluno.nome_completo),
             a.get_status_display(),
-            a.data_agendamento.strftime('%Y-%m-%d %H:%M') if a.data_agendamento else '',
-            a.data_realizacao.strftime('%Y-%m-%d %H:%M') if a.data_realizacao else '',
+            a.data.strftime('%Y-%m-%d %H:%M') if a.data else '',
+            '', # Data Realização is removed, keeping empty column for retro-compatibility if needed or can just remove. I'll leave empty.
             a.stage_no_momento,
             smart_str(a.criado_por.nome_completo) if a.criado_por else 'N/A',
             smart_str(a.dificuldades),
