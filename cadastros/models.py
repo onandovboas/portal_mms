@@ -649,3 +649,28 @@ class FollowUp(models.Model):
     def __str__(self):
         return f"FollowUp {self.get_tipo_contato_display()} com {self.lead.nome_completo}"
 
+class Despesa(models.Model):
+    CATEGORIA_CHOICES = [
+        ('administrativo', 'Administrativo (Água, Luz, Internet, etc.)'),
+        ('folha_pagamento', 'Folha de Pagamento / Professores'),
+        ('marketing', 'Marketing e Vendas'),
+        ('infraestrutura', 'Infraestrutura e Manutenção'),
+        ('impostos', 'Impostos e Taxas'),
+        ('outro', 'Outro'),
+    ]
+
+    descricao = models.CharField("Descrição / Nome", max_length=200)
+    valor = models.DecimalField("Valor", max_digits=10, decimal_places=2)
+    data_vencimento = models.DateField("Data de Vencimento")
+    data_pagamento = models.DateField("Data de Pagamento", null=True, blank=True)
+    pago = models.BooleanField("Pago?", default=False)
+    categoria = models.CharField("Categoria", max_length=20, choices=CATEGORIA_CHOICES, default='administrativo')
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-data_vencimento']
+
+    def __str__(self):
+        status = "Pago" if self.pago else "Pendente"
+        return f"{self.descricao} - R${self.valor} ({status})"
+

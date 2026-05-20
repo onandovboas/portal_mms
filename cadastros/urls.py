@@ -130,6 +130,7 @@ urlpatterns = [
     # Dashboards de Dados
     path('dashboard/marketing/', views.dashboard_marketing, name='dashboard_marketing'),
     path('dashboard/feedback/', views.dashboard_feedback, name='dashboard_feedback'),
+    path('dashboard/saude/', views.dashboard_saude_view, name='dashboard_saude'),
 
     # Rotas de Envio de Emails
     path('enviar-email/', views.enviar_email_alunos, name='enviar_email_alunos'),

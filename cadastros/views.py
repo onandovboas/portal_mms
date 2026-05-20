@@ -1,11 +1,12 @@
 # cadastros/views.py
 from django.core.paginator import Paginator
 from django.contrib.auth.decorators import login_required
-from .models import Turma, Inscricao, RegistroAula, Professor, Presenca, Pagamento, Contrato, AcompanhamentoFalta, Aluno, Inscricao, RegistroAula, Presenca, Lead, TokenAtualizacaoAluno, AcompanhamentoPedagogico, AlunoProva, Questao, ProvaTemplate, RespostaAluno, PesquisaSatisfacao, AvaliacaoProfessor, AvaliacaoAdministrativo, AvaliacaoPedagogico, FollowUp
+from .models import Turma, Inscricao, RegistroAula, Professor, Presenca, Pagamento, Contrato, AcompanhamentoFalta, Aluno, Inscricao, RegistroAula, Presenca, Lead, TokenAtualizacaoAluno, AcompanhamentoPedagogico, AlunoProva, Questao, ProvaTemplate, RespostaAluno, PesquisaSatisfacao, AvaliacaoProfessor, AvaliacaoAdministrativo, AvaliacaoPedagogico, FollowUp, Despesa
 from .forms import (
     AlunoForm, PagamentoForm, AlunoExperimentalForm, ContratoForm, 
     RegistroAulaForm, LeadForm, AcompanhamentoPedagogicoForm, 
-    LiberarProvaForm, PlanoAulaForm, PesquisaSatisfacaoForm, EsqueciSenhaForm
+    LiberarProvaForm, PlanoAulaForm, PesquisaSatisfacaoForm, EsqueciSenhaForm,
+    DespesaForm
 )
 from django.utils import timezone
 from datetime import date, timedelta
@@ -3083,3 +3084,136 @@ def enviar_email_alunos(request):
         form = EnviarEmailForm()
 
     return render(request, 'cadastros/enviar_email.html', {'form': form})
+
+@login_required
+@admin_required
+def dashboard_saude_view(request):
+    if request.method == 'POST':
+        form = DespesaForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Despesa lançada com sucesso!')
+            # Mantém as datas no redirect, se existirem na URL
+            url_redirect = reverse('cadastros:dashboard_saude')
+            params = request.GET.urlencode()
+            if params:
+                url_redirect += f"?{params}"
+            return redirect(url_redirect)
+    else:
+        form = DespesaForm()
+
+    hoje = timezone.now().date()
+    
+    # Filtro de datas (padrão: mês atual)
+    data_inicio_str = request.GET.get('data_inicio')
+    data_fim_str = request.GET.get('data_fim')
+    
+    if data_inicio_str and data_fim_str:
+        data_inicio = date.fromisoformat(data_inicio_str)
+        data_fim = date.fromisoformat(data_fim_str)
+    else:
+        data_inicio = hoje.replace(day=1)
+        # Último dia do mês
+        prox_mes = data_inicio.replace(day=28) + timedelta(days=4)
+        data_fim = prox_mes - timedelta(days=prox_mes.day)
+
+    # 1. Alunos Ativos
+    alunos_ativos = Aluno.objects.filter(status='ativo').count()
+    
+    # 2. Receita Bruta (status 'pago' e data_pagamento no período)
+    receita_bruta = Pagamento.objects.filter(
+        status='pago',
+        data_pagamento__range=[data_inicio, data_fim]
+    ).aggregate(total=Sum('valor_pago'))['total'] or Decimal('0.00')
+
+    # 3. Despesas Totais
+    despesas_totais = Despesa.objects.filter(
+        pago=True,
+        data_pagamento__range=[data_inicio, data_fim]
+    ).aggregate(total=Sum('valor'))['total'] or Decimal('0.00')
+
+    # 4. Lucro Líquido
+    lucro_liquido = receita_bruta - despesas_totais
+
+    # 5. Ticket Médio
+    ticket_medio = (receita_bruta / Decimal(str(alunos_ativos))) if alunos_ativos > 0 else Decimal('0.00')
+
+    # 6. Churn Rate
+    # Contratos cujo data_fim está no período, ou cujo status virou 'cancelado' 
+    # Como não temos a data exata do cancelamento, usamos os cancelados globalmente
+    # que possam coincidir de alguma forma (tentando inferir pelo status cancelado)
+    # ou os vencidos no período sem renovação, excluindo alunos no Stage 12.
+    
+    contratos_potenciais_churn = Contrato.objects.filter(
+        Q(data_fim__range=[data_inicio, data_fim]) | Q(status='cancelado')
+    ).exclude(
+        aluno__inscricao__turma__stage=12
+    ).values('aluno').distinct()
+    
+    churn_count = 0
+    for c in contratos_potenciais_churn:
+        aluno_id = c['aluno']
+        # Verifica se ele tem algum contrato ativo que vai além do período ou status ativo
+        tem_ativo = Contrato.objects.filter(aluno_id=aluno_id, ativo=True).exists()
+        if not tem_ativo:
+            churn_count += 1
+            
+    total_alunos_inicio = Aluno.objects.filter(data_matricula__lte=data_inicio, status='ativo').count() or 1
+    churn_rate = (churn_count / total_alunos_inicio) * 100
+
+    # 7. LTV
+    churn_decimal = (churn_rate / 100) if churn_rate > 0 else 1
+    ltv = ticket_medio / Decimal(str(churn_decimal)) if churn_decimal > 0 else Decimal('0.00')
+
+    # 8. CAC
+    despesas_mkt = Despesa.objects.filter(
+        categoria='marketing',
+        pago=True,
+        data_pagamento__range=[data_inicio, data_fim]
+    ).aggregate(total=Sum('valor'))['total'] or Decimal('0.00')
+    
+    novos_alunos = Aluno.objects.filter(data_matricula__range=[data_inicio, data_fim]).count()
+    cac = (despesas_mkt / Decimal(str(novos_alunos))) if novos_alunos > 0 else Decimal('0.00')
+
+    # 9. Inadimplência
+    valor_atrasados = Pagamento.objects.filter(
+        status='atrasado',
+        data_vencimento__range=[data_inicio, data_fim]
+    ).aggregate(total=Sum(F('valor') - F('valor_pago')))['total'] or Decimal('0.00')
+    
+    valor_gerado = Pagamento.objects.filter(
+        data_vencimento__range=[data_inicio, data_fim]
+    ).aggregate(total=Sum('valor'))['total'] or Decimal('0.00')
+    
+    inadimplencia = (valor_atrasados / valor_gerado * 100) if valor_gerado > 0 else Decimal('0.00')
+
+    # Preparar dados para o Gráfico de Despesas (Rosca)
+    despesas_por_categoria = Despesa.objects.filter(
+        pago=True,
+        data_pagamento__range=[data_inicio, data_fim]
+    ).values('categoria').annotate(total=Sum('valor'))
+    
+    labels_rosca = []
+    valores_rosca = []
+    dict_categorias = dict(Despesa.CATEGORIA_CHOICES)
+    for d in despesas_por_categoria:
+        labels_rosca.append(dict_categorias.get(d['categoria'], d['categoria']))
+        valores_rosca.append(float(d['total']))
+
+    context = {
+        'form_despesa': form,
+        'data_inicio': data_inicio.isoformat(),
+        'data_fim': data_fim.isoformat(),
+        'alunos_ativos': alunos_ativos,
+        'receita_bruta': receita_bruta,
+        'despesas_totais': despesas_totais,
+        'lucro_liquido': lucro_liquido,
+        'ticket_medio': ticket_medio,
+        'churn_rate': churn_rate,
+        'ltv': ltv,
+        'cac': cac,
+        'inadimplencia': inadimplencia,
+        'labels_rosca': labels_rosca,
+        'valores_rosca': valores_rosca,
+    }
+    return render(request, 'cadastros/dashboard_saude.html', context)

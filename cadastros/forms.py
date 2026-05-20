@@ -1,6 +1,6 @@
 import re
 from django import forms
-from .models import Aluno, Pagamento, Turma, Contrato, RegistroAula, Inscricao, Lead, AcompanhamentoPedagogico, ProvaTemplate, PesquisaSatisfacao
+from .models import Aluno, Pagamento, Turma, Contrato, RegistroAula, Inscricao, Lead, AcompanhamentoPedagogico, ProvaTemplate, PesquisaSatisfacao, Despesa
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -322,3 +322,16 @@ class EnviarEmailForm(forms.Form):
     mensagem = forms.CharField(
         widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 6, 'placeholder': 'Escreva sua mensagem aqui...'})
     )
+
+class DespesaForm(forms.ModelForm):
+    class Meta:
+        model = Despesa
+        fields = ['descricao', 'valor', 'data_vencimento', 'data_pagamento', 'pago', 'categoria']
+        widgets = {
+            'descricao': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Conta de Luz'}),
+            'valor': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'data_vencimento': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'data_pagamento': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'pago': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'categoria': forms.Select(attrs={'class': 'form-select'}),
+        }
