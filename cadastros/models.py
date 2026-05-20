@@ -131,6 +131,7 @@ class Contrato(models.Model):
     data_inicio = models.DateField()
     # 👇 Tornamos o campo verdadeiramente opcional, permitindo valores nulos no banco de dados
     data_fim = models.DateField(null=True, blank=True) 
+    data_cancelamento = models.DateField(null=True, blank=True)
     valor_mensalidade = models.DecimalField(max_digits=7, decimal_places=2)
     valor_matricula = models.DecimalField(max_digits=7, decimal_places=2, default=0)
     parcelas_matricula = models.IntegerField(default=1)

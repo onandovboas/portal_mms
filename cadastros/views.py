@@ -2578,6 +2578,7 @@ def cancelar_contrato(request, pk):
         # 4. Encerra o contrato e cancela cobranças futuras
         contrato.status = 'cancelado'
         contrato.ativo = False
+        contrato.data_cancelamento = hoje
         contrato.save()
         
         # Cancela boletos futuros que ainda não foram pagos
@@ -3086,104 +3087,48 @@ def enviar_email_alunos(request):
     return render(request, 'cadastros/enviar_email.html', {'form': form})
 
 @login_required
-@admin_required
-def dashboard_saude_view(request):
-    if request.method == 'POST':
-        form = DespesaForm(request.POST)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Despesa lançada com sucesso!')
-            # Mantém as datas no redirect, se existirem na URL
-            url_redirect = reverse('cadastros:dashboard_saude')
-            params = request.GET.urlencode()
-            if params:
-                url_redirect += f"?{params}"
-            return redirect(url_redirect)
-    else:
-        form = DespesaForm()
-
+def calc_metricas_saude(data_inicio, data_fim):
     hoje = timezone.now().date()
     
-    # Filtro de datas (padrão: mês atual)
-    data_inicio_str = request.GET.get('data_inicio')
-    data_fim_str = request.GET.get('data_fim')
+    alunos_ativos = Aluno.objects.filter(status='ativo', data_matricula__lte=data_fim).count()
     
-    if data_inicio_str and data_fim_str:
-        data_inicio = date.fromisoformat(data_inicio_str)
-        data_fim = date.fromisoformat(data_fim_str)
-    else:
-        data_inicio = hoje.replace(day=1)
-        # Último dia do mês
-        prox_mes = data_inicio.replace(day=28) + timedelta(days=4)
-        data_fim = prox_mes - timedelta(days=prox_mes.day)
-
-    # 1. Alunos Ativos
-    alunos_ativos = Aluno.objects.filter(status='ativo').count()
-    
-    # 2. Receita Bruta (status 'pago' e data_pagamento no período)
     receita_bruta = Pagamento.objects.filter(
-        status='pago',
-        data_pagamento__range=[data_inicio, data_fim]
+        status='pago', data_pagamento__range=[data_inicio, data_fim]
     ).aggregate(total=Sum('valor_pago'))['total'] or Decimal('0.00')
 
-    # 3. Despesas Totais
     despesas_totais = Despesa.objects.filter(
-        pago=True,
-        data_pagamento__range=[data_inicio, data_fim]
+        pago=True, data_pagamento__range=[data_inicio, data_fim]
     ).aggregate(total=Sum('valor'))['total'] or Decimal('0.00')
 
-    # 4. Lucro Líquido
     lucro_liquido = receita_bruta - despesas_totais
-
-    # 5. Ticket Médio
     ticket_medio = (receita_bruta / Decimal(str(alunos_ativos))) if alunos_ativos > 0 else Decimal('0.00')
 
-    # 6. Churn Rate
-    # Contratos cujo data_fim está no período, ou cujo status virou 'cancelado' 
-    # Como não temos a data exata do cancelamento, usamos os cancelados globalmente
-    # que possam coincidir de alguma forma (tentando inferir pelo status cancelado)
-    # ou os vencidos no período sem renovação, excluindo alunos no Stage 12.
-    
     contratos_potenciais_churn = Contrato.objects.filter(
-        Q(data_fim__range=[data_inicio, data_fim]) | Q(status='cancelado')
-    ).exclude(
-        aluno__inscricao__turma__stage=12
-    ).values('aluno').distinct()
+        Q(data_fim__range=[data_inicio, data_fim], status='finalizado') | 
+        Q(data_cancelamento__range=[data_inicio, data_fim], status='cancelado')
+    ).exclude(aluno__inscricao__turma__stage=12).values('aluno').distinct()
     
     churn_count = 0
     for c in contratos_potenciais_churn:
-        aluno_id = c['aluno']
-        # Verifica se ele tem algum contrato ativo que vai além do período ou status ativo
-        tem_ativo = Contrato.objects.filter(aluno_id=aluno_id, ativo=True).exists()
+        tem_ativo = Contrato.objects.filter(aluno_id=c['aluno'], ativo=True).exists()
         if not tem_ativo:
             churn_count += 1
             
     total_alunos_inicio = Aluno.objects.filter(data_matricula__lte=data_inicio, status='ativo').count() or 1
     churn_rate = (churn_count / total_alunos_inicio) * 100
 
-    # 7. LTV
     churn_decimal = (churn_rate / 100) if churn_rate > 0 else 1
     ltv = ticket_medio / Decimal(str(churn_decimal)) if churn_decimal > 0 else Decimal('0.00')
 
-    # 8. CAC
     despesas_mkt = Despesa.objects.filter(
-        categoria='marketing',
-        pago=True,
-        data_pagamento__range=[data_inicio, data_fim]
+        categoria='marketing', pago=True, data_pagamento__range=[data_inicio, data_fim]
     ).aggregate(total=Sum('valor'))['total'] or Decimal('0.00')
     
     novos_alunos = Aluno.objects.filter(data_matricula__range=[data_inicio, data_fim]).count()
     cac = (despesas_mkt / Decimal(str(novos_alunos))) if novos_alunos > 0 else Decimal('0.00')
 
-    # 9. Inadimplência e Valores a Receber
     valor_atrasados = Pagamento.objects.filter(
         Q(status='atrasado') | (Q(status__in=['pendente', 'parcial']) & Q(data_vencimento__lt=hoje)),
-        data_vencimento__range=[data_inicio, data_fim]
-    ).aggregate(total=Sum(F('valor') - F('valor_pago')))['total'] or Decimal('0.00')
-    
-    valor_pendente_no_prazo = Pagamento.objects.filter(
-        status__in=['pendente', 'parcial'],
-        data_vencimento__gte=hoje,
         data_vencimento__range=[data_inicio, data_fim]
     ).aggregate(total=Sum(F('valor') - F('valor_pago')))['total'] or Decimal('0.00')
     
@@ -3192,15 +3137,103 @@ def dashboard_saude_view(request):
     ).exclude(status='cancelado').aggregate(total=Sum('valor'))['total'] or Decimal('0.00')
     
     inadimplencia = (valor_atrasados / valor_gerado * 100) if valor_gerado > 0 else Decimal('0.00')
+    
+    valor_pendente_no_prazo = Pagamento.objects.filter(
+        status__in=['pendente', 'parcial'],
+        data_vencimento__gte=hoje,
+        data_vencimento__range=[data_inicio, data_fim]
+    ).aggregate(total=Sum(F('valor') - F('valor_pago')))['total'] or Decimal('0.00')
 
-    # Preparar dados para o Gráfico de Despesas (Rosca)
+    return {
+        'alunos_ativos': alunos_ativos, 'receita_bruta': receita_bruta,
+        'despesas_totais': despesas_totais, 'lucro_liquido': lucro_liquido,
+        'ticket_medio': ticket_medio, 'churn_rate': churn_rate, 'ltv': ltv,
+        'cac': cac, 'inadimplencia': inadimplencia, 'valor_atrasados': valor_atrasados,
+        'valor_pendente_no_prazo': valor_pendente_no_prazo
+    }
+
+@login_required
+@admin_required
+def dashboard_saude_view(request):
+    if request.method == 'POST':
+        form = DespesaForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Despesa lançada com sucesso!')
+            url_redirect = reverse('cadastros:dashboard_saude')
+            params = request.GET.urlencode()
+            if params: url_redirect += f"?{params}"
+            return redirect(url_redirect)
+    else:
+        form = DespesaForm()
+
+    hoje = timezone.now().date()
+    data_inicio_str = request.GET.get('data_inicio')
+    data_fim_str = request.GET.get('data_fim')
+    
+    if data_inicio_str and data_fim_str:
+        data_inicio = date.fromisoformat(data_inicio_str)
+        data_fim = date.fromisoformat(data_fim_str)
+    else:
+        # Default para os últimos 6 meses (para mostrar o gráfico histórico bonito por padrão)
+        data_inicio = (hoje - relativedelta(months=5)).replace(day=1)
+        prox_mes = hoje.replace(day=28) + timedelta(days=4)
+        data_fim = prox_mes - timedelta(days=prox_mes.day)
+
+    # 1. Atual
+    atual = calc_metricas_saude(data_inicio, data_fim)
+    
+    # 2. Comparativo
+    delta_days = (data_fim - data_inicio).days
+    data_fim_ant = data_inicio - timedelta(days=1)
+    data_inicio_ant = data_fim_ant - timedelta(days=delta_days)
+    anterior = calc_metricas_saude(data_inicio_ant, data_fim_ant)
+    
+    def calc_delta(val_atual, val_ant):
+        va = float(val_ant)
+        vu = float(val_atual)
+        if va == 0: return 100.0 if vu > 0 else 0.0
+        return ((vu - va) / abs(va)) * 100
+
+    deltas = {
+        'lucro_liquido': calc_delta(atual['lucro_liquido'], anterior['lucro_liquido']),
+        'alunos_ativos': calc_delta(atual['alunos_ativos'], anterior['alunos_ativos']),
+        'churn_rate': calc_delta(atual['churn_rate'], anterior['churn_rate']),
+        'inadimplencia': calc_delta(atual['inadimplencia'], anterior['inadimplencia']),
+        'ltv': calc_delta(atual['ltv'], anterior['ltv']),
+        'cac': calc_delta(atual['cac'], anterior['cac']),
+        'receita_bruta': calc_delta(atual['receita_bruta'], anterior['receita_bruta']),
+        'despesas_totais': calc_delta(atual['despesas_totais'], anterior['despesas_totais']),
+    }
+    
+    # 3. Gráfico Histórico
+    meses_historico = []
+    dados_historico = {'churn': [], 'despesas': [], 'lucro': [], 'inadimplencia': []}
+    
+    curr = data_inicio.replace(day=1)
+    contador = 0
+    while curr <= data_fim and contador < 12:
+        nxt_month = (curr + timedelta(days=32)).replace(day=1)
+        fim_mes = nxt_month - timedelta(days=1)
+        if fim_mes > data_fim: fim_mes = data_fim
+            
+        m_dados = calc_metricas_saude(curr, fim_mes)
+        
+        meses_historico.append(curr.strftime('%b/%Y'))
+        dados_historico['churn'].append(float(m_dados['churn_rate']))
+        dados_historico['despesas'].append(float(m_dados['despesas_totais']))
+        dados_historico['lucro'].append(float(m_dados['lucro_liquido']))
+        dados_historico['inadimplencia'].append(float(m_dados['inadimplencia']))
+        
+        curr = nxt_month
+        contador += 1
+
+    # 4. Gráfico Rosca
     despesas_por_categoria = Despesa.objects.filter(
-        pago=True,
-        data_pagamento__range=[data_inicio, data_fim]
+        pago=True, data_pagamento__range=[data_inicio, data_fim]
     ).values('categoria').annotate(total=Sum('valor'))
     
-    labels_rosca = []
-    valores_rosca = []
+    labels_rosca, valores_rosca = [], []
     dict_categorias = dict(Despesa.CATEGORIA_CHOICES)
     for d in despesas_por_categoria:
         labels_rosca.append(dict_categorias.get(d['categoria'], d['categoria']))
@@ -3210,18 +3243,11 @@ def dashboard_saude_view(request):
         'form_despesa': form,
         'data_inicio': data_inicio.isoformat(),
         'data_fim': data_fim.isoformat(),
-        'alunos_ativos': alunos_ativos,
-        'receita_bruta': receita_bruta,
-        'despesas_totais': despesas_totais,
-        'lucro_liquido': lucro_liquido,
-        'ticket_medio': ticket_medio,
-        'churn_rate': churn_rate,
-        'ltv': ltv,
-        'cac': cac,
-        'inadimplencia': inadimplencia,
-        'valor_atrasados': valor_atrasados,
-        'valor_pendente_no_prazo': valor_pendente_no_prazo,
+        'atual': atual,
+        'deltas': deltas,
         'labels_rosca': labels_rosca,
         'valores_rosca': valores_rosca,
+        'meses_historico': meses_historico,
+        'dados_historico': dados_historico,
     }
     return render(request, 'cadastros/dashboard_saude.html', context)
