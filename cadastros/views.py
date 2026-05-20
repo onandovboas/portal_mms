@@ -3175,15 +3175,21 @@ def dashboard_saude_view(request):
     novos_alunos = Aluno.objects.filter(data_matricula__range=[data_inicio, data_fim]).count()
     cac = (despesas_mkt / Decimal(str(novos_alunos))) if novos_alunos > 0 else Decimal('0.00')
 
-    # 9. Inadimplência
+    # 9. Inadimplência e Valores a Receber
     valor_atrasados = Pagamento.objects.filter(
-        status='atrasado',
+        Q(status='atrasado') | (Q(status__in=['pendente', 'parcial']) & Q(data_vencimento__lt=hoje)),
+        data_vencimento__range=[data_inicio, data_fim]
+    ).aggregate(total=Sum(F('valor') - F('valor_pago')))['total'] or Decimal('0.00')
+    
+    valor_pendente_no_prazo = Pagamento.objects.filter(
+        status__in=['pendente', 'parcial'],
+        data_vencimento__gte=hoje,
         data_vencimento__range=[data_inicio, data_fim]
     ).aggregate(total=Sum(F('valor') - F('valor_pago')))['total'] or Decimal('0.00')
     
     valor_gerado = Pagamento.objects.filter(
         data_vencimento__range=[data_inicio, data_fim]
-    ).aggregate(total=Sum('valor'))['total'] or Decimal('0.00')
+    ).exclude(status='cancelado').aggregate(total=Sum('valor'))['total'] or Decimal('0.00')
     
     inadimplencia = (valor_atrasados / valor_gerado * 100) if valor_gerado > 0 else Decimal('0.00')
 
@@ -3213,6 +3219,8 @@ def dashboard_saude_view(request):
         'ltv': ltv,
         'cac': cac,
         'inadimplencia': inadimplencia,
+        'valor_atrasados': valor_atrasados,
+        'valor_pendente_no_prazo': valor_pendente_no_prazo,
         'labels_rosca': labels_rosca,
         'valores_rosca': valores_rosca,
     }
