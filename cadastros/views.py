@@ -3086,7 +3086,6 @@ def enviar_email_alunos(request):
 
     return render(request, 'cadastros/enviar_email.html', {'form': form})
 
-@login_required
 def calc_metricas_saude(data_inicio, data_fim):
     hoje = timezone.now().date()
     
